@@ -4,10 +4,11 @@ This document describes the three new API endpoints developed for the Dulaan Bac
 
 ## Overview
 
-The backend provides three main API endpoints:
+The backend provides four main API endpoints:
 1. **Speech-to-Text API** - Convert audio to text using Google Cloud Speech-to-Text
-2. **User Data Storage API** - Store user information and device fingerprints
-3. **User Consent API** - Store and manage user consent preferences
+2. **Speech-to-Text with LLM API** - Convert audio to text and process with Google Gemini LLM
+3. **User Data Storage API** - Store user information and device fingerprints
+4. **User Consent API** - Store and manage user consent preferences
 
 All endpoints are deployed to the `europe-west1` region and support CORS for web applications.
 
@@ -201,7 +202,172 @@ curl -X POST "https://europe-west1-dulaan-backend.cloudfunctions.net/speechToTex
 
 ---
 
-## 2. User Data Storage API
+## 2. Speech-to-Text with LLM API
+
+### Endpoint
+`POST /speechToTextWithLLM`
+
+### Description
+Converts audio content to text using Google Cloud Speech-to-Text API, then processes the transcript with Google Gemini LLM for adaptive motor control. This endpoint is specifically designed for adult toy control applications.
+
+### Request Headers
+```
+Content-Type: application/json
+```
+
+### Request Body
+```json
+{
+  "msgHis": [],                                 // Required: Message history array
+  "audioContent": "base64-encoded-audio-data",  // Required if audioUri not provided
+  "audioUri": "gs://bucket/audio-file.wav",     // Required if audioContent not provided
+  "currentPwm": 128,                           // Required: Current PWM value (0-255)
+  "geminiApiKey": "your-gemini-api-key",       // Required: Google Gemini API key
+  "encoding": "WEBM_OPUS",                     // Optional, default: "WEBM_OPUS"
+  "sampleRateHertz": 48000,                    // Optional, default: 48000
+  "languageCode": "en-US"                      // Optional, enables automatic detection if omitted
+}
+```
+
+### Request Parameters
+
+- `msgHis`: Array of conversation history messages in Gemini format
+- `audioContent`: Base64-encoded audio data
+- `audioUri`: Google Cloud Storage URI for audio file
+- `currentPwm`: Current PWM value (0-255 integer)
+- `geminiApiKey`: Google Gemini API key (can also be set as GEMINI_API_KEY environment variable)
+- `encoding`: Audio encoding format
+- `sampleRateHertz`: Audio sample rate
+- `languageCode`: Language for speech recognition (auto-detected if omitted)
+
+### Message History Format
+
+The `msgHis` array follows Google Gemini's conversation format:
+```json
+[
+  {
+    "role": "user",
+    "parts": [{ "text": "{\"user_command\": \"increase speed\", \"current_pwm\": 100}" }]
+  },
+  {
+    "role": "model", 
+    "parts": [{ "text": "150" }]
+  }
+]
+```
+
+### Processing Logic
+
+1. **Speech Recognition**: Converts audio to text with automatic language detection
+2. **Message History Management**: 
+   - Resets msgHis if empty or >13 messages
+   - Adds new user message with transcript and current PWM
+3. **LLM Processing**: Sends updated msgHis to Google Gemini for PWM value generation
+4. **Response Integration**: Adds LLM response to msgHis and returns complete conversation
+
+### Response
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "transcript": "increase the speed a little bit",
+  "currentPwm": 100,
+  "newPwmValue": "150",
+  "msgHis": [
+    {
+      "role": "user",
+      "parts": [{ "text": "{\"user_command\": \"increase the speed a little bit\", \"current_pwm\": 100}" }]
+    },
+    {
+      "role": "model",
+      "parts": [{ "text": "150" }]
+    }
+  ],
+  "detectedLanguage": "en-US",
+  "autoDetected": true
+}
+```
+
+**Error (400/500):**
+```json
+{
+  "success": false,
+  "error": "Error description",
+  "details": "Detailed error message"
+}
+```
+
+### System Instruction
+
+The LLM uses this system instruction for motor control:
+
+```
+# System Role
+You are an adaptive motor control engine for adult toys, combining **natural language instructions** and **current real-time PWM value** to generate one PWM value. 
+if you don't understand **natural language instructions**, just return **current real-time PWM value**.
+**Output Restriction**: Return ONLY the PWM value.
+
+# Input Specification
+"user_command": "String",          // natural language instruction
+"current_pwm": 0-255 integer       // current real-time PWM value
+
+# Output Specification
+0-255 integer   // (ONLY this field)
+```
+
+### Example Usage
+
+**JavaScript/Fetch:**
+```javascript
+const audioBlob = new Blob([audioData], { type: 'audio/webm' });
+const reader = new FileReader();
+reader.onload = async function() {
+  const base64Audio = reader.result.split(',')[1];
+  
+  const response = await fetch('/speechToTextWithLLM', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      msgHis: [], // Empty for first message
+      audioContent: base64Audio,
+      currentPwm: 100,
+      geminiApiKey: 'your-gemini-api-key'
+    })
+  });
+  
+  const result = await response.json();
+  console.log('Transcript:', result.transcript);
+  console.log('New PWM Value:', result.newPwmValue);
+  console.log('Updated Message History:', result.msgHis);
+};
+reader.readAsDataURL(audioBlob);
+```
+
+**cURL:**
+```bash
+curl -X POST "https://europe-west1-dulaan-backend.cloudfunctions.net/speechToTextWithLLM" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "msgHis": [],
+    "audioContent": "base64-encoded-audio-data",
+    "currentPwm": 128,
+    "geminiApiKey": "your-gemini-api-key"
+  }'
+```
+
+### Security Considerations
+
+- **API Key Security**: Store Gemini API key securely, preferably as environment variable
+- **Input Validation**: All inputs are validated before processing
+- **Content Safety**: Safety settings are configured to allow adult content processing
+- **Rate Limiting**: Consider implementing rate limiting for production use
+
+---
+
+## 3. User Data Storage API
 
 ### Endpoint
 `POST /storeUserData`
@@ -306,7 +472,7 @@ console.log('User data stored:', result);
 
 ---
 
-## 3. User Consent API
+## 4. User Consent API
 
 ### Endpoints
 
