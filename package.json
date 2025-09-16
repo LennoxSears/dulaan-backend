@@ -1,0 +1,38 @@
+{
+  "name": "functions-samples",
+  "version": "1.0.0",
+  "description": "Samples for Cloud Functions for Firebase",
+  "author": "Firebase (https://firebase.google.com/)",
+  "license": "Apache-2.0",
+  "scripts": {
+    "bootstrap": "pnpm --recursive install",
+    "bootstrap-1st-gen": "pnpm --recursive --filter  \"./Node-1st-gen/**\" install",
+    "bootstrap-2nd-gen": "pnpm --recursive --filter  \"./Node/**\" install",
+    "lint-1st-gen": "pnpm --recursive --filter  \"./Node-1st-gen/**\" run lint",
+    "lint-2nd-gen": "pnpm --recursive --filter  \"./Node/**\" run lint",
+    "test-1st-gen": "pnpm --recursive --filter  \"./Node-1st-gen/**\" run test ",
+    "test-2nd-gen": "pnpm --recursive --filter  \"./Node/**\" run test ",
+    "compile-1st-gen": "pnpm --recursive --filter  \"./Node-1st-gen/**\" run compile ",
+    "compile-2nd-gen": "pnpm --recursive --filter  \"./Node/**\" run compile "
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1",
+    "pnpm": "^9.15.4",
+    "typescript": "^5.0.4"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "ignoreMissing": [
+        "@firebase/app-compat",
+        "@firebase/app-types"
+      ]
+    }
+  },
+  "dependencies": {
+    "firebase-admin": "^13.5.0",
+    "firebase-functions": "^6.4.0"
+  }
+}
