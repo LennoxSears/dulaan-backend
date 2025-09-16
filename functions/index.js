@@ -82,16 +82,31 @@ exports.speechToText = onRequest(
                 });
             }
 
-            // Configure the speech recognition request
-            const request = {
-                config: {
-                    encoding: req.body.encoding || 'WEBM_OPUS',
-                    sampleRateHertz: req.body.sampleRateHertz || 48000,
-                    languageCode: req.body.languageCode || 'en-US',
-                    enableAutomaticPunctuation: true,
-                    model: 'latest_long'
-                }
+            // Configure the speech recognition request with automatic language detection
+            const config = {
+                encoding: req.body.encoding || 'WEBM_OPUS',
+                sampleRateHertz: req.body.sampleRateHertz || 48000,
+                enableAutomaticPunctuation: true,
+                model: 'latest_long'
             };
+
+            // If languageCode is provided, use it; otherwise enable automatic language detection
+            if (req.body.languageCode) {
+                config.languageCode = req.body.languageCode;
+            } else {
+                // Enable automatic language detection by providing multiple language codes
+                config.languageCode = 'en-US'; // Primary language (required)
+                config.alternativeLanguageCodes = [
+                    'en-GB', 'es-ES', 'fr-FR', 'de-DE', 'it-IT', 'pt-PT', 
+                    'ru-RU', 'ja-JP', 'ko-KR', 'zh-CN', 'zh-TW', 'ar-SA', 
+                    'hi-IN', 'nl-NL', 'sv-SE', 'da-DK', 'no-NO', 'fi-FI', 
+                    'pl-PL', 'cs-CZ', 'hu-HU', 'tr-TR', 'he-IL', 'th-TH',
+                    'vi-VN', 'id-ID', 'ms-MY', 'tl-PH', 'uk-UA', 'bg-BG',
+                    'hr-HR', 'sk-SK', 'sl-SI', 'et-EE', 'lv-LV', 'lt-LT'
+                ];
+            }
+
+            const request = { config };
 
             // Add audio content based on input type
             if (req.body.audioContent) {
@@ -112,17 +127,25 @@ exports.speechToText = onRequest(
                 .map(result => result.alternatives[0].transcript)
                 .join('\n');
 
+            // Extract detected language information
+            const detectedLanguage = response.results[0]?.languageCode || null;
+            const languageConfidence = response.results[0]?.alternatives[0]?.confidence || 0;
+
             // Log the transcription for debugging
             logger.log('Speech-to-text transcription completed', {
                 transcriptionLength: transcription.length,
-                resultsCount: response.results.length
+                resultsCount: response.results.length,
+                detectedLanguage: detectedLanguage,
+                confidence: languageConfidence
             });
 
-            // Return the transcription
+            // Return the transcription with language detection info
             res.json({
                 success: true,
                 transcription: transcription,
-                confidence: response.results[0]?.alternatives[0]?.confidence || 0,
+                confidence: languageConfidence,
+                detectedLanguage: detectedLanguage,
+                autoDetected: !req.body.languageCode, // Indicates if language was auto-detected
                 results: response.results
             });
 

@@ -45,7 +45,7 @@ Content-Type: application/json
   "audioUri": "gs://bucket/audio-file.wav",     // Required if audioContent not provided
   "encoding": "WEBM_OPUS",                      // Optional, default: "WEBM_OPUS"
   "sampleRateHertz": 48000,                     // Optional, default: 48000
-  "languageCode": "en-US"                       // Optional, default: "en-US"
+  "languageCode": "en-US"                       // Optional, enables automatic detection if omitted
 }
 ```
 
@@ -59,13 +59,50 @@ Content-Type: application/json
 - `OGG_OPUS`
 - `SPEEX_WITH_HEADER_BYTE`
 
-### Supported Language Codes
-- `en-US` (English - US)
-- `en-GB` (English - UK)
+### Language Detection
+
+**Automatic Language Detection**: If `languageCode` is not provided, the API automatically detects the language from a comprehensive list of supported languages including:
+
+- `en-US`, `en-GB` (English)
 - `es-ES` (Spanish)
-- `fr-FR` (French)
+- `fr-FR` (French) 
 - `de-DE` (German)
+- `it-IT` (Italian)
+- `pt-PT` (Portuguese)
+- `ru-RU` (Russian)
+- `ja-JP` (Japanese)
+- `ko-KR` (Korean)
+- `zh-CN`, `zh-TW` (Chinese)
+- `ar-SA` (Arabic)
+- `hi-IN` (Hindi)
+- `nl-NL` (Dutch)
+- `sv-SE` (Swedish)
+- `da-DK` (Danish)
+- `no-NO` (Norwegian)
+- `fi-FI` (Finnish)
+- `pl-PL` (Polish)
+- `cs-CZ` (Czech)
+- `hu-HU` (Hungarian)
+- `tr-TR` (Turkish)
+- `he-IL` (Hebrew)
+- `th-TH` (Thai)
+- `vi-VN` (Vietnamese)
+- `id-ID` (Indonesian)
+- `ms-MY` (Malay)
+- `tl-PH` (Filipino)
+- `uk-UA` (Ukrainian)
 - And many more...
+
+**Manual Language Selection**: You can still specify a `languageCode` to force recognition in a specific language.
+
+### Response Fields
+
+- `success`: Boolean indicating if the request was successful
+- `transcription`: The transcribed text from the audio
+- `confidence`: Confidence score for the transcription (0.0 to 1.0)
+- `detectedLanguage`: The language code detected by the API (e.g., "en-US", "fr-FR")
+- `autoDetected`: Boolean indicating if language was automatically detected (true) or manually specified (false)
+- `results`: Full results array from Google Cloud Speech-to-Text API
 
 ### Response
 
@@ -75,6 +112,8 @@ Content-Type: application/json
   "success": true,
   "transcription": "Hello, this is the transcribed text.",
   "confidence": 0.95,
+  "detectedLanguage": "en-US",
+  "autoDetected": true,
   "results": [
     {
       "alternatives": [
@@ -82,7 +121,8 @@ Content-Type: application/json
           "transcript": "Hello, this is the transcribed text.",
           "confidence": 0.95
         }
-      ]
+      ],
+      "languageCode": "en-US"
     }
   ]
 }
@@ -99,7 +139,7 @@ Content-Type: application/json
 
 ### Example Usage
 
-**JavaScript/Fetch:**
+**JavaScript/Fetch (with automatic language detection):**
 ```javascript
 const audioBlob = new Blob([audioData], { type: 'audio/webm' });
 const reader = new FileReader();
@@ -112,24 +152,50 @@ reader.onload = async function() {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      audioContent: base64Audio,
-      languageCode: 'en-US'
+      audioContent: base64Audio
+      // languageCode omitted for automatic detection
     })
   });
   
   const result = await response.json();
   console.log('Transcription:', result.transcription);
+  console.log('Detected Language:', result.detectedLanguage);
+  console.log('Auto-detected:', result.autoDetected);
 };
 reader.readAsDataURL(audioBlob);
 ```
 
-**cURL:**
+**JavaScript/Fetch (with specific language):**
+```javascript
+// Force specific language recognition
+const response = await fetch('/speechToText', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    audioContent: base64Audio,
+    languageCode: 'es-ES' // Force Spanish recognition
+  })
+});
+```
+
+**cURL (automatic language detection):**
+```bash
+curl -X POST "https://europe-west1-dulaan-backend.cloudfunctions.net/speechToText" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "audioContent": "base64-encoded-audio-data"
+  }'
+```
+
+**cURL (specific language):**
 ```bash
 curl -X POST "https://europe-west1-dulaan-backend.cloudfunctions.net/speechToText" \
   -H "Content-Type: application/json" \
   -d '{
     "audioContent": "base64-encoded-audio-data",
-    "languageCode": "en-US"
+    "languageCode": "fr-FR"
   }'
 ```
 
@@ -168,6 +234,15 @@ Content-Type: application/json
   }
 }
 ```
+
+### Response Fields
+
+- `success`: Boolean indicating if the request was successful
+- `transcription`: The transcribed text from the audio
+- `confidence`: Confidence score for the transcription (0.0 to 1.0)
+- `detectedLanguage`: The language code detected by the API (e.g., "en-US", "fr-FR")
+- `autoDetected`: Boolean indicating if language was automatically detected (true) or manually specified (false)
+- `results`: Full results array from Google Cloud Speech-to-Text API
 
 ### Response
 
