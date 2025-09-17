@@ -53,7 +53,7 @@ echo "🚀 Deploying to App Engine..."
 gcloud app deploy app.yaml --quiet
 
 # Get the deployed URL
-APP_URL=$(gcloud app browse --service=peerjs-server --no-launch-browser)
+APP_URL=$(gcloud app browse --service=default --no-launch-browser)
 echo "✅ Deployment successful!"
 echo "🌐 PeerJS Server URL: $APP_URL"
 echo "🔗 PeerJS Endpoint: $APP_URL/peerjs"
@@ -64,7 +64,7 @@ if curl -s "$APP_URL" | grep -q "Dulaan PeerJS Server"; then
     echo "✅ Server is responding correctly!"
 else
     echo "⚠️  Server might not be fully ready yet. Please check the logs:"
-    echo "   gcloud app logs tail --service=peerjs-server"
+    echo "   gcloud app logs tail --service=default"
 fi
 
 echo ""
@@ -72,5 +72,5 @@ echo "🎉 Deployment complete!"
 echo ""
 echo "Next steps:"
 echo "1. Update your client code to use: $APP_URL/peerjs"
-echo "2. Monitor logs: gcloud app logs tail --service=peerjs-server"
+echo "2. Monitor logs: gcloud app logs tail --service=default"
 echo "3. View in console: https://console.cloud.google.com/appengine/services"

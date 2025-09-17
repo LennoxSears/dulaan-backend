@@ -74,7 +74,7 @@ The server only handles signaling; actual data flows directly between peers.
 
 3. **Enable App Engine:**
    ```bash
-   gcloud app create --region=us-central1
+   gcloud app create --region=europe-west1
    ```
 
 ### Deploy

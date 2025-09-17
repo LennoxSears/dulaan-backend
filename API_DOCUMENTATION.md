@@ -799,7 +799,7 @@ cd peerjs-server
 ### Monitoring
 
 Monitor the PeerJS server through Google Cloud Console:
-- **Logs**: `gcloud app logs tail --service=peerjs-server`
+- **Logs**: `gcloud app logs tail --service=default`
 - **Metrics**: CPU, memory, and connection count
 - **Health**: Automatic health checks and alerting
 
