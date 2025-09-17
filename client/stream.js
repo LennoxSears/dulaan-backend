@@ -151,132 +151,89 @@ const packageSpeechSegment = async () => {
     window.AUDIO_STATE.isSpeaking = false;
     window.AUDIO_STATE.silenceCounter = 0;
 
-    let transcript = null
     try {
-        transcript = await recognizePCM(int16Data);
-        console.log("[识别结果]", transcript);
-    } catch (error) {
-        console.error("[识别失败]", error);
-    }
+        // Convert Int16Array to base64 for our API
+        const uint8Array = new Uint8Array(int16Data.buffer);
+        const base64Audio = btoa(String.fromCharCode.apply(null, uint8Array));
 
-    if (transcript) {
-        try {
-            let PWM_result = await recognizePWM(transcript, window.current_pwm);
-            window.aiValue = Number(PWM_result)
-            console.log("[PWM结果]", PWM_result);
-            if (window.aiValue < 256 && window.aiValue > -1) {
-                window.current_pwm = window.aiValue
-                window.dulaan.write(window.current_pwm)
+        // Use our integrated speech-to-text with LLM API
+        const result = await window.dulaan.speechToTextWithLLM(
+            base64Audio,
+            window.current_pwm,
+            window.msgHis,
+            {
+                encoding: 'LINEAR16',
+                sampleRateHertz: 16000
             }
-        } catch (error) {
-            console.error("[PWM失败]", error);
+        );
+
+        console.log("[识别结果]", result.transcript);
+        console.log("[PWM结果]", result.newPwmValue);
+
+        // Update message history
+        window.msgHis = result.msgHis;
+        
+        const pwmValue = Number(result.newPwmValue);
+        if (pwmValue < 256 && pwmValue > -1) {
+            window.aiValue = pwmValue;
+            window.current_pwm = pwmValue;
+            
+            // Check if this is a remote user
+            if (window.remoteControl.isRemote) {
+                // Send command to host instead of local control
+                window.remoteControl.sendControlCommand('ai', pwmValue, {
+                    transcript: result.transcript,
+                    confidence: result.confidence
+                });
+            } else {
+                // Local control or host receiving remote command
+                window.dulaan.write(window.current_pwm);
+            }
         }
+    } catch (error) {
+        console.error("[语音处理失败]", error);
     }
 };
 
 const recognizePCM = async (int16Data) => {
-    // 1. 构造API参数（必须声明PCM格式参数）
-    const apiUrl = new URL('https://api.deepgram.com/v1/listen');
-    apiUrl.searchParams.append('smart_format', 'true');
-    apiUrl.searchParams.append('model', 'nova-3');
-    apiUrl.searchParams.append('encoding', 'linear16'); // ✅ 必须声明编码格式
-    apiUrl.searchParams.append('sample_rate', '16000'); // ✅ 必须声明采样率
-    apiUrl.searchParams.append('channels', '1'); // ✅ 必须声明声道数
-    apiUrl.searchParams.append('language', 'multi');
-    apiUrl.searchParams.append('paragraphs', 'true');
-    // 2. 直接发送PCM二进制数据（等效curl --data-binary）
-    const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Token ca5f25d0f72b2fd7e5bceb21abcaefb297f8bbe0`, // 替换实际API密钥
-            'Content-Type': 'application/octet-stream' // ✅ 声明原始二进制类型
-        },
-        body: int16Data.buffer // ⭐ 直接传递ArrayBuffer（PCM原始数据）
-    });
+    try {
+        // Convert Int16Array to base64 for our API
+        const uint8Array = new Uint8Array(int16Data.buffer);
+        const base64Audio = btoa(String.fromCharCode.apply(null, uint8Array));
 
-    // 3. 错误处理（含HTTP状态码和Deepgram错误消息）
-    if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`Deepgram错误 ${response.status}: ${errorBody}`);
+        // Use our new speech-to-text API
+        const result = await window.dulaan.speechToText(base64Audio, {
+            encoding: 'LINEAR16',
+            sampleRateHertz: 16000
+        });
+
+        return result.transcription;
+    } catch (error) {
+        console.error('Speech recognition error:', error);
+        throw error;
     }
-
-    // 4. 解析响应
-    const result = await response.json();
-    return result.results.channels[0].alternatives[0].transcript;
 };
 
 const recognizePWM = async (transcript, pwm) => {
-    if (window.msgHis.length == 0 || window.msgHis.length > 13) {
-        window.msgHis = [
-            {
-                role: 'user',
-                parts: [{ text: JSON.stringify({ user_command: transcript, current_pwm: pwm }) }]
-            }
-        ]
+    try {
+        // Convert Int16Array to base64 for our API (if needed)
+        // For this function, we already have the transcript, so we can use it directly
+        
+        // Use our new speech-to-text with LLM API
+        const result = await window.dulaan.speechToTextWithLLM(
+            null, // No audio content needed since we already have transcript
+            pwm,
+            window.msgHis
+        );
+
+        // Update message history
+        window.msgHis = result.msgHis;
+        
+        return result.newPwmValue;
+    } catch (error) {
+        console.error('PWM recognition error:', error);
+        throw error;
     }
-    else {
-        window.msgHis.push(
-            {
-                role: 'user',
-                parts: [{ text: JSON.stringify({ user_command: transcript, current_pwm: pwm }) }]
-            }
-        )
-    }
-
-    const API_KEY = 'AQ.Ab8RN6KGpvk0TlA0Z1nwdrQ-FH2v2WIk1hrnBjixpurRp6YtuA';          // 替换成真实 key
-    const MODEL_ID = 'gemini-2.5-flash';
-
-    const requestBody = {
-        contents: window.msgHis,
-        systemInstruction: {
-            parts: [{
-                text: `# System Role
-You are an adaptive motor control engine for adult toys, combining **natural language instructions** and **current real-time PWM value** to generate one PWM value. 
-if you don't understand  **natural language instructions**, just return **current real-time PWM value**.
-**Output Restriction**: Return ONLY the PWM value.
-
-# Input Specification
-"user_command": "String",          // natural language instruction
-"current_pwm": 0-255 integer       // current real-time PWM value
-
-# Output Specification
-0-255 integer   // (ONLY this field)`
-            }]
-        },
-        generationConfig: {
-            temperature: 1,
-            maxOutputTokens: 65535,
-            topP: 1,
-            thinkingConfig: { thinkingBudget: -1 }
-        },
-        safetySettings: [
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'OFF' },
-            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'OFF' },
-            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'OFF' },
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'OFF' }
-        ]
-    };
-
-    const response = await fetch(
-        `https://aiplatform.googleapis.com/v1/publishers/google/models/${MODEL_ID}:streamGenerateContent?key=${API_KEY}`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        }
-    )
-
-    // 3. 错误处理（含HTTP状态码和Deepgram错误消息）
-    if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`Gemini错误 ${response.status}: ${errorBody}`);
-    }
-
-    // 4. 解析响应
-    const result = await response.json();
-    window.msgHis.push(result[0].candidates[0].content)
-    console.log(result[0].candidates[0].content.parts[0].text)
-    return result[0].candidates[0].content.parts[0].text
 };
 
 // ===== 6. 音频分块处理（核心逻辑） =====
@@ -383,7 +340,17 @@ window.startAbi = async () => {
         let value = Number(audio2PWM(maxEnergy))
         if (value > 0) {
             window.current_pwm = value
-            window.dulaan.write(window.current_pwm)
+            
+            // Check if this is a remote user
+            if (window.remoteControl.isRemote) {
+                // Send command to host instead of local control
+                window.remoteControl.sendControlCommand('ambient', value, {
+                    energy: window.AUDIO_STATE.lastRMS
+                });
+            } else {
+                // Local control or host receiving remote command
+                window.dulaan.write(window.current_pwm);
+            }
         }
     }, 100);
 }
@@ -405,13 +372,153 @@ window.startTouch = async () => {
     window.current_pwm = Math.round((window.touchValue / 100) * 255)
     window.syncInterval = setInterval(() => {
         window.current_pwm = Math.round((window.touchValue / 100) * 255)
-        window.dulaan.write(window.current_pwm)
+        
+        // Check if this is a remote user
+        if (window.remoteControl.isRemote) {
+            // Send command to host instead of local control
+            window.remoteControl.sendControlCommand('touch', window.current_pwm, {
+                touchValue: window.touchValue
+            });
+        } else {
+            // Local control or host receiving remote command
+            window.dulaan.write(window.current_pwm);
+        }
     }, 100);
 }
 
 window.stopTouch = async () => {
     console.log("[状态] TouchMode已停止");
     window.current_pwm = 0
-    window.dulaan.write(window.current_pwm)
+    
+    // Check if this is a remote user
+    if (window.remoteControl.isRemote) {
+        // Send stop command to host
+        window.remoteControl.sendControlCommand('touch', 0);
+    } else {
+        // Local control
+        window.dulaan.write(window.current_pwm);
+    }
+    
     clearInterval(window.syncInterval)
+}
+
+// ===== Remote Control Mode Functions =====
+
+// Start remote control as host (device owner)
+window.startRemoteHost = () => {
+    console.log("[状态] 启动远程控制主机模式");
+    
+    // Initialize as host
+    const hostId = window.remoteControl.initializeAsHost();
+    
+    console.log("[远程控制] 主机ID:", hostId);
+    return hostId;
+}
+
+// Connect as remote user
+window.connectToRemoteHost = (hostId) => {
+    console.log("[状态] 连接到远程主机:", hostId);
+    
+    // Connect as remote user
+    window.remoteControl.connectAsRemote(hostId);
+}
+
+// Stop remote control
+window.stopRemoteControl = () => {
+    console.log("[状态] 停止远程控制");
+    
+    // Stop all intervals
+    clearInterval(window.audioInterval);
+    clearInterval(window.syncInterval);
+    
+    // Stop audio streaming
+    if (window.VoiceRecorder) {
+        window.VoiceRecorder.removeAllListeners();
+        window.VoiceRecorder.stopStreaming();
+    }
+    
+    // Disconnect from remote control
+    window.remoteControl.disconnect();
+    
+    // Reset motor
+    window.current_pwm = 0;
+    if (window.dulaan && window.dulaan.writeForce) {
+        window.dulaan.writeForce(0);
+    }
+}
+
+// Remote control versions of existing functions
+window.remoteStartStreaming = async () => {
+    if (!window.remoteControl.isRemote) {
+        console.error("Not connected as remote user");
+        return;
+    }
+    
+    console.log("[远程控制] 启动AI语音控制");
+    await window.startStreaming();
+}
+
+window.remoteStopStreaming = async () => {
+    if (!window.remoteControl.isRemote) {
+        console.error("Not connected as remote user");
+        return;
+    }
+    
+    console.log("[远程控制] 停止AI语音控制");
+    await window.stopStreaming();
+}
+
+window.remoteStartAbi = async () => {
+    if (!window.remoteControl.isRemote) {
+        console.error("Not connected as remote user");
+        return;
+    }
+    
+    console.log("[远程控制] 启动环境音控制");
+    await window.startAbi();
+}
+
+window.remoteStopAbi = async () => {
+    if (!window.remoteControl.isRemote) {
+        console.error("Not connected as remote user");
+        return;
+    }
+    
+    console.log("[远程控制] 停止环境音控制");
+    await window.stopAbi();
+}
+
+window.remoteStartTouch = async () => {
+    if (!window.remoteControl.isRemote) {
+        console.error("Not connected as remote user");
+        return;
+    }
+    
+    console.log("[远程控制] 启动触摸控制");
+    await window.startTouch();
+}
+
+window.remoteStopTouch = async () => {
+    if (!window.remoteControl.isRemote) {
+        console.error("Not connected as remote user");
+        return;
+    }
+    
+    console.log("[远程控制] 停止触摸控制");
+    await window.stopTouch();
+}
+
+// Get remote control status
+window.getRemoteControlStatus = () => {
+    return window.remoteControl.getStatus();
+}
+
+// Manual remote control (for testing)
+window.sendRemoteCommand = (mode, value) => {
+    if (!window.remoteControl.isRemote) {
+        console.error("Not connected as remote user");
+        return false;
+    }
+    
+    return window.remoteControl.sendControlCommand(mode, value);
 }
