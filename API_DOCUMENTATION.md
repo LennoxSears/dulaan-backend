@@ -4,11 +4,16 @@ This document describes the three new API endpoints developed for the Dulaan Bac
 
 ## Overview
 
-The backend provides four main API endpoints:
+The backend provides four main API endpoints and a WebRTC signaling server:
+
+### Firebase Cloud Functions APIs:
 1. **Speech-to-Text API** - Convert audio to text using Google Cloud Speech-to-Text
 2. **Speech-to-Text with LLM API** - Convert audio to text and process with Google Gemini LLM
 3. **User Data Storage API** - Store user information and device fingerprints
 4. **User Consent API** - Store and manage user consent preferences
+
+### Google App Engine Services:
+5. **PeerJS Server** - WebRTC signaling server for peer-to-peer communication
 
 All endpoints are deployed to the `europe-west1` region and support CORS for web applications.
 
@@ -19,9 +24,14 @@ All endpoints are deployed to the `europe-west1` region and support CORS for web
 http://localhost:5001/dulaan-backend/europe-west1/
 ```
 
-**Production:**
+**Production (Cloud Functions):**
 ```
 https://europe-west1-dulaan-backend.cloudfunctions.net/
+```
+
+**Production (PeerJS Server):**
+```
+https://peerjs-server-dot-dulaan-backend.appspot.com/peerjs
 ```
 
 ---
@@ -659,6 +669,142 @@ For production use, consider implementing additional rate limiting based on your
 
 ---
 
+## 5. PeerJS Server (WebRTC Signaling)
+
+### Overview
+The PeerJS server enables WebRTC peer-to-peer connections for real-time communication. It's deployed on Google App Engine as a separate service from the Cloud Functions.
+
+### Server URL
+**Production:** `https://peerjs-server-dot-dulaan-backend.appspot.com/peerjs`
+**Local Development:** `http://localhost:8080/peerjs`
+
+### Architecture
+```
+Client A ←→ PeerJS Server ←→ Client B
+    ↓                           ↓
+    └─── Direct P2P Connection ──┘
+```
+
+The server only handles signaling; actual data flows directly between peers.
+
+### Client Integration
+
+**JavaScript/Web Client:**
+```javascript
+// Connect to the PeerJS server
+const peer = new Peer('unique-peer-id', {
+  host: 'peerjs-server-dot-dulaan-backend.appspot.com',
+  port: 443,
+  path: '/peerjs',
+  secure: true,
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  }
+});
+
+// Handle connection events
+peer.on('open', (id) => {
+  console.log('Connected with ID:', id);
+});
+
+peer.on('connection', (conn) => {
+  console.log('Incoming connection from:', conn.peer);
+  
+  conn.on('data', (data) => {
+    console.log('Received data:', data);
+  });
+});
+
+// Connect to another peer
+const conn = peer.connect('target-peer-id');
+conn.on('open', () => {
+  conn.send('Hello from peer!');
+});
+```
+
+**React/Vue/Angular Integration:**
+```javascript
+import Peer from 'peerjs';
+
+class PeerService {
+  constructor() {
+    this.peer = new Peer({
+      host: 'peerjs-server-dot-dulaan-backend.appspot.com',
+      port: 443,
+      path: '/peerjs',
+      secure: true
+    });
+  }
+
+  connect(targetPeerId) {
+    return this.peer.connect(targetPeerId);
+  }
+
+  onConnection(callback) {
+    this.peer.on('connection', callback);
+  }
+
+  disconnect() {
+    if (this.peer) {
+      this.peer.destroy();
+    }
+  }
+}
+
+export default PeerService;
+```
+
+### API Endpoints
+
+**Server Information:**
+- `GET /` - Server status and information
+- `GET /_ah/health` - Health check for App Engine
+
+**PeerJS Endpoints:**
+- `POST /peerjs/id` - Generate new peer ID
+- `WebSocket /peerjs/peerjs` - WebSocket endpoint for signaling
+
+### Features
+
+- **Automatic Peer ID Generation**: Server generates unique peer IDs
+- **Connection Management**: Tracks active peers and handles disconnections
+- **CORS Support**: Configured for cross-origin requests
+- **Session Affinity**: Enabled for WebSocket connections
+- **Auto Scaling**: 1-10 instances based on CPU utilization
+- **Health Monitoring**: Built-in health checks and monitoring
+
+### Security
+
+- **HTTPS/WSS**: All connections use secure protocols in production
+- **Peer Discovery**: Disabled by default to prevent peer enumeration
+- **Rate Limiting**: App Engine provides built-in DDoS protection
+- **Authentication**: Optional API key authentication available
+
+### Testing
+
+A test client is available at `/peerjs-server/test-client.html` for development and testing purposes.
+
+### Deployment
+
+The PeerJS server is deployed separately from Cloud Functions:
+
+```bash
+cd peerjs-server
+./deploy.sh
+```
+
+### Monitoring
+
+Monitor the PeerJS server through Google Cloud Console:
+- **Logs**: `gcloud app logs tail --service=peerjs-server`
+- **Metrics**: CPU, memory, and connection count
+- **Health**: Automatic health checks and alerting
+
+---
+
 ## Monitoring and Logging
 
 All functions include comprehensive logging:
@@ -700,10 +846,22 @@ firebase deploy --only functions:speechToText
 ```
 
 For local development:
+
+**Cloud Functions:**
 ```bash
 # Start emulator
 firebase emulators:start --only functions
 
 # Functions available at:
 # http://localhost:5001/dulaan-backend/europe-west1/functionName
+```
+
+**PeerJS Server:**
+```bash
+# Start development server
+cd peerjs-server
+npm run dev
+
+# Server available at:
+# http://localhost:8080/peerjs
 ```

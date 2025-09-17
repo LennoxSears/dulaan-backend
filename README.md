@@ -1,8 +1,12 @@
 # Cloud Functions for Firebase Sample Library
 
-This repository contains a collection of samples showcasing some typical uses of [Cloud Functions for Firebase](https://firebase.google.com/features/functions).
+This repository contains Firebase Cloud Functions for the Dulaan backend API and a PeerJS server for WebRTC communication.
 
-Samples are available for the **Node** (2nd gen), **Python** (2nd gen), and Node (1st gen). 
+## Project Structure
+
+- **`/functions`** - Firebase Cloud Functions for API endpoints
+- **`/peerjs-server`** - PeerJS server for WebRTC signaling (Google App Engine)
+- **`/API_DOCUMENTATION.md`** - Comprehensive API documentation 
 
 > Note: Python support in Cloud Functions for Firebase is a public preview. This means that the functionality might change in backward-incompatible ways. A preview release is not subject to any SLA or deprecation policy and may receive limited or no support.
 
