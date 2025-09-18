@@ -66,6 +66,7 @@ exports.makeuppercase = onDocumentCreated(
 exports.storeUserData = onRequest(
     {
         region: "europe-west1",
+        invoker: "public",
         cors: {
             origin: [
                 /^https?:\/\/localhost(:\d+)?$/,
@@ -171,6 +172,7 @@ exports.storeUserData = onRequest(
 exports.storeUserConsent = onRequest(
     {
         region: "europe-west1",
+        invoker: "public",
         cors: {
             origin: [
                 /^https?:\/\/localhost(:\d+)?$/,
@@ -335,6 +337,7 @@ exports.storeUserConsent = onRequest(
 exports.getUserConsent = onRequest(
     {
         region: "europe-west1",
+        invoker: "public",
         cors: {
             origin: [
                 /^https?:\/\/localhost(:\d+)?$/,
@@ -410,6 +413,7 @@ exports.getUserConsent = onRequest(
 exports.speechToTextWithLLM = onRequest(
     {
         region: "europe-west1",
+        invoker: "public",
         cors: {
             origin: [
                 /^https?:\/\/localhost(:\d+)?$/,
