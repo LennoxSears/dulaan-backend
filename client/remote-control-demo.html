@@ -787,12 +787,16 @@
             initializeAsHost: () => {
                 const hostId = `dulaan-host-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
                 
-                window.remoteControl.peer = new Peer(hostId, {
-                    host: 'dulaan-backend.ew.r.appspot.com',
-                    port: 443,
-                    path: '/peerjs',
-                    secure: true
-                });
+                // Option 1: Use default PeerJS cloud server (temporary)
+                window.remoteControl.peer = new Peer(hostId);
+                
+                // Option 2: Use custom server (uncomment when server is fixed)
+                // window.remoteControl.peer = new Peer(hostId, {
+                //     host: 'dulaan-backend.ew.r.appspot.com',
+                //     port: 443,
+                //     path: '/peerjs',
+                //     secure: true
+                // });
 
                 window.remoteControl.peer.on('open', (id) => {
                     window.remoteControl.isHost = true;
@@ -832,12 +836,16 @@
             },
 
             connectAsRemote: (hostId) => {
-                window.remoteControl.peer = new Peer({
-                    host: 'dulaan-backend.ew.r.appspot.com',
-                    port: 443,
-                    path: '/peerjs',
-                    secure: true
-                });
+                // Option 1: Use default PeerJS cloud server (temporary)
+                window.remoteControl.peer = new Peer();
+                
+                // Option 2: Use custom server (uncomment when server is fixed)
+                // window.remoteControl.peer = new Peer({
+                //     host: 'dulaan-backend.ew.r.appspot.com',
+                //     port: 443,
+                //     path: '/peerjs',
+                //     secure: true
+                // });
 
                 window.remoteControl.peer.on('open', (id) => {
                     log(`Remote peer initialized with ID: ${id}`);
