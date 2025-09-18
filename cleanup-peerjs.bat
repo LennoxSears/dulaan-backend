@@ -46,7 +46,7 @@ echo Step 1: Cleaning up PeerJS Cloud Run services...
 REM ============================================================================
 
 echo Checking for dulaan-peerjs-server in europe-west1...
-gcloud run services describe dulaan-peerjs-server --region=europe-west1 2>nul
+gcloud run services describe dulaan-peerjs-server --region=europe-west1
 if !errorlevel!==0 (
     echo Found dulaan-peerjs-server in europe-west1
     echo Deleting Cloud Run service: dulaan-peerjs-server (europe-west1)
@@ -61,7 +61,7 @@ if !errorlevel!==0 (
 )
 
 echo Checking for dulaan-peerjs-server in us-central1...
-gcloud run services describe dulaan-peerjs-server --region=us-central1 2>nul
+gcloud run services describe dulaan-peerjs-server --region=us-central1
 if !errorlevel!==0 (
     echo Found dulaan-peerjs-server in us-central1
     echo Deleting Cloud Run service: dulaan-peerjs-server (us-central1)
@@ -84,7 +84,7 @@ REM ============================================================================
 echo Checking for dulaan-peerjs-server container images...
 set FOUND_IMAGES=0
 
-for /f "tokens=*" %%i in ('gcloud container images list --repository^=gcr.io/%PROJECT_ID% --format^="value(name)" 2^>nul') do (
+for /f "tokens=*" %%i in ('gcloud container images list --repository^=gcr.io/%PROJECT_ID% --format^="value(name)"') do (
     echo %%i | findstr "dulaan-peerjs-server" >nul
     if !errorlevel!==0 (
         set FOUND_IMAGES=1
@@ -109,7 +109,7 @@ echo Step 3: Cleaning up PeerJS App Engine service...
 REM ============================================================================
 
 echo Checking for peerjs App Engine service...
-gcloud app services describe peerjs 2>nul
+gcloud app services describe peerjs
 if !errorlevel!==0 (
     echo Found peerjs App Engine service
     echo Deleting App Engine service: peerjs
@@ -126,14 +126,14 @@ if !errorlevel!==0 (
 echo Checking for PeerJS versions in default App Engine service...
 set FOUND_VERSIONS=0
 
-for /f "tokens=*" %%i in ('gcloud app versions list --service^=default --format^="value(id)" 2^>nul') do (
+for /f "tokens=*" %%i in ('gcloud app versions list --service^=default --format^="value(id)"') do (
     echo %%i | findstr "dulaan" >nul
     if !errorlevel!==0 (
         set FOUND_VERSIONS=1
         echo Checking if version %%i is serving traffic...
         
         REM Check if this version has traffic
-        for /f "tokens=*" %%j in ('gcloud app versions list --service^=default --filter^="id^=%%i AND traffic_split^>0" --format^="value(id)" 2^>nul') do (
+        for /f "tokens=*" %%j in ('gcloud app versions list --service^=default --filter^="id^=%%i AND traffic_split^>0" --format^="value(id)"') do (
             if "%%j"=="%%i" (
                 echo KEEPING serving version: %%i (has traffic)
                 goto :skip_version
@@ -165,7 +165,7 @@ REM ============================================================================
 echo Checking for PeerJS Cloud Build triggers...
 set FOUND_TRIGGERS=0
 
-for /f "tokens=1,2*" %%a in ('gcloud builds triggers list --format^="value(id,name)" 2^>nul') do (
+for /f "tokens=1,2*" %%a in ('gcloud builds triggers list --format^="value(id,name)"') do (
     echo %%b | findstr /i "dulaan peerjs" >nul
     if !errorlevel!==0 (
         set FOUND_TRIGGERS=1
@@ -190,7 +190,7 @@ echo Step 5: Cleaning up PeerJS firewall rules...
 REM ============================================================================
 
 echo Checking for allow-peerjs-server firewall rule...
-gcloud compute firewall-rules describe allow-peerjs-server 2>nul
+gcloud compute firewall-rules describe allow-peerjs-server
 if !errorlevel!==0 (
     echo Found allow-peerjs-server firewall rule
     echo Deleting firewall rule: allow-peerjs-server
@@ -205,7 +205,7 @@ if !errorlevel!==0 (
 )
 
 echo Checking for allow-http-8080 firewall rule...
-gcloud compute firewall-rules describe allow-http-8080 2>nul
+gcloud compute firewall-rules describe allow-http-8080
 if !errorlevel!==0 (
     echo Found allow-http-8080 firewall rule
     echo Deleting firewall rule: allow-http-8080
@@ -228,7 +228,7 @@ REM ============================================================================
 echo Checking for PeerJS SSL certificates...
 set FOUND_CERTS=0
 
-for /f "tokens=*" %%i in ('gcloud compute ssl-certificates list --format^="value(name)" 2^>nul') do (
+for /f "tokens=*" %%i in ('gcloud compute ssl-certificates list --format^="value(name)"') do (
     echo %%i | findstr /i "dulaan peerjs" >nul
     if !errorlevel!==0 (
         set FOUND_CERTS=1
@@ -256,14 +256,14 @@ echo Verifying PeerJS cleanup...
 echo.
 
 echo Checking for remaining PeerJS Cloud Run services:
-gcloud run services describe dulaan-peerjs-server --region=europe-west1 2>nul
+gcloud run services describe dulaan-peerjs-server --region=europe-west1
 if !errorlevel!==0 (
     echo WARNING: dulaan-peerjs-server still exists in europe-west1
 ) else (
     echo OK: No dulaan-peerjs-server in europe-west1
 )
 
-gcloud run services describe dulaan-peerjs-server --region=us-central1 2>nul
+gcloud run services describe dulaan-peerjs-server --region=us-central1
 if !errorlevel!==0 (
     echo WARNING: dulaan-peerjs-server still exists in us-central1
 ) else (
@@ -273,7 +273,7 @@ if !errorlevel!==0 (
 echo.
 echo Checking for remaining PeerJS container images:
 set REMAINING_IMAGES=0
-for /f "tokens=*" %%i in ('gcloud container images list --repository^=gcr.io/%PROJECT_ID% --format^="value(name)" 2^>nul') do (
+for /f "tokens=*" %%i in ('gcloud container images list --repository^=gcr.io/%PROJECT_ID% --format^="value(name)"') do (
     echo %%i | findstr "dulaan-peerjs-server" >nul
     if !errorlevel!==0 (
         set REMAINING_IMAGES=1
@@ -288,7 +288,7 @@ if !REMAINING_IMAGES!==1 (
 
 echo.
 echo Checking for PeerJS App Engine service:
-gcloud app services describe peerjs 2>nul
+gcloud app services describe peerjs
 if !errorlevel!==0 (
     echo WARNING: peerjs App Engine service still exists
 ) else (
@@ -297,14 +297,14 @@ if !errorlevel!==0 (
 
 echo.
 echo Checking PeerJS firewall rules:
-gcloud compute firewall-rules describe allow-peerjs-server 2>nul
+gcloud compute firewall-rules describe allow-peerjs-server
 if !errorlevel!==0 (
     echo WARNING: allow-peerjs-server firewall rule still exists
 ) else (
     echo OK: No allow-peerjs-server firewall rule found
 )
 
-gcloud compute firewall-rules describe allow-http-8080 2>nul
+gcloud compute firewall-rules describe allow-http-8080
 if !errorlevel!==0 (
     echo WARNING: allow-http-8080 firewall rule still exists
 ) else (
