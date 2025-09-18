@@ -62,208 +62,6 @@ exports.makeuppercase = onDocumentCreated(
     return event.data.ref.set({ uppercase }, { merge: true });
 });
 
-
-
-// Speech-to-Text with LLM processing API endpoint
-exports.speechToTextWithLLM = onRequest(
-    {
-        region: "europe-west1",
-        cors: true
-    },
-    async (req, res) => {
-        try {
-            // Only allow POST requests
-            if (req.method !== 'POST') {
-                return res.status(405).json({ error: 'Method not allowed. Use POST.' });
-            }
-
-            // Validate required fields
-            const { msgHis, audioContent, audioUri, currentPwm } = req.body;
-
-            // Check if audio data is provided
-            if (!audioContent && !audioUri) {
-                return res.status(400).json({ 
-                    error: 'Missing audio data. Provide either audioContent (base64) or audioUri.' 
-                });
-            }
-
-            // Validate msgHis array
-            if (!Array.isArray(msgHis)) {
-                return res.status(400).json({ 
-                    error: 'msgHis must be an array.' 
-                });
-            }
-
-            // Validate currentPwm
-            if (typeof currentPwm !== 'number' || currentPwm < 0 || currentPwm > 255) {
-                return res.status(400).json({ 
-                    error: 'currentPwm must be a number between 0 and 255.' 
-                });
-            }
-
-            // Step 1: Convert speech to text
-            const speechConfig = {
-                encoding: req.body.encoding || 'WEBM_OPUS',
-                sampleRateHertz: req.body.sampleRateHertz || 48000,
-                enableAutomaticPunctuation: true,
-                model: 'latest_long'
-            };
-
-            // Enable automatic language detection if no languageCode provided
-            if (req.body.languageCode) {
-                speechConfig.languageCode = req.body.languageCode;
-            } else {
-                speechConfig.languageCode = 'en-US';
-                speechConfig.alternativeLanguageCodes = [
-                    'en-GB', 'es-ES', 'fr-FR', 'de-DE', 'it-IT', 'pt-PT', 
-                    'ru-RU', 'ja-JP', 'ko-KR', 'zh-CN', 'zh-TW', 'ar-SA', 
-                    'hi-IN', 'nl-NL', 'sv-SE', 'da-DK', 'no-NO', 'fi-FI', 
-                    'pl-PL', 'cs-CZ', 'hu-HU', 'tr-TR', 'he-IL', 'th-TH',
-                    'vi-VN', 'id-ID', 'ms-MY', 'tl-PH', 'uk-UA', 'bg-BG'
-                ];
-            }
-
-            const speechRequest = { config: speechConfig };
-
-            // Add audio content
-            if (audioContent) {
-                speechRequest.audio = { content: audioContent };
-            } else if (audioUri) {
-                speechRequest.audio = { uri: audioUri };
-            }
-
-            // Perform speech recognition
-            const [speechResponse] = await speechClient.recognize(speechRequest);
-            
-            // Extract transcription
-            const transcript = speechResponse.results
-                .map(result => result.alternatives[0].transcript)
-                .join('\n');
-
-            if (!transcript || transcript.trim() === '') {
-                return res.status(400).json({
-                    success: false,
-                    error: 'No speech detected in audio'
-                });
-            }
-
-            // Step 2: Update msgHis with speech transcript
-            let updatedMsgHis = [...msgHis];
-
-            // Reset msgHis if empty or too long (>13 messages)
-            if (updatedMsgHis.length === 0 || updatedMsgHis.length > 13) {
-                updatedMsgHis = [
-                    {
-                        role: 'user',
-                        parts: [{ text: JSON.stringify({ user_command: transcript, current_pwm: currentPwm }) }]
-                    }
-                ];
-            } else {
-                // Add new user message
-                updatedMsgHis.push({
-                    role: 'user',
-                    parts: [{ text: JSON.stringify({ user_command: transcript, current_pwm: currentPwm }) }]
-                });
-            }
-
-            // Step 3: Send to Google Gemini LLM
-            const API_KEY = process.env.GEMINI_API_KEY || req.body.geminiApiKey;
-            if (!API_KEY) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Gemini API key is required. Provide it in request body as geminiApiKey or set GEMINI_API_KEY environment variable.'
-                });
-            }
-
-            const MODEL_ID = 'gemini-2.0-flash-exp';
-
-            const geminiRequestBody = {
-                contents: updatedMsgHis,
-                systemInstruction: {
-                    parts: [{
-                        text: `# System Role
-You are an adaptive motor control engine for adult toys, combining **natural language instructions** and **current real-time PWM value** to generate one PWM value. 
-if you don't understand  **natural language instructions**, just return **current real-time PWM value**.
-**Output Restriction**: Return ONLY the PWM value.
-
-# Input Specification
-"user_command": "String",          // natural language instruction
-"current_pwm": 0-255 integer       // current real-time PWM value
-
-# Output Specification
-0-255 integer   // (ONLY this field)`
-                    }]
-                },
-                generationConfig: {
-                    temperature: 1,
-                    maxOutputTokens: 65535,
-                    topP: 1
-                },
-                safetySettings: [
-                    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-                    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-                    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-                    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' }
-                ]
-            };
-
-            const geminiResponse = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${API_KEY}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(geminiRequestBody)
-                }
-            );
-
-            if (!geminiResponse.ok) {
-                const errorBody = await geminiResponse.text();
-                logger.error('Gemini API error:', errorBody);
-                return res.status(500).json({
-                    success: false,
-                    error: `Gemini API error ${geminiResponse.status}: ${errorBody}`
-                });
-            }
-
-            const geminiResult = await geminiResponse.json();
-            
-            // Extract LLM response
-            const llmResponse = geminiResult.candidates[0].content;
-            const pwmValue = llmResponse.parts[0].text.trim();
-
-            // Step 4: Add LLM response to msgHis
-            updatedMsgHis.push(llmResponse);
-
-            // Log the processing for debugging
-            logger.log('Speech-to-text with LLM processing completed', {
-                transcript: transcript,
-                currentPwm: currentPwm,
-                newPwmValue: pwmValue,
-                msgHisLength: updatedMsgHis.length
-            });
-
-            // Step 5: Return final msgHis and processing results
-            res.json({
-                success: true,
-                transcript: transcript,
-                currentPwm: currentPwm,
-                newPwmValue: pwmValue,
-                msgHis: updatedMsgHis,
-                detectedLanguage: speechResponse.results[0]?.languageCode || null,
-                autoDetected: !req.body.languageCode
-            });
-
-        } catch (error) {
-            logger.error('Speech-to-text with LLM error:', error);
-            res.status(500).json({
-                success: false,
-                error: 'Speech-to-text with LLM processing failed',
-                details: error.message
-            });
-        }
-    }
-);
-
 // User data storage API endpoint
 exports.storeUserData = onRequest(
     {
@@ -294,7 +92,7 @@ exports.storeUserData = onRequest(
                 deviceFingerprint: deviceFingerprint,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-                // Store additional metadata if provided
+                // Store additional metadata
                 userAgent: req.headers['user-agent'] || null,
                 ipAddress: req.headers['x-forwarded-for'] || req.connection.remoteAddress || null,
                 // Include any additional device details if provided
@@ -345,206 +143,6 @@ exports.storeUserData = onRequest(
             res.status(500).json({
                 success: false,
                 error: 'Failed to store user data',
-                details: error.message
-            });
-        }
-    }
-);
-
-// Speech-to-Text with LLM processing API endpoint
-exports.speechToTextWithLLM = onRequest(
-    {
-        region: "europe-west1",
-        cors: true
-    },
-    async (req, res) => {
-        try {
-            // Only allow POST requests
-            if (req.method !== 'POST') {
-                return res.status(405).json({ error: 'Method not allowed. Use POST.' });
-            }
-
-            // Validate required fields
-            const { msgHis, audioContent, audioUri, currentPwm } = req.body;
-
-            // Check if audio data is provided
-            if (!audioContent && !audioUri) {
-                return res.status(400).json({ 
-                    error: 'Missing audio data. Provide either audioContent (base64) or audioUri.' 
-                });
-            }
-
-            // Validate msgHis array
-            if (!Array.isArray(msgHis)) {
-                return res.status(400).json({ 
-                    error: 'msgHis must be an array.' 
-                });
-            }
-
-            // Validate currentPwm
-            if (typeof currentPwm !== 'number' || currentPwm < 0 || currentPwm > 255) {
-                return res.status(400).json({ 
-                    error: 'currentPwm must be a number between 0 and 255.' 
-                });
-            }
-
-            // Step 1: Convert speech to text
-            const speechConfig = {
-                encoding: req.body.encoding || 'WEBM_OPUS',
-                sampleRateHertz: req.body.sampleRateHertz || 48000,
-                enableAutomaticPunctuation: true,
-                model: 'latest_long'
-            };
-
-            // Enable automatic language detection if no languageCode provided
-            if (req.body.languageCode) {
-                speechConfig.languageCode = req.body.languageCode;
-            } else {
-                speechConfig.languageCode = 'en-US';
-                speechConfig.alternativeLanguageCodes = [
-                    'en-GB', 'es-ES', 'fr-FR', 'de-DE', 'it-IT', 'pt-PT', 
-                    'ru-RU', 'ja-JP', 'ko-KR', 'zh-CN', 'zh-TW', 'ar-SA', 
-                    'hi-IN', 'nl-NL', 'sv-SE', 'da-DK', 'no-NO', 'fi-FI', 
-                    'pl-PL', 'cs-CZ', 'hu-HU', 'tr-TR', 'he-IL', 'th-TH',
-                    'vi-VN', 'id-ID', 'ms-MY', 'tl-PH', 'uk-UA', 'bg-BG'
-                ];
-            }
-
-            const speechRequest = { config: speechConfig };
-
-            // Add audio content
-            if (audioContent) {
-                speechRequest.audio = { content: audioContent };
-            } else if (audioUri) {
-                speechRequest.audio = { uri: audioUri };
-            }
-
-            // Perform speech recognition
-            const [speechResponse] = await speechClient.recognize(speechRequest);
-            
-            // Extract transcription
-            const transcript = speechResponse.results
-                .map(result => result.alternatives[0].transcript)
-                .join('\n');
-
-            if (!transcript || transcript.trim() === '') {
-                return res.status(400).json({
-                    success: false,
-                    error: 'No speech detected in audio'
-                });
-            }
-
-            // Step 2: Update msgHis with speech transcript
-            let updatedMsgHis = [...msgHis];
-
-            // Reset msgHis if empty or too long (>13 messages)
-            if (updatedMsgHis.length === 0 || updatedMsgHis.length > 13) {
-                updatedMsgHis = [
-                    {
-                        role: 'user',
-                        parts: [{ text: JSON.stringify({ user_command: transcript, current_pwm: currentPwm }) }]
-                    }
-                ];
-            } else {
-                // Add new user message
-                updatedMsgHis.push({
-                    role: 'user',
-                    parts: [{ text: JSON.stringify({ user_command: transcript, current_pwm: currentPwm }) }]
-                });
-            }
-
-            // Step 3: Send to Google Gemini LLM
-            const API_KEY = process.env.GEMINI_API_KEY || req.body.geminiApiKey;
-            if (!API_KEY) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Gemini API key is required. Provide it in request body as geminiApiKey or set GEMINI_API_KEY environment variable.'
-                });
-            }
-
-            const MODEL_ID = 'gemini-2.0-flash-exp';
-
-            const geminiRequestBody = {
-                contents: updatedMsgHis,
-                systemInstruction: {
-                    parts: [{
-                        text: `# System Role
-You are an adaptive motor control engine for adult toys, combining **natural language instructions** and **current real-time PWM value** to generate one PWM value. 
-if you don't understand  **natural language instructions**, just return **current real-time PWM value**.
-**Output Restriction**: Return ONLY the PWM value.
-
-# Input Specification
-"user_command": "String",          // natural language instruction
-"current_pwm": 0-255 integer       // current real-time PWM value
-
-# Output Specification
-0-255 integer   // (ONLY this field)`
-                    }]
-                },
-                generationConfig: {
-                    temperature: 1,
-                    maxOutputTokens: 65535,
-                    topP: 1
-                },
-                safetySettings: [
-                    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-                    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-                    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-                    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' }
-                ]
-            };
-
-            const geminiResponse = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${API_KEY}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(geminiRequestBody)
-                }
-            );
-
-            if (!geminiResponse.ok) {
-                const errorBody = await geminiResponse.text();
-                logger.error('Gemini API error:', errorBody);
-                return res.status(500).json({
-                    success: false,
-                    error: `Gemini API error ${geminiResponse.status}: ${errorBody}`
-                });
-            }
-
-            const geminiResult = await geminiResponse.json();
-            
-            // Extract LLM response
-            const llmResponse = geminiResult.candidates[0].content;
-            const pwmValue = llmResponse.parts[0].text.trim();
-
-            // Step 4: Add LLM response to msgHis
-            updatedMsgHis.push(llmResponse);
-
-            // Log the processing for debugging
-            logger.log('Speech-to-text with LLM processing completed', {
-                transcript: transcript,
-                currentPwm: currentPwm,
-                newPwmValue: pwmValue,
-                msgHisLength: updatedMsgHis.length
-            });
-
-            // Step 5: Return final msgHis and processing results
-            res.json({
-                success: true,
-                transcript: transcript,
-                currentPwm: currentPwm,
-                newPwmValue: pwmValue,
-                msgHis: updatedMsgHis,
-                detectedLanguage: speechResponse.results[0]?.languageCode || null,
-                autoDetected: !req.body.languageCode
-            });
-
-        } catch (error) {
-            logger.error('Speech-to-text with LLM error:', error);
-            res.status(500).json({
-                success: false,
-                error: 'Speech-to-text with LLM processing failed',
                 details: error.message
             });
         }
@@ -697,207 +295,7 @@ exports.storeUserConsent = onRequest(
     }
 );
 
-// Speech-to-Text with LLM processing API endpoint
-exports.speechToTextWithLLM = onRequest(
-    {
-        region: "europe-west1",
-        cors: true
-    },
-    async (req, res) => {
-        try {
-            // Only allow POST requests
-            if (req.method !== 'POST') {
-                return res.status(405).json({ error: 'Method not allowed. Use POST.' });
-            }
-
-            // Validate required fields
-            const { msgHis, audioContent, audioUri, currentPwm } = req.body;
-
-            // Check if audio data is provided
-            if (!audioContent && !audioUri) {
-                return res.status(400).json({ 
-                    error: 'Missing audio data. Provide either audioContent (base64) or audioUri.' 
-                });
-            }
-
-            // Validate msgHis array
-            if (!Array.isArray(msgHis)) {
-                return res.status(400).json({ 
-                    error: 'msgHis must be an array.' 
-                });
-            }
-
-            // Validate currentPwm
-            if (typeof currentPwm !== 'number' || currentPwm < 0 || currentPwm > 255) {
-                return res.status(400).json({ 
-                    error: 'currentPwm must be a number between 0 and 255.' 
-                });
-            }
-
-            // Step 1: Convert speech to text
-            const speechConfig = {
-                encoding: req.body.encoding || 'WEBM_OPUS',
-                sampleRateHertz: req.body.sampleRateHertz || 48000,
-                enableAutomaticPunctuation: true,
-                model: 'latest_long'
-            };
-
-            // Enable automatic language detection if no languageCode provided
-            if (req.body.languageCode) {
-                speechConfig.languageCode = req.body.languageCode;
-            } else {
-                speechConfig.languageCode = 'en-US';
-                speechConfig.alternativeLanguageCodes = [
-                    'en-GB', 'es-ES', 'fr-FR', 'de-DE', 'it-IT', 'pt-PT', 
-                    'ru-RU', 'ja-JP', 'ko-KR', 'zh-CN', 'zh-TW', 'ar-SA', 
-                    'hi-IN', 'nl-NL', 'sv-SE', 'da-DK', 'no-NO', 'fi-FI', 
-                    'pl-PL', 'cs-CZ', 'hu-HU', 'tr-TR', 'he-IL', 'th-TH',
-                    'vi-VN', 'id-ID', 'ms-MY', 'tl-PH', 'uk-UA', 'bg-BG'
-                ];
-            }
-
-            const speechRequest = { config: speechConfig };
-
-            // Add audio content
-            if (audioContent) {
-                speechRequest.audio = { content: audioContent };
-            } else if (audioUri) {
-                speechRequest.audio = { uri: audioUri };
-            }
-
-            // Perform speech recognition
-            const [speechResponse] = await speechClient.recognize(speechRequest);
-            
-            // Extract transcription
-            const transcript = speechResponse.results
-                .map(result => result.alternatives[0].transcript)
-                .join('\n');
-
-            if (!transcript || transcript.trim() === '') {
-                return res.status(400).json({
-                    success: false,
-                    error: 'No speech detected in audio'
-                });
-            }
-
-            // Step 2: Update msgHis with speech transcript
-            let updatedMsgHis = [...msgHis];
-
-            // Reset msgHis if empty or too long (>13 messages)
-            if (updatedMsgHis.length === 0 || updatedMsgHis.length > 13) {
-                updatedMsgHis = [
-                    {
-                        role: 'user',
-                        parts: [{ text: JSON.stringify({ user_command: transcript, current_pwm: currentPwm }) }]
-                    }
-                ];
-            } else {
-                // Add new user message
-                updatedMsgHis.push({
-                    role: 'user',
-                    parts: [{ text: JSON.stringify({ user_command: transcript, current_pwm: currentPwm }) }]
-                });
-            }
-
-            // Step 3: Send to Google Gemini LLM
-            const API_KEY = process.env.GEMINI_API_KEY || req.body.geminiApiKey;
-            if (!API_KEY) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Gemini API key is required. Provide it in request body as geminiApiKey or set GEMINI_API_KEY environment variable.'
-                });
-            }
-
-            const MODEL_ID = 'gemini-2.0-flash-exp';
-
-            const geminiRequestBody = {
-                contents: updatedMsgHis,
-                systemInstruction: {
-                    parts: [{
-                        text: `# System Role
-You are an adaptive motor control engine for adult toys, combining **natural language instructions** and **current real-time PWM value** to generate one PWM value. 
-if you don't understand  **natural language instructions**, just return **current real-time PWM value**.
-**Output Restriction**: Return ONLY the PWM value.
-
-# Input Specification
-"user_command": "String",          // natural language instruction
-"current_pwm": 0-255 integer       // current real-time PWM value
-
-# Output Specification
-0-255 integer   // (ONLY this field)`
-                    }]
-                },
-                generationConfig: {
-                    temperature: 1,
-                    maxOutputTokens: 65535,
-                    topP: 1
-                },
-                safetySettings: [
-                    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-                    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-                    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-                    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' }
-                ]
-            };
-
-            const geminiResponse = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${API_KEY}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(geminiRequestBody)
-                }
-            );
-
-            if (!geminiResponse.ok) {
-                const errorBody = await geminiResponse.text();
-                logger.error('Gemini API error:', errorBody);
-                return res.status(500).json({
-                    success: false,
-                    error: `Gemini API error ${geminiResponse.status}: ${errorBody}`
-                });
-            }
-
-            const geminiResult = await geminiResponse.json();
-            
-            // Extract LLM response
-            const llmResponse = geminiResult.candidates[0].content;
-            const pwmValue = llmResponse.parts[0].text.trim();
-
-            // Step 4: Add LLM response to msgHis
-            updatedMsgHis.push(llmResponse);
-
-            // Log the processing for debugging
-            logger.log('Speech-to-text with LLM processing completed', {
-                transcript: transcript,
-                currentPwm: currentPwm,
-                newPwmValue: pwmValue,
-                msgHisLength: updatedMsgHis.length
-            });
-
-            // Step 5: Return final msgHis and processing results
-            res.json({
-                success: true,
-                transcript: transcript,
-                currentPwm: currentPwm,
-                newPwmValue: pwmValue,
-                msgHis: updatedMsgHis,
-                detectedLanguage: speechResponse.results[0]?.languageCode || null,
-                autoDetected: !req.body.languageCode
-            });
-
-        } catch (error) {
-            logger.error('Speech-to-text with LLM error:', error);
-            res.status(500).json({
-                success: false,
-                error: 'Speech-to-text with LLM processing failed',
-                details: error.message
-            });
-        }
-    }
-);
-
-// Get user consent API endpoint (bonus endpoint for retrieving consent)
+// Get user consent API endpoint
 exports.getUserConsent = onRequest(
     {
         region: "europe-west1",
@@ -910,6 +308,7 @@ exports.getUserConsent = onRequest(
                 return res.status(405).json({ error: 'Method not allowed. Use GET.' });
             }
 
+            // Get userId from query parameters
             const userId = req.query.userId;
             
             if (!userId) {
@@ -930,6 +329,8 @@ exports.getUserConsent = onRequest(
             }
 
             const consentData = consentDoc.data();
+            
+            logger.log('User consent retrieved', { userId });
             
             res.json({
                 success: true,
@@ -1006,7 +407,8 @@ exports.speechToTextWithLLM = onRequest(
                     'ru-RU', 'ja-JP', 'ko-KR', 'zh-CN', 'zh-TW', 'ar-SA', 
                     'hi-IN', 'nl-NL', 'sv-SE', 'da-DK', 'no-NO', 'fi-FI', 
                     'pl-PL', 'cs-CZ', 'hu-HU', 'tr-TR', 'he-IL', 'th-TH',
-                    'vi-VN', 'id-ID', 'ms-MY', 'tl-PH', 'uk-UA', 'bg-BG'
+                    'vi-VN', 'id-ID', 'ms-MY', 'tl-PH', 'uk-UA', 'bg-BG',
+                    'hr-HR', 'sk-SK', 'sl-SI', 'et-EE', 'lv-LV', 'lt-LT'
                 ];
             }
 
@@ -1027,117 +429,112 @@ exports.speechToTextWithLLM = onRequest(
                 .map(result => result.alternatives[0].transcript)
                 .join('\n');
 
-            if (!transcript || transcript.trim() === '') {
+            if (!transcript) {
                 return res.status(400).json({
                     success: false,
-                    error: 'No speech detected in audio'
+                    error: 'No speech detected in audio',
+                    transcription: '',
+                    newPwmValue: currentPwm,
+                    msgHis: msgHis
                 });
             }
 
-            // Step 2: Update msgHis with speech transcript
-            let updatedMsgHis = [...msgHis];
-
-            // Reset msgHis if empty or too long (>13 messages)
-            if (updatedMsgHis.length === 0 || updatedMsgHis.length > 13) {
-                updatedMsgHis = [
-                    {
-                        role: 'user',
-                        parts: [{ text: JSON.stringify({ user_command: transcript, current_pwm: currentPwm }) }]
-                    }
-                ];
-            } else {
-                // Add new user message
-                updatedMsgHis.push({
-                    role: 'user',
-                    parts: [{ text: JSON.stringify({ user_command: transcript, current_pwm: currentPwm }) }]
+            // Step 2: Process with LLM for motor control
+            const { GoogleGenerativeAI } = require("@google/generative-ai");
+            
+            // Get API key from request body (should be moved to environment variables)
+            const apiKey = req.body.geminiApiKey;
+            if (!apiKey) {
+                return res.status(400).json({ 
+                    error: 'Missing Gemini API key in request body.' 
                 });
             }
 
-            // Step 3: Send to Google Gemini LLM
-            const API_KEY = process.env.GEMINI_API_KEY || req.body.geminiApiKey;
-            if (!API_KEY) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Gemini API key is required. Provide it in request body as geminiApiKey or set GEMINI_API_KEY environment variable.'
-                });
-            }
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-            const MODEL_ID = 'gemini-2.0-flash-exp';
+            // Prepare conversation history for context
+            const conversationHistory = msgHis.map(msg => 
+                `User: ${msg.user}\nAssistant: ${msg.assistant}`
+            ).join('\n\n');
 
-            const geminiRequestBody = {
-                contents: updatedMsgHis,
-                systemInstruction: {
-                    parts: [{
-                        text: `# System Role
-You are an adaptive motor control engine for adult toys, combining **natural language instructions** and **current real-time PWM value** to generate one PWM value. 
-if you don't understand  **natural language instructions**, just return **current real-time PWM value**.
-**Output Restriction**: Return ONLY the PWM value.
+            const prompt = `You are controlling a motor device with PWM values (0-255). Current PWM: ${currentPwm}
 
-# Input Specification
-"user_command": "String",          // natural language instruction
-"current_pwm": 0-255 integer       // current real-time PWM value
+Previous conversation:
+${conversationHistory}
 
-# Output Specification
-0-255 integer   // (ONLY this field)`
-                    }]
-                },
-                generationConfig: {
-                    temperature: 1,
-                    maxOutputTokens: 65535,
-                    topP: 1
-                },
-                safetySettings: [
-                    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-                    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-                    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-                    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' }
-                ]
-            };
+New user speech: "${transcript}"
 
-            const geminiResponse = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${API_KEY}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(geminiRequestBody)
+Respond with a JSON object containing:
+- "response": Your natural language response to the user
+- "pwm": New PWM value (0-255) based on the user's request
+- "reasoning": Brief explanation of why you chose this PWM value
+
+Consider:
+- 0 = motor off
+- 1-50 = very low intensity
+- 51-100 = low intensity  
+- 101-150 = medium intensity
+- 151-200 = high intensity
+- 201-255 = maximum intensity
+
+Be conversational and helpful. If the user asks to increase/decrease, adjust relative to current value.`;
+
+            const result = await model.generateContent(prompt);
+            const responseText = result.response.text();
+            
+            // Parse LLM response
+            let llmResponse;
+            try {
+                // Extract JSON from response (handle potential markdown formatting)
+                const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    llmResponse = JSON.parse(jsonMatch[0]);
+                } else {
+                    throw new Error('No JSON found in response');
                 }
-            );
-
-            if (!geminiResponse.ok) {
-                const errorBody = await geminiResponse.text();
-                logger.error('Gemini API error:', errorBody);
+            } catch (parseError) {
+                logger.error('Failed to parse LLM response:', parseError);
                 return res.status(500).json({
                     success: false,
-                    error: `Gemini API error ${geminiResponse.status}: ${errorBody}`
+                    error: 'Failed to parse LLM response',
+                    transcription: transcript,
+                    newPwmValue: currentPwm,
+                    msgHis: msgHis
                 });
             }
 
-            const geminiResult = await geminiResponse.json();
+            // Validate PWM value
+            const newPwmValue = Math.max(0, Math.min(255, parseInt(llmResponse.pwm) || currentPwm));
             
-            // Extract LLM response
-            const llmResponse = geminiResult.candidates[0].content;
-            const pwmValue = llmResponse.parts[0].text.trim();
+            // Update message history
+            const updatedMsgHis = [...msgHis, {
+                user: transcript,
+                assistant: llmResponse.response,
+                pwm: newPwmValue,
+                timestamp: new Date().toISOString()
+            }];
 
-            // Step 4: Add LLM response to msgHis
-            updatedMsgHis.push(llmResponse);
+            // Keep only last 10 messages to prevent context from getting too long
+            const trimmedMsgHis = updatedMsgHis.slice(-10);
 
-            // Log the processing for debugging
-            logger.log('Speech-to-text with LLM processing completed', {
-                transcript: transcript,
+            logger.log('Speech-to-text with LLM completed', {
+                transcriptionLength: transcript.length,
                 currentPwm: currentPwm,
-                newPwmValue: pwmValue,
-                msgHisLength: updatedMsgHis.length
+                newPwmValue: newPwmValue,
+                messageHistoryLength: trimmedMsgHis.length
             });
 
-            // Step 5: Return final msgHis and processing results
             res.json({
                 success: true,
-                transcript: transcript,
-                currentPwm: currentPwm,
-                newPwmValue: pwmValue,
-                msgHis: updatedMsgHis,
+                transcription: transcript,
+                response: llmResponse.response,
+                reasoning: llmResponse.reasoning,
+                newPwmValue: newPwmValue,
+                previousPwm: currentPwm,
+                msgHis: trimmedMsgHis,
                 detectedLanguage: speechResponse.results[0]?.languageCode || null,
-                autoDetected: !req.body.languageCode
+                confidence: speechResponse.results[0]?.alternatives[0]?.confidence || 0
             });
 
         } catch (error) {
