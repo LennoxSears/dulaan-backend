@@ -4,10 +4,18 @@ This directory contains the updated client-side JavaScript files for the Dulaan 
 
 ## Files Overview
 
-### Core Files
-- **`plugin.js`** - Main plugin with Bluetooth LE, API integration, and remote control setup
-- **`stream.js`** - Audio streaming, voice processing, and control mode implementations
-- **`remote-control-demo.html`** - Interactive demo for testing remote control features
+### Core Files (v2.0 - New Modular Architecture)
+- **`dulaan-browser.js`** - Complete browser-compatible SDK bundle
+- **`dulaan-sdk.js`** - ES6 module version for modern development
+- **`core/`** - Core functionality (motor control, audio processing)
+- **`services/`** - External services (API, consent, remote control)
+- **`modes/`** - Control modes (AI voice, ambient, touch)
+- **`utils/`** - Utilities and constants
+- **`remote-control-demo.html`** - Interactive demo for testing all features
+
+### Legacy Files (Deprecated)
+- **`plugin.js`** - ⚠️ DEPRECATED: Use `dulaan-browser.js` instead
+- **`stream.js`** - ⚠️ DEPRECATED: Use `dulaan-browser.js` instead
 
 ## Key Features
 
@@ -51,6 +59,10 @@ Add to your project:
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
 <!-- Your existing Capacitor plugins -->
+<!-- New modular approach (recommended) -->
+<script src="dulaan-browser.js"></script>
+
+<!-- Legacy approach (deprecated) -->
 <script src="plugin.js"></script>
 <script src="stream.js"></script>
 ```
@@ -102,7 +114,7 @@ window.sendRemoteCommand('touch', 128); // PWM 0-255
 
 ### Cloud Functions Endpoints
 
-Update the API endpoints in `plugin.js`:
+Update the API endpoints in `dulaan-browser.js` (or legacy `plugin.js`):
 
 ```javascript
 // Production endpoints
@@ -122,7 +134,7 @@ const PEERJS_SERVER = {
 
 Configure your API keys:
 ```javascript
-// In plugin.js - speechToTextWithLLM function
+// In dulaan-browser.js (or legacy plugin.js) - speechToTextWithLLM function
 const GEMINI_API_KEY = 'your-gemini-api-key-here';
 ```
 
@@ -317,7 +329,7 @@ let onDisconnect = (deviceId) => {
 
 Enable debug logging:
 ```javascript
-// In plugin.js
+// In dulaan-browser.js (or legacy plugin.js)
 window.DEBUG_MODE = true;
 
 // Enhanced logging

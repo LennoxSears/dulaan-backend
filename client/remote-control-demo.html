@@ -430,7 +430,7 @@
             document.getElementById('logs').innerHTML = '';
         }
 
-        // Consent Functions (using real plugin.js functions)
+        // Consent Functions (using real Dulaan SDK functions)
         async function initializeDeviceId() {
             try {
                 const deviceId = await window.dulaan.getDeviceId();
@@ -469,7 +469,7 @@
                     return;
                 }
 
-                // Use real consent collection from plugin.js
+                // Use real consent collection from Dulaan SDK
                 const result = await window.dulaan.collectUserConsent(consentData);
                 
                 if (result.success) {
@@ -500,7 +500,7 @@
                     revoked: true
                 };
 
-                // Use real consent collection from plugin.js
+                // Use real consent collection from Dulaan SDK
                 const result = await window.dulaan.collectUserConsent(consentData);
                 
                 document.getElementById('consentStatus').className = 'status disconnected';
@@ -536,7 +536,7 @@
             }
         }
 
-        // Control Mode Functions (using real stream.js functionality)
+        // Control Mode Functions (using real Dulaan SDK functionality)
         function startAIControl() {
             log('Starting AI voice control...');
             // Use real AI streaming from stream.js
@@ -917,7 +917,7 @@
         document.getElementById('touchStartBtn').disabled = false;
         document.getElementById('manualSendBtn').disabled = false;
         
-        log('Remote control demo initialized with real plugin.js and stream.js');
+        log('Remote control demo initialized with new modular Dulaan SDK');
     </script>
 </body>
 </html>
