@@ -93,6 +93,13 @@
 <body>
     <h1>🎮 Dulaan Remote Control Demo</h1>
     
+    <div class="container" style="background: #d1ecf1; border-left: 4px solid #0c5460;">
+        <h3>🧪 Demo Mode Active</h3>
+        <p><strong>Hardware Mocked:</strong> BLE communication simulated for testing</p>
+        <p><strong>API Fallback:</strong> CORS-protected APIs fall back to local storage</p>
+        <p><strong>Full Functionality:</strong> All features available for testing</p>
+    </div>
+    
     <!-- User Consent Section -->
     <div class="container" id="consentContainer">
         <h2>🛡️ User Consent & Privacy</h2>
@@ -277,13 +284,23 @@
 
         // Mock BLE functions for demo
         window.BleClient = {
-            initialize: async () => console.log('BLE initialized (mock)'),
+            initialize: async () => {
+                console.log('BLE initialized (mock)');
+                return true;
+            },
             requestDevice: async () => ({ deviceId: 'mock_device_123' }),
-            connect: async () => console.log('BLE connected (mock)'),
+            connect: async (deviceId) => {
+                console.log('BLE connected (mock):', deviceId);
+                return true;
+            },
             write: async (deviceId, service, characteristic, value) => {
                 console.log(`BLE write (mock): ${deviceId}, ${service}, ${characteristic}, ${value}`);
+                return true;
             },
-            disconnect: async () => console.log('BLE disconnected (mock)')
+            disconnect: async (deviceId) => {
+                console.log('BLE disconnected (mock):', deviceId);
+                return true;
+            }
         };
 
         // Mock BLE utility functions

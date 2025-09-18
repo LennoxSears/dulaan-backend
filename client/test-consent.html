@@ -5,6 +5,9 @@
 </head>
 <body>
     <h1>Consent Collection Test</h1>
+    <div style="background: #fff3cd; padding: 10px; margin: 10px 0; border-radius: 5px;">
+        <strong>Demo Mode:</strong> Running locally with mocked BLE and CORS fallback
+    </div>
     <button onclick="testConsent()">Test Consent Collection</button>
     <div id="result"></div>
 
@@ -26,7 +29,22 @@
         };
 
         // Mock BLE
-        window.BleClient = {};
+        // Proper BLE mock
+        window.BleClient = {
+            initialize: async () => {
+                console.log('BLE initialized (mock)');
+                return true;
+            },
+            connect: async (deviceId) => {
+                console.log('BLE connected (mock):', deviceId);
+                return true;
+            },
+            write: async (deviceId, service, characteristic, value) => {
+                console.log('BLE write (mock):', { deviceId, service, characteristic, value });
+                return true;
+            }
+        };
+        
         window.textToDataView = (text) => new DataView(new ArrayBuffer(text.length));
         window.hexStringToDataView = (hex) => new DataView(new ArrayBuffer(hex.length / 2));
         window.deviceAddress = 'mock_device_123';
