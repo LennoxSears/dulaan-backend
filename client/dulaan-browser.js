@@ -184,30 +184,7 @@
                     ...consentData
                 };
 
-                // Check if running locally (for demo purposes)
-                const isLocalhost = window.location.hostname === 'localhost' || 
-                                  window.location.hostname === '127.0.0.1' ||
-                                  window.location.hostname.includes('gitpod.dev');
-
-                if (isLocalhost) {
-                    console.warn('Running in demo mode - simulating consent storage');
-                    
-                    // Cache consent locally for demo
-                    localStorage.setItem(this.storageKeys.consent, JSON.stringify(consentData));
-                    localStorage.setItem(this.storageKeys.timestamp, new Date().toISOString());
-                    
-                    // Return mock success response
-                    const mockResult = {
-                        success: true,
-                        deviceId: deviceId,
-                        consent: consentData,
-                        action: 'demo_stored',
-                        message: 'Consent stored locally (demo mode)'
-                    };
-                    
-                    console.log('Demo consent stored:', mockResult);
-                    return mockResult;
-                }
+                // Make API call to Cloud Function
 
                 // Try real API call for production
                 const response = await fetch(this.apiUrl, {
@@ -232,24 +209,6 @@
                 return result;
             } catch (error) {
                 console.error('Error collecting user consent:', error);
-                
-                // Fallback to local storage for demo purposes
-                if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
-                    console.warn('CORS error detected - falling back to demo mode');
-                    
-                    const deviceId = await this.getDeviceId();
-                    localStorage.setItem(this.storageKeys.consent, JSON.stringify(consentData));
-                    localStorage.setItem(this.storageKeys.timestamp, new Date().toISOString());
-                    
-                    return {
-                        success: true,
-                        deviceId: deviceId,
-                        consent: consentData,
-                        action: 'demo_fallback',
-                        message: 'Consent stored locally (CORS fallback)'
-                    };
-                }
-                
                 throw error;
             }
         }
