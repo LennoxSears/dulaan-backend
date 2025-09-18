@@ -179,9 +179,9 @@
                 
                 const consentPayload = {
                     deviceId: deviceId,
+                    consent: consentData,
                     timestamp: new Date().toISOString(),
-                    userAgent: navigator.userAgent,
-                    ...consentData
+                    userAgent: navigator.userAgent
                 };
 
                 // Make API call to Cloud Function
