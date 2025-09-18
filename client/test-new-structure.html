@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test New Dulaan Structure</title>
+</head>
+<body>
+    <h1>Test New Dulaan SDK Structure</h1>
+    <button onclick="testSDK()">Test SDK</button>
+    <button onclick="testConsent()">Test Consent</button>
+    <button onclick="testMotor()">Test Motor</button>
+    <div id="results"></div>
+
+    <!-- Mock dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@thumbmarkjs/thumbmarkjs/dist/thumbmark.umd.js"></script>
+    <script>
+        // Mock Capacitor and BLE
+        window.Capacitor = {
+            Plugins: {
+                VoiceRecorder: {
+                    requestAudioRecordingPermission: async () => ({ value: true }),
+                    startRecording: async () => ({ value: true }),
+                    stopRecording: async () => ({ 
+                        value: { 
+                            recordDataBase64: 'mock_audio_data_' + Date.now() 
+                        } 
+                    })
+                }
+            }
+        };
+
+        window.BleClient = {
+            initialize: async () => console.log('BLE initialized (mock)'),
+            connect: async () => console.log('BLE connected (mock)'),
+            write: async (deviceId, service, characteristic, value) => {
+                console.log(`BLE write (mock): ${value}`);
+            }
+        };
+
+        window.ble = {
+            write: async (deviceId, service, characteristic, value) => {
+                console.log(`BLE write (mock): ${value}`);
+                return true;
+            }
+        };
+
+        window.deviceAddress = 'mock_device_123';
+    </script>
+    
+    <!-- Include new Dulaan SDK -->
+    <script src="dulaan-browser.js"></script>
+    
+    <script>
+        function log(message) {
+            const results = document.getElementById('results');
+            results.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${message}</div>`;
+        }
+
+        async function testSDK() {
+            log('Testing SDK initialization...');
+            
+            try {
+                const info = window.dulaan;
+                log(`SDK available: ${!!info}`);
+                log(`Motor controller: ${!!info.motor}`);
+                log(`Consent service: ${!!info.consent}`);
+                log(`API service: ${!!info.api}`);
+                log('✅ SDK structure test passed');
+            } catch (error) {
+                log(`❌ SDK test failed: ${error.message}`);
+            }
+        }
+
+        async function testConsent() {
+            log('Testing consent collection...');
+            
+            try {
+                const deviceId = await window.dulaan.getDeviceId();
+                log(`Device ID: ${deviceId}`);
+                
+                const consentData = {
+                    dataProcessing: true,
+                    analytics: false,
+                    remoteControl: true,
+                    purpose: 'testing'
+                };
+                
+                const result = await window.dulaan.collectUserConsent(consentData);
+                log(`Consent result: ${JSON.stringify(result)}`);
+                log('✅ Consent test passed');
+            } catch (error) {
+                log(`❌ Consent test failed: ${error.message}`);
+            }
+        }
+
+        async function testMotor() {
+            log('Testing motor control...');
+            
+            try {
+                await window.dulaan.write(100);
+                log(`Motor PWM set to: ${window.dulaan.motor.getCurrentPwm()}`);
+                
+                await window.dulaan.write(0);
+                log(`Motor PWM set to: ${window.dulaan.motor.getCurrentPwm()}`);
+                
+                log('✅ Motor test passed');
+            } catch (error) {
+                log(`❌ Motor test failed: ${error.message}`);
+            }
+        }
+
+        // Auto-run basic test
+        setTimeout(() => {
+            log('Auto-running SDK test...');
+            testSDK();
+        }, 1000);
+    </script>
+</body>
+</html>

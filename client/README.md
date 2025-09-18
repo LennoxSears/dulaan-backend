@@ -111,7 +111,7 @@ const SPEECH_TO_TEXT_LLM_API = 'https://europe-west1-dulaan-backend.cloudfunctio
 
 // PeerJS Server
 const PEERJS_SERVER = {
-    host: 'peerjs-server-dot-dulaan-backend.appspot.com',
+    host: 'dulaan-backend.ew.r.appspot.com',
     port: 443,
     path: '/peerjs',
     secure: true
