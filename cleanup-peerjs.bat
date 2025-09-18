@@ -46,8 +46,9 @@ echo Step 1: Cleaning up PeerJS Cloud Run services...
 REM ============================================================================
 
 echo Checking for dulaan-peerjs-server in europe-west1...
-gcloud run services describe dulaan-peerjs-server --region=europe-west1 >nul 2>&1
+gcloud run services describe dulaan-peerjs-server --region=europe-west1 2>nul
 if !errorlevel!==0 (
+    echo Found dulaan-peerjs-server in europe-west1
     echo Deleting Cloud Run service: dulaan-peerjs-server (europe-west1)
     gcloud run services delete dulaan-peerjs-server --region=europe-west1 --quiet
     if !errorlevel!==0 (
@@ -60,8 +61,9 @@ if !errorlevel!==0 (
 )
 
 echo Checking for dulaan-peerjs-server in us-central1...
-gcloud run services describe dulaan-peerjs-server --region=us-central1 >nul 2>&1
+gcloud run services describe dulaan-peerjs-server --region=us-central1 2>nul
 if !errorlevel!==0 (
+    echo Found dulaan-peerjs-server in us-central1
     echo Deleting Cloud Run service: dulaan-peerjs-server (us-central1)
     gcloud run services delete dulaan-peerjs-server --region=us-central1 --quiet
     if !errorlevel!==0 (
@@ -107,8 +109,9 @@ echo Step 3: Cleaning up PeerJS App Engine service...
 REM ============================================================================
 
 echo Checking for peerjs App Engine service...
-gcloud app services describe peerjs >nul 2>&1
+gcloud app services describe peerjs 2>nul
 if !errorlevel!==0 (
+    echo Found peerjs App Engine service
     echo Deleting App Engine service: peerjs
     gcloud app services delete peerjs --quiet
     if !errorlevel!==0 (
@@ -187,8 +190,9 @@ echo Step 5: Cleaning up PeerJS firewall rules...
 REM ============================================================================
 
 echo Checking for allow-peerjs-server firewall rule...
-gcloud compute firewall-rules describe allow-peerjs-server >nul 2>&1
+gcloud compute firewall-rules describe allow-peerjs-server 2>nul
 if !errorlevel!==0 (
+    echo Found allow-peerjs-server firewall rule
     echo Deleting firewall rule: allow-peerjs-server
     gcloud compute firewall-rules delete allow-peerjs-server --quiet
     if !errorlevel!==0 (
@@ -201,8 +205,9 @@ if !errorlevel!==0 (
 )
 
 echo Checking for allow-http-8080 firewall rule...
-gcloud compute firewall-rules describe allow-http-8080 >nul 2>&1
+gcloud compute firewall-rules describe allow-http-8080 2>nul
 if !errorlevel!==0 (
+    echo Found allow-http-8080 firewall rule
     echo Deleting firewall rule: allow-http-8080
     gcloud compute firewall-rules delete allow-http-8080 --quiet
     if !errorlevel!==0 (
@@ -251,14 +256,14 @@ echo Verifying PeerJS cleanup...
 echo.
 
 echo Checking for remaining PeerJS Cloud Run services:
-gcloud run services describe dulaan-peerjs-server --region=europe-west1 >nul 2>&1
+gcloud run services describe dulaan-peerjs-server --region=europe-west1 2>nul
 if !errorlevel!==0 (
     echo WARNING: dulaan-peerjs-server still exists in europe-west1
 ) else (
     echo OK: No dulaan-peerjs-server in europe-west1
 )
 
-gcloud run services describe dulaan-peerjs-server --region=us-central1 >nul 2>&1
+gcloud run services describe dulaan-peerjs-server --region=us-central1 2>nul
 if !errorlevel!==0 (
     echo WARNING: dulaan-peerjs-server still exists in us-central1
 ) else (
@@ -283,7 +288,7 @@ if !REMAINING_IMAGES!==1 (
 
 echo.
 echo Checking for PeerJS App Engine service:
-gcloud app services describe peerjs >nul 2>&1
+gcloud app services describe peerjs 2>nul
 if !errorlevel!==0 (
     echo WARNING: peerjs App Engine service still exists
 ) else (
@@ -292,14 +297,14 @@ if !errorlevel!==0 (
 
 echo.
 echo Checking PeerJS firewall rules:
-gcloud compute firewall-rules describe allow-peerjs-server >nul 2>&1
+gcloud compute firewall-rules describe allow-peerjs-server 2>nul
 if !errorlevel!==0 (
     echo WARNING: allow-peerjs-server firewall rule still exists
 ) else (
     echo OK: No allow-peerjs-server firewall rule found
 )
 
-gcloud compute firewall-rules describe allow-http-8080 >nul 2>&1
+gcloud compute firewall-rules describe allow-http-8080 2>nul
 if !errorlevel!==0 (
     echo WARNING: allow-http-8080 firewall rule still exists
 ) else (
