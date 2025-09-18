@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Remote Control Module</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        .status { padding: 5px 10px; border-radius: 3px; margin: 5px 0; }
+        .status.hosting { background: #e8f5e8; color: #2d5a2d; }
+        .status.connected { background: #e8f0ff; color: #1a4480; }
+        .status.connecting { background: #fff3cd; color: #856404; }
+        .status.disconnected { background: #f8d7da; color: #721c24; }
+        button { margin: 5px; padding: 10px; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        #errorMessage { display: none; background: #f8d7da; color: #721c24; padding: 10px; border-radius: 3px; margin: 10px 0; }
+        .id-display { font-family: monospace; font-size: 18px; font-weight: bold; background: #f0f0f0; padding: 10px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Remote Control Module Test</h1>
+    
+    <div class="test-section">
+        <h2>Automated Tests</h2>
+        <div id="test-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Connection Status</h2>
+        <div id="connectionStatus" class="status disconnected">Disconnected</div>
+        <div>Host ID: <span id="hostId" class="id-display">-</span></div>
+        <div>Connected Users: <span id="userCount">0</span></div>
+        <div id="errorMessage"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Remote Control Actions</h2>
+        <button id="hostBtn">Start as Host</button>
+        <button id="connectBtn">Connect to Host</button>
+        <button id="disconnectBtn" disabled>Disconnect</button>
+        <button id="generateBtn">Generate ID</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Command Testing (Remote Mode Only)</h2>
+        <button onclick="testSendCommand('manual', 128)">Send Manual Command (128)</button>
+        <button onclick="testSendCommand('touch', 200)">Send Touch Command (200)</button>
+        <button onclick="testSendCommand('ai', 50)">Send AI Command (50)</button>
+        <input type="range" id="commandSlider" min="0" max="255" value="128" oninput="updateSliderValue(this.value)">
+        <span id="sliderValue">128</span>
+        <button onclick="sendSliderCommand()">Send Slider Value</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test Output</h2>
+        <div id="output"></div>
+    </div>
+
+    <script src="dulaan-browser.js"></script>
+    <script>
+        let remoteControl;
+
+        function log(message, isError = false) {
+            const output = document.getElementById('output');
+            const div = document.createElement('div');
+            div.className = isError ? 'error' : 'success';
+            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            output.appendChild(div);
+            console.log(message);
+        }
+
+        function updateSliderValue(value) {
+            document.getElementById('sliderValue').textContent = value;
+        }
+
+        function sendSliderCommand() {
+            const value = document.getElementById('commandSlider').value;
+            testSendCommand('manual', parseInt(value));
+        }
+
+        async function testSendCommand(mode, value) {
+            try {
+                if (remoteControl && remoteControl.getStatus().isRemote) {
+                    await remoteControl.sendCommand(mode, value);
+                    log(`Sent ${mode} command: ${value}`);
+                } else {
+                    log('Not connected as remote user', true);
+                }
+            } catch (error) {
+                log(`Failed to send command: ${error.message}`, true);
+            }
+        }
+
+        // Automated tests
+        function runAutomatedTests() {
+            const results = document.getElementById('test-results');
+            let passed = 0;
+            let total = 0;
+
+            function test(name, condition) {
+                total++;
+                const div = document.createElement('div');
+                if (condition) {
+                    passed++;
+                    div.className = 'success';
+                    div.textContent = `✅ ${name}`;
+                } else {
+                    div.className = 'error';
+                    div.textContent = `❌ ${name}`;
+                }
+                results.appendChild(div);
+            }
+
+            // Test global availability
+            test('window.remoteControl exists', typeof window.remoteControl !== 'undefined');
+            test('window.RemoteControl class exists', typeof window.RemoteControl !== 'undefined');
+            
+            if (window.remoteControl) {
+                remoteControl = window.remoteControl;
+                
+                // Test methods
+                test('generateId method exists', typeof remoteControl.generateId === 'function');
+                test('startAsHost method exists', typeof remoteControl.startAsHost === 'function');
+                test('connectToHost method exists', typeof remoteControl.connectToHost === 'function');
+                test('sendCommand method exists', typeof remoteControl.sendCommand === 'function');
+                test('getStatus method exists', typeof remoteControl.getStatus === 'function');
+                test('isValidId method exists', typeof remoteControl.isValidId === 'function');
+                
+                // Test ID generation
+                const id = remoteControl.generateId();
+                test('generateId returns 6-character string', typeof id === 'string' && id.length === 6);
+                test('generateId returns valid format', /^[A-Z0-9]{6}$/.test(id));
+                
+                // Test ID validation
+                test('isValidId validates correct ID', remoteControl.isValidId('ABC123'));
+                test('isValidId rejects invalid ID', !remoteControl.isValidId('abc123'));
+                test('isValidId rejects wrong length', !remoteControl.isValidId('ABC12'));
+                
+                // Test status
+                const status = remoteControl.getStatus();
+                test('getStatus returns object', typeof status === 'object');
+                test('status has isConnected property', 'isConnected' in status);
+                test('status has connectionStatus property', 'connectionStatus' in status);
+                
+                // Setup UI callbacks
+                remoteControl.setUICallbacks({
+                    onHostReady: (hostId) => log(`Host ready: ${hostId}`),
+                    onConnectionStatusChange: (status, error) => {
+                        log(`Status changed: ${status}${error ? ` (${error})` : ''}`);
+                    },
+                    onUserListUpdate: (users) => log(`Users updated: ${users.length} connected`),
+                    onError: (message, error) => log(`Error: ${message}`, true)
+                });
+                
+                // Setup demo handlers
+                remoteControl.setupDemoHandlers();
+                
+                test('UI callbacks setup successful', true);
+            }
+
+            // Test legacy compatibility
+            test('window.startRemoteHost exists', typeof window.startRemoteHost === 'function');
+            test('window.connectToRemoteHost exists', typeof window.connectToRemoteHost === 'function');
+            test('window.generateRemoteId exists', typeof window.generateRemoteId === 'function');
+
+            const summary = document.createElement('div');
+            summary.style.fontWeight = 'bold';
+            summary.style.marginTop = '10px';
+            summary.textContent = `Tests: ${passed}/${total} passed`;
+            summary.className = passed === total ? 'success' : 'error';
+            results.appendChild(summary);
+            
+            if (passed === total) {
+                log('All automated tests passed!');
+            } else {
+                log(`${total - passed} tests failed`, true);
+            }
+        }
+
+        // Manual test functions for buttons
+        async function testStartHost() {
+            try {
+                const hostId = await remoteControl.startAsHost();
+                log(`Host started successfully: ${hostId}`);
+                alert(`Host started! Share this ID: ${hostId}`);
+            } catch (error) {
+                log(`Failed to start host: ${error.message}`, true);
+                alert(`Failed to start host: ${error.message}`);
+            }
+        }
+
+        async function testConnectToHost() {
+            const hostId = prompt('Enter Host ID (6 characters):');
+            if (hostId) {
+                try {
+                    await remoteControl.connectToHost(hostId.toUpperCase());
+                    log(`Connected to host: ${hostId}`);
+                } catch (error) {
+                    log(`Failed to connect: ${error.message}`, true);
+                    alert(`Failed to connect: ${error.message}`);
+                }
+            }
+        }
+
+        async function testDisconnect() {
+            try {
+                await remoteControl.disconnect();
+                log('Disconnected successfully');
+            } catch (error) {
+                log(`Failed to disconnect: ${error.message}`, true);
+            }
+        }
+
+        function testGenerateId() {
+            const id = remoteControl.generateId();
+            log(`Generated ID: ${id}`);
+            alert(`Generated ID: ${id}`);
+        }
+
+        // Override demo handlers with test versions
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                runAutomatedTests();
+                
+                // Override button handlers with test versions
+                if (remoteControl) {
+                    document.getElementById('hostBtn').onclick = testStartHost;
+                    document.getElementById('connectBtn').onclick = testConnectToHost;
+                    document.getElementById('disconnectBtn').onclick = testDisconnect;
+                    document.getElementById('generateBtn').onclick = testGenerateId;
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>

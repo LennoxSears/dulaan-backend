@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dulaan Basic Integration Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.disconnected { background: #f8d7da; color: #721c24; }
+        .status.connecting { background: #fff3cd; color: #856404; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .error { color: #dc3545; margin: 10px 0; }
+        .success { color: #28a745; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Dulaan Basic Integration</h1>
+        <p>This example shows the basic setup and motor control functionality.</p>
+        
+        <div class="container">
+            <h2>1. Motor Connection</h2>
+            <div id="motorStatus" class="status disconnected">Motor: Disconnected</div>
+            <button id="connectMotor">Connect Motor</button>
+            <button id="disconnectMotor" disabled>Disconnect Motor</button>
+            <div id="motorError" class="error" style="display: none;"></div>
+        </div>
+        
+        <div class="container">
+            <h2>2. Basic Motor Control</h2>
+            <label for="pwmSlider">PWM Value (0-255): <span id="pwmValue">0</span></label><br>
+            <input type="range" id="pwmSlider" min="0" max="255" value="0" style="width: 100%; margin: 10px 0;">
+            <br>
+            <button onclick="sendPWM()">Send PWM</button>
+            <button onclick="stopMotor()">Stop Motor</button>
+            <div id="controlStatus"></div>
+        </div>
+        
+        <div class="container">
+            <h2>3. Quick Actions</h2>
+            <button onclick="testLowIntensity()">Low (25%)</button>
+            <button onclick="testMediumIntensity()">Medium (50%)</button>
+            <button onclick="testHighIntensity()">High (75%)</button>
+            <button onclick="testMaxIntensity()">Max (100%)</button>
+        </div>
+        
+        <div class="container">
+            <h2>4. System Information</h2>
+            <div id="systemInfo">
+                <p><strong>SDK Version:</strong> <span id="sdkVersion">-</span></p>
+                <p><strong>Motor Status:</strong> <span id="motorInfo">-</span></p>
+                <p><strong>Current PWM:</strong> <span id="currentPwm">0</span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dulaan SDK -->
+    <script src="../dulaan-browser.js"></script>
+    
+    <script>
+        // Global state
+        let isMotorConnected = false;
+        let currentPwmValue = 0;
+
+        // Initialize when page loads
+        window.addEventListener('load', async () => {
+            try {
+                // Initialize SDK
+                await window.dulaan.initialize();
+                updateSystemInfo();
+                log('SDK initialized successfully', 'success');
+            } catch (error) {
+                log(`SDK initialization failed: ${error.message}`, 'error');
+            }
+        });
+
+        // Motor connection functions
+        document.getElementById('connectMotor').onclick = async () => {
+            try {
+                setConnecting(true);
+                
+                // In a real app, you would get the device address from user input or scanning
+                // For demo purposes, we'll use a placeholder
+                const deviceAddress = prompt('Enter Bluetooth device address (or leave empty for demo):');
+                
+                if (deviceAddress) {
+                    await window.dulaan.connectMotor(deviceAddress);
+                } else {
+                    // Demo mode - simulate connection
+                    console.log('Demo mode: Motor connection simulated');
+                }
+                
+                isMotorConnected = true;
+                updateMotorStatus('connected');
+                updateSystemInfo();
+                log('Motor connected successfully', 'success');
+                
+            } catch (error) {
+                updateMotorStatus('disconnected');
+                log(`Motor connection failed: ${error.message}`, 'error');
+            } finally {
+                setConnecting(false);
+            }
+        };
+
+        document.getElementById('disconnectMotor').onclick = async () => {
+            try {
+                await window.dulaan.disconnectMotor();
+                isMotorConnected = false;
+                currentPwmValue = 0;
+                updateMotorStatus('disconnected');
+                updateSystemInfo();
+                document.getElementById('pwmSlider').value = 0;
+                document.getElementById('pwmValue').textContent = 0;
+                log('Motor disconnected', 'success');
+            } catch (error) {
+                log(`Disconnection failed: ${error.message}`, 'error');
+            }
+        };
+
+        // PWM control functions
+        document.getElementById('pwmSlider').oninput = function() {
+            document.getElementById('pwmValue').textContent = this.value;
+        };
+
+        async function sendPWM() {
+            const pwmValue = parseInt(document.getElementById('pwmSlider').value);
+            
+            if (!isMotorConnected) {
+                log('Motor not connected', 'error');
+                return;
+            }
+
+            try {
+                await window.dulaan.writeMotor(pwmValue);
+                currentPwmValue = pwmValue;
+                updateSystemInfo();
+                log(`PWM sent: ${pwmValue}`, 'success');
+            } catch (error) {
+                log(`Failed to send PWM: ${error.message}`, 'error');
+            }
+        }
+
+        async function stopMotor() {
+            try {
+                await window.dulaan.writeMotor(0);
+                currentPwmValue = 0;
+                document.getElementById('pwmSlider').value = 0;
+                document.getElementById('pwmValue').textContent = 0;
+                updateSystemInfo();
+                log('Motor stopped', 'success');
+            } catch (error) {
+                log(`Failed to stop motor: ${error.message}`, 'error');
+            }
+        }
+
+        // Quick action functions
+        async function testLowIntensity() {
+            await setPWMPercentage(25);
+        }
+
+        async function testMediumIntensity() {
+            await setPWMPercentage(50);
+        }
+
+        async function testHighIntensity() {
+            await setPWMPercentage(75);
+        }
+
+        async function testMaxIntensity() {
+            await setPWMPercentage(100);
+        }
+
+        async function setPWMPercentage(percentage) {
+            const pwmValue = Math.round((percentage / 100) * 255);
+            document.getElementById('pwmSlider').value = pwmValue;
+            document.getElementById('pwmValue').textContent = pwmValue;
+            await sendPWM();
+        }
+
+        // UI update functions
+        function updateMotorStatus(status) {
+            const statusElement = document.getElementById('motorStatus');
+            const connectBtn = document.getElementById('connectMotor');
+            const disconnectBtn = document.getElementById('disconnectMotor');
+            
+            statusElement.className = `status ${status}`;
+            
+            switch (status) {
+                case 'connected':
+                    statusElement.textContent = 'Motor: Connected';
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    break;
+                case 'connecting':
+                    statusElement.textContent = 'Motor: Connecting...';
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = true;
+                    break;
+                case 'disconnected':
+                default:
+                    statusElement.textContent = 'Motor: Disconnected';
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    break;
+            }
+        }
+
+        function setConnecting(connecting) {
+            if (connecting) {
+                updateMotorStatus('connecting');
+            }
+        }
+
+        function updateSystemInfo() {
+            document.getElementById('sdkVersion').textContent = window.DULAAN_CONSTANTS?.SDK_INFO?.VERSION || '2.0.0';
+            document.getElementById('motorInfo').textContent = isMotorConnected ? 'Connected' : 'Disconnected';
+            document.getElementById('currentPwm').textContent = currentPwmValue;
+        }
+
+        function log(message, type = 'info') {
+            const statusElement = document.getElementById('controlStatus');
+            statusElement.className = type;
+            statusElement.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            console.log(message);
+        }
+
+        // Error handling for motor errors
+        function showMotorError(message) {
+            const errorElement = document.getElementById('motorError');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

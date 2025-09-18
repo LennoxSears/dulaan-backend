@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-18T12:02:47.554Z
+ * Generated on: 2025-09-18T11:57:18.732Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -2861,7 +2861,6 @@ if (typeof window !== 'undefined') {
         ApiService,
         ConsentService,
         RemoteService,
-        RemoteControl,
         AIVoiceControl,
         AmbientControl,
         TouchControl,

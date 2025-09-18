@@ -1,23 +1,101 @@
-# Dulaan Client Integration
+# Dulaan Client SDK
 
-This directory contains the updated client-side JavaScript files for the Dulaan hybrid app, integrating with the new Google Cloud Function APIs and PeerJS remote control functionality.
+🚀 **NEW: Modular Architecture with Automated Bundling!**
 
-## Files Overview
+This directory contains the Dulaan client SDK with a modern modular architecture that provides clean development while maintaining browser compatibility through automated bundling.
 
-### Core Files (v2.0 - New Modular Architecture)
-- **`dulaan-browser.js`** - Complete browser-compatible SDK bundle
-- **`dulaan-sdk.js`** - ES6 module version for modern development
-- **`core/`** - Core functionality (motor control, audio processing)
-- **`services/`** - External services (API, consent, remote control)
-- **`modes/`** - Control modes (AI voice, ambient, touch)
-- **`utils/`** - Utilities and constants
-- **`remote-control-demo.html`** - Interactive demo for testing all features
+## 🏗️ Architecture Overview
+
+### Modular Development Structure
+```
+client/
+├── utils/                  # Utility functions and constants
+├── core/                   # Core functionality (motor, audio)
+├── services/              # External services (API, consent, remote)
+├── modes/                 # Control modes (AI, ambient, touch)
+├── dulaan-sdk.js          # Main SDK entry point
+├── build.js               # Automated build system
+└── dulaan-browser.js      # Generated browser bundle
+```
+
+### Key Benefits
+- ✅ **Clean Development**: ES6 modules with proper imports/exports
+- ✅ **Browser Compatible**: Single bundle file for production
+- ✅ **Automated Building**: Watch mode for continuous development
+- ✅ **6-Character IDs**: Simple remote control sharing
+- ✅ **Professional Structure**: Organized, maintainable codebase
+
+## 🚀 Quick Start
+
+### For Developers
+```bash
+cd client
+npm install
+npm run dev    # Start development with auto-rebuild
+```
+
+### For Browser Integration
+```html
+<script src="dulaan-browser.js"></script>
+<script>
+    // SDK auto-initializes
+    const id = window.dulaan.generateId(); // 6-character ID
+    window.dulaan.startRemoteControl(id);
+</script>
+```
+
+## 📁 File Structure
+
+### Core Files (v2.0 - Modular Architecture)
+- **`dulaan-browser.js`** - 📦 Complete browser-compatible SDK bundle (69KB)
+- **`dulaan-sdk.js`** - 🎯 Main SDK entry point (ES6 module)
+- **`build.js`** - 🔨 Automated build system with watch mode
+- **`package.json`** - 📋 npm configuration and build scripts
+- **`BUILD_GUIDE.md`** - 📖 Complete development guide
+
+### Modular Source Files
+- **`core/`** - 🔧 Core functionality (motor control, audio processing)
+- **`services/`** - 🌐 External services (API, consent, remote control)
+- **`modes/`** - 🎮 Control modes (AI voice, ambient, touch)
+- **`remote-control.js`** - 🎯 High-level remote control orchestration
+- **`utils/`** - 🛠️ Utilities and constants
+
+### Demo & Testing
+- **`remote-control-demo.html`** - 🎮 Interactive demo for testing all features
+- **`test-bundle.html`** - 🧪 Automated tests for bundle verification
+- **`test-remote-control.html`** - 🎯 Dedicated remote control module testing
 
 ### Legacy Files (Deprecated)
 - **`plugin.js`** - ⚠️ DEPRECATED: Use `dulaan-browser.js` instead
 - **`stream.js`** - ⚠️ DEPRECATED: Use `dulaan-browser.js` instead
 
-## Key Features
+## 🎯 Development Workflow
+
+### 1. Install Dependencies
+```bash
+npm install
+```
+
+### 2. Development Mode
+```bash
+npm run dev    # Auto-rebuild on file changes
+```
+
+### 3. Build for Production
+```bash
+npm run build  # Generate dulaan-browser.js
+```
+
+### 4. Test Your Changes
+Open `test-bundle.html` or `remote-control-demo.html` to verify functionality.
+
+## ✨ Key Features
+
+### 🏗️ Modular Architecture
+- **ES6 Modules**: Clean imports/exports for development
+- **Automated Bundling**: Single browser-compatible file
+- **Watch Mode**: Continuous rebuilding during development
+- **Dependency Management**: Proper file processing order
 
 ### 🔄 API Integration
 - **Speech-to-Text**: Integrated with Google Cloud Functions instead of Deepgram
@@ -26,6 +104,7 @@ This directory contains the updated client-side JavaScript files for the Dulaan 
 - **Error Handling**: Comprehensive error handling and fallbacks
 
 ### 🎮 Remote Control System
+- **6-Character IDs**: Simple, memorable sharing codes (e.g., "A1B2C3")
 - **Host Mode**: Device owner shares unique ID for remote access
 - **Remote Mode**: Users connect to host via ID to control device
 - **Multi-user Support**: Multiple remote users can control one device
@@ -49,36 +128,49 @@ All three control modes work both locally and remotely:
    - Real-time slider control
    - Percentage to PWM conversion
 
-## Integration Guide
+## 🔧 Integration Guide
 
-### 1. Dependencies
+### 1. Browser Integration
 
-Add to your project:
+Add to your HTML:
 ```html
 <!-- PeerJS for remote control -->
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
-<!-- Your existing Capacitor plugins -->
-<!-- New modular approach (recommended) -->
+<!-- Dulaan SDK (auto-initializes) -->
 <script src="dulaan-browser.js"></script>
-
-<!-- Legacy approach (deprecated) -->
-<script src="plugin.js"></script>
-<script src="stream.js"></script>
 ```
 
-### 2. Basic Setup
+### 2. Development Integration
+
+For modular development:
+```javascript
+// In your ES6 modules
+import { DulaanSDK } from './dulaan-sdk.js';
+import { MotorController } from './core/motor-controller.js';
+
+const sdk = new DulaanSDK();
+```
+
+### 3. Basic Usage
 
 ```javascript
+// SDK is automatically initialized when script loads
+// Generate a 6-character ID for remote control
+const id = window.dulaan.generateId(); // Returns: "A1B2C3"
+console.log('Share this ID:', id);
+
+// High-level remote control (recommended)
+const hostId = await window.remoteControl.startAsHost();
+await window.remoteControl.connectToHost('A1B2C3');
+await window.remoteControl.sendCommand('manual', 128);
+
+// Or use SDK methods
+window.dulaan.startRemoteControl(id);
+window.dulaan.connectToRemote('A1B2C3');
+
 // Initialize Bluetooth connection
 await window.dulaan.connect();
-
-// Initialize remote control as host
-const hostId = window.startRemoteHost();
-console.log('Share this ID:', hostId);
-
-// Or connect as remote user
-window.connectToRemoteHost('host-id-here');
 ```
 
 ### 3. Control Modes

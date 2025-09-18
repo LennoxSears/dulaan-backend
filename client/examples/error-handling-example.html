@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dulaan Error Handling Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .error-demo {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success-demo {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .warning-demo {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button.danger { background: #dc3545; }
+        button.danger:hover { background: #c82333; }
+        button.warning { background: #ffc107; color: #212529; }
+        button.warning:hover { background: #e0a800; }
+        .log-container {
+            background: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            height: 200px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .error-type {
+            font-weight: bold;
+            color: #dc3545;
+        }
+        .recovery-action {
+            font-weight: bold;
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚠️ Dulaan Error Handling Examples</h1>
+        <p>Learn how to properly handle errors and implement recovery strategies in your Dulaan applications.</p>
+    </div>
+
+    <div class="container">
+        <h2>🔧 Connection Error Scenarios</h2>
+        
+        <h3>Bluetooth Connection Errors</h3>
+        <button onclick="simulateBluetoothError('not_available')">BLE Not Available</button>
+        <button onclick="simulateBluetoothError('permission_denied')">Permission Denied</button>
+        <button onclick="simulateBluetoothError('connection_failed')">Connection Failed</button>
+        <button onclick="simulateBluetoothError('device_not_found')">Device Not Found</button>
+        
+        <div class="code-block">
+try {
+    await window.dulaan.connectMotor(deviceAddress);
+} catch (error) {
+    if (error.name === 'NotSupportedError') {
+        showError('Bluetooth not supported on this device');
+        suggestAlternative('usb_connection');
+    } else if (error.name === 'NotAllowedError') {
+        showError('Bluetooth permission denied');
+        requestPermissionAgain();
+    } else {
+        showError(`Connection failed: ${error.message}`);
+        retryConnection();
+    }
+}
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🌐 Network Error Scenarios</h2>
+        
+        <h3>API Connection Errors</h3>
+        <button onclick="simulateNetworkError('timeout')">Request Timeout</button>
+        <button onclick="simulateNetworkError('offline')">Network Offline</button>
+        <button onclick="simulateNetworkError('server_error')">Server Error</button>
+        <button onclick="simulateNetworkError('rate_limit')">Rate Limited</button>
+        
+        <div class="code-block">
+async function callAPIWithRetry(apiFunction, maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            return await apiFunction();
+        } catch (error) {
+            if (attempt === maxRetries) throw error;
+            
+            const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+}
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🎤 Audio Error Scenarios</h2>
+        
+        <h3>Microphone Access Errors</h3>
+        <button onclick="simulateAudioError('permission_denied')">Mic Permission Denied</button>
+        <button onclick="simulateAudioError('not_found')">No Microphone Found</button>
+        <button onclick="simulateAudioError('in_use')">Microphone In Use</button>
+        <button onclick="simulateAudioError('hardware_error')">Hardware Error</button>
+        
+        <div class="code-block">
+async function initializeAudio() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        return stream;
+    } catch (error) {
+        switch (error.name) {
+            case 'NotAllowedError':
+                showMicrophonePermissionDialog();
+                break;
+            case 'NotFoundError':
+                showNoMicrophoneError();
+                break;
+            case 'NotReadableError':
+                showMicrophoneInUseError();
+                break;
+            default:
+                showGenericAudioError(error.message);
+        }
+        throw error;
+    }
+}
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🎮 Remote Control Error Scenarios</h2>
+        
+        <h3>PeerJS Connection Errors</h3>
+        <button onclick="simulateRemoteError('peer_unavailable')">Peer Unavailable</button>
+        <button onclick="simulateRemoteError('connection_lost')">Connection Lost</button>
+        <button onclick="simulateRemoteError('invalid_id')">Invalid Host ID</button>
+        <button onclick="simulateRemoteError('server_down')">PeerJS Server Down</button>
+        
+        <div class="code-block">
+window.remoteControl.setUICallbacks({
+    onError: (message, error) => {
+        console.error('Remote control error:', message, error);
+        
+        if (error.type === 'peer-unavailable') {
+            showRetryDialog('Host is not available. Retry connection?');
+        } else if (error.type === 'network') {
+            showNetworkErrorDialog();
+        } else {
+            showGenericRemoteError(message);
+        }
+    }
+});
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🔄 Recovery Strategies</h2>
+        
+        <h3>Automatic Recovery</h3>
+        <button onclick="demonstrateAutoRecovery()">Auto-Reconnect Demo</button>
+        <button onclick="demonstrateGracefulDegradation()">Graceful Degradation</button>
+        <button onclick="demonstrateOfflineMode()">Offline Mode</button>
+        
+        <div class="code-block">
+class ConnectionManager {
+    constructor() {
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        this.reconnectDelay = 1000;
+    }
+    
+    async handleDisconnection() {
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.reconnectAttempts++;
+            const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+            
+            setTimeout(async () => {
+                try {
+                    await this.reconnect();
+                    this.reconnectAttempts = 0;
+                } catch (error) {
+                    this.handleDisconnection();
+                }
+            }, delay);
+        } else {
+            this.enterOfflineMode();
+        }
+    }
+}
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📊 Error Monitoring</h2>
+        
+        <h3>Error Logging and Analytics</h3>
+        <button onclick="demonstrateErrorLogging()">Log Error Example</button>
+        <button onclick="showErrorStatistics()">Show Error Stats</button>
+        <button onclick="exportErrorLog()">Export Error Log</button>
+        
+        <div class="log-container" id="errorLog">
+            <div>Error log will appear here...</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🛡️ Defensive Programming</h2>
+        
+        <h3>Input Validation</h3>
+        <button onclick="demonstrateInputValidation()">Test Input Validation</button>
+        <button onclick="demonstrateBoundaryChecking()">Boundary Checking</button>
+        <button onclick="demonstrateTypeChecking()">Type Checking</button>
+        
+        <div class="code-block">
+function validatePWMValue(value) {
+    // Type checking
+    if (typeof value !== 'number') {
+        throw new TypeError(`PWM value must be a number, got ${typeof value}`);
+    }
+    
+    // Range checking
+    if (value < 0 || value > 255) {
+        throw new RangeError(`PWM value must be between 0-255, got ${value}`);
+    }
+    
+    // NaN checking
+    if (isNaN(value)) {
+        throw new Error('PWM value cannot be NaN');
+    }
+    
+    return Math.round(value);
+}
+        </div>
+    </div>
+
+    <!-- Dulaan SDK -->
+    <script src="../dulaan-browser.js"></script>
+    
+    <script>
+        // Error tracking
+        let errorLog = [];
+        let errorStats = {
+            bluetooth: 0,
+            network: 0,
+            audio: 0,
+            remote: 0,
+            validation: 0
+        };
+
+        // Bluetooth error simulations
+        function simulateBluetoothError(errorType) {
+            const errors = {
+                not_available: new Error('Bluetooth LE not available on this device'),
+                permission_denied: new Error('Bluetooth permission denied by user'),
+                connection_failed: new Error('Failed to connect to motor device'),
+                device_not_found: new Error('Motor device not found')
+            };
+            
+            const error = errors[errorType];
+            error.name = 'BluetoothError';
+            error.type = errorType;
+            
+            logError('Bluetooth', error);
+            handleBluetoothError(error);
+        }
+
+        function handleBluetoothError(error) {
+            switch (error.type) {
+                case 'not_available':
+                    showError('Bluetooth not supported', 'Try using USB connection instead');
+                    break;
+                case 'permission_denied':
+                    showError('Bluetooth permission denied', 'Please allow Bluetooth access in browser settings');
+                    break;
+                case 'connection_failed':
+                    showError('Connection failed', 'Check if device is powered on and in range');
+                    setTimeout(() => retryBluetoothConnection(), 3000);
+                    break;
+                case 'device_not_found':
+                    showError('Device not found', 'Make sure device is discoverable');
+                    break;
+            }
+        }
+
+        // Network error simulations
+        function simulateNetworkError(errorType) {
+            const errors = {
+                timeout: new Error('Request timeout after 30 seconds'),
+                offline: new Error('Network connection unavailable'),
+                server_error: new Error('Server returned 500 Internal Server Error'),
+                rate_limit: new Error('Rate limit exceeded. Try again in 60 seconds')
+            };
+            
+            const error = errors[errorType];
+            error.name = 'NetworkError';
+            error.type = errorType;
+            
+            logError('Network', error);
+            handleNetworkError(error);
+        }
+
+        function handleNetworkError(error) {
+            switch (error.type) {
+                case 'timeout':
+                    showWarning('Request timed out', 'Retrying with longer timeout...');
+                    setTimeout(() => retryWithLongerTimeout(), 2000);
+                    break;
+                case 'offline':
+                    showError('Network offline', 'Switching to offline mode');
+                    enableOfflineMode();
+                    break;
+                case 'server_error':
+                    showError('Server error', 'Retrying in 5 seconds...');
+                    setTimeout(() => retryAPICall(), 5000);
+                    break;
+                case 'rate_limit':
+                    showWarning('Rate limited', 'Please wait before making more requests');
+                    break;
+            }
+        }
+
+        // Audio error simulations
+        function simulateAudioError(errorType) {
+            const errors = {
+                permission_denied: new Error('Microphone permission denied'),
+                not_found: new Error('No microphone found'),
+                in_use: new Error('Microphone is being used by another application'),
+                hardware_error: new Error('Microphone hardware error')
+            };
+            
+            const error = errors[errorType];
+            error.name = 'AudioError';
+            error.type = errorType;
+            
+            logError('Audio', error);
+            handleAudioError(error);
+        }
+
+        function handleAudioError(error) {
+            switch (error.type) {
+                case 'permission_denied':
+                    showError('Microphone access denied', 'Please allow microphone access');
+                    showPermissionInstructions();
+                    break;
+                case 'not_found':
+                    showError('No microphone found', 'Please connect a microphone');
+                    break;
+                case 'in_use':
+                    showWarning('Microphone in use', 'Close other applications using microphone');
+                    break;
+                case 'hardware_error':
+                    showError('Microphone hardware error', 'Try reconnecting your microphone');
+                    break;
+            }
+        }
+
+        // Remote control error simulations
+        function simulateRemoteError(errorType) {
+            const errors = {
+                peer_unavailable: new Error('Peer ID not found or unavailable'),
+                connection_lost: new Error('Connection to peer lost'),
+                invalid_id: new Error('Invalid host ID format'),
+                server_down: new Error('PeerJS server unavailable')
+            };
+            
+            const error = errors[errorType];
+            error.name = 'RemoteError';
+            error.type = errorType;
+            
+            logError('Remote', error);
+            handleRemoteError(error);
+        }
+
+        function handleRemoteError(error) {
+            switch (error.type) {
+                case 'peer_unavailable':
+                    showError('Host not available', 'Check the host ID and try again');
+                    break;
+                case 'connection_lost':
+                    showWarning('Connection lost', 'Attempting to reconnect...');
+                    attemptReconnection();
+                    break;
+                case 'invalid_id':
+                    showError('Invalid host ID', 'Host ID must be 6 characters (A-Z, 0-9)');
+                    break;
+                case 'server_down':
+                    showError('Remote control server unavailable', 'Try again later');
+                    break;
+            }
+        }
+
+        // Recovery demonstrations
+        function demonstrateAutoRecovery() {
+            showSuccess('Auto-recovery demo', 'Simulating connection loss and recovery...');
+            
+            // Simulate connection loss
+            setTimeout(() => {
+                showWarning('Connection lost', 'Attempting recovery...');
+                
+                // Simulate recovery attempts
+                let attempts = 0;
+                const maxAttempts = 3;
+                
+                const recoveryInterval = setInterval(() => {
+                    attempts++;
+                    if (attempts <= maxAttempts) {
+                        showWarning(`Recovery attempt ${attempts}/${maxAttempts}`, 'Reconnecting...');
+                        
+                        if (attempts === maxAttempts) {
+                            clearInterval(recoveryInterval);
+                            showSuccess('Recovery successful', 'Connection restored');
+                        }
+                    }
+                }, 2000);
+            }, 1000);
+        }
+
+        function demonstrateGracefulDegradation() {
+            showSuccess('Graceful degradation demo', 'Reducing functionality due to errors...');
+            
+            setTimeout(() => {
+                showWarning('Voice control unavailable', 'Falling back to manual control');
+            }, 1000);
+            
+            setTimeout(() => {
+                showWarning('Remote control unavailable', 'Local control only');
+            }, 2000);
+            
+            setTimeout(() => {
+                showSuccess('Core functionality maintained', 'Basic motor control still available');
+            }, 3000);
+        }
+
+        function demonstrateOfflineMode() {
+            showSuccess('Offline mode demo', 'Switching to offline operation...');
+            
+            setTimeout(() => {
+                showWarning('Network unavailable', 'Enabling offline mode');
+            }, 1000);
+            
+            setTimeout(() => {
+                showSuccess('Offline mode active', 'Local controls available, data will sync when online');
+            }, 2000);
+        }
+
+        // Error logging and monitoring
+        function logError(category, error) {
+            const logEntry = {
+                timestamp: new Date().toISOString(),
+                category: category,
+                type: error.type || 'unknown',
+                message: error.message,
+                stack: error.stack
+            };
+            
+            errorLog.push(logEntry);
+            errorStats[category.toLowerCase()]++;
+            
+            updateErrorLogDisplay();
+            console.error(`[${category}] ${error.message}`, error);
+        }
+
+        function updateErrorLogDisplay() {
+            const logContainer = document.getElementById('errorLog');
+            const recentErrors = errorLog.slice(-10).reverse();
+            
+            logContainer.innerHTML = recentErrors.map(entry => 
+                `<div>[${entry.timestamp}] <span class="error-type">${entry.category}</span>: ${entry.message}</div>`
+            ).join('');
+        }
+
+        function demonstrateErrorLogging() {
+            const sampleError = new Error('Sample error for demonstration');
+            sampleError.type = 'demo';
+            logError('Demo', sampleError);
+            showSuccess('Error logged', 'Check the error log below');
+        }
+
+        function showErrorStatistics() {
+            const stats = Object.entries(errorStats)
+                .map(([category, count]) => `${category}: ${count}`)
+                .join(', ');
+            
+            showSuccess('Error Statistics', stats);
+        }
+
+        function exportErrorLog() {
+            const logData = JSON.stringify(errorLog, null, 2);
+            const blob = new Blob([logData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dulaan-error-log-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            showSuccess('Error log exported', 'Downloaded as JSON file');
+        }
+
+        // Input validation demonstrations
+        function demonstrateInputValidation() {
+            const testValues = ['abc', -10, 300, NaN, null, 128];
+            
+            testValues.forEach(value => {
+                try {
+                    const validated = validatePWMValue(value);
+                    showSuccess(`Valid input: ${value}`, `Validated as: ${validated}`);
+                } catch (error) {
+                    logError('Validation', error);
+                    showError(`Invalid input: ${value}`, error.message);
+                }
+            });
+        }
+
+        function validatePWMValue(value) {
+            if (typeof value !== 'number') {
+                throw new TypeError(`PWM value must be a number, got ${typeof value}`);
+            }
+            
+            if (isNaN(value)) {
+                throw new Error('PWM value cannot be NaN');
+            }
+            
+            if (value < 0 || value > 255) {
+                throw new RangeError(`PWM value must be between 0-255, got ${value}`);
+            }
+            
+            return Math.round(value);
+        }
+
+        function demonstrateBoundaryChecking() {
+            const testValues = [-1, 0, 127, 255, 256];
+            
+            testValues.forEach(value => {
+                try {
+                    const clamped = Math.max(0, Math.min(255, value));
+                    showSuccess(`Boundary check: ${value}`, `Clamped to: ${clamped}`);
+                } catch (error) {
+                    showError(`Boundary error: ${value}`, error.message);
+                }
+            });
+        }
+
+        function demonstrateTypeChecking() {
+            const testValues = [123, '123', true, [], {}, null, undefined];
+            
+            testValues.forEach(value => {
+                const type = typeof value;
+                const isValid = type === 'number' && !isNaN(value);
+                
+                if (isValid) {
+                    showSuccess(`Type check: ${value} (${type})`, 'Valid number');
+                } else {
+                    showError(`Type check: ${value} (${type})`, 'Invalid type for PWM value');
+                }
+            });
+        }
+
+        // Recovery functions
+        function retryBluetoothConnection() {
+            showWarning('Retrying Bluetooth connection', 'Attempt 1 of 3...');
+        }
+
+        function retryWithLongerTimeout() {
+            showWarning('Retrying with longer timeout', 'Timeout increased to 60 seconds');
+        }
+
+        function enableOfflineMode() {
+            showWarning('Offline mode enabled', 'Limited functionality available');
+        }
+
+        function retryAPICall() {
+            showWarning('Retrying API call', 'Using backup server...');
+        }
+
+        function showPermissionInstructions() {
+            showWarning('Permission Instructions', 'Click the microphone icon in address bar to allow access');
+        }
+
+        function attemptReconnection() {
+            showWarning('Reconnecting', 'Trying to restore remote connection...');
+        }
+
+        // UI helper functions
+        function showError(title, message) {
+            createNotification('error-demo', `<strong>${title}</strong><br>${message}`);
+        }
+
+        function showWarning(title, message) {
+            createNotification('warning-demo', `<strong>${title}</strong><br>${message}`);
+        }
+
+        function showSuccess(title, message) {
+            createNotification('success-demo', `<strong>${title}</strong><br>${message}`);
+        }
+
+        function createNotification(className, content) {
+            const notification = document.createElement('div');
+            notification.className = className;
+            notification.innerHTML = content;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

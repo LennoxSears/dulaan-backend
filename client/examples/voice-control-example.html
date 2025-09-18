@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dulaan Voice Control Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.listening { background: #d4edda; color: #155724; }
+        .status.processing { background: #fff3cd; color: #856404; }
+        .status.stopped { background: #f8d7da; color: #721c24; }
+        .voice-indicator {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin: 20px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            transition: all 0.3s ease;
+        }
+        .voice-indicator.listening {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            animation: pulse 1.5s infinite;
+        }
+        .voice-indicator.processing {
+            background: linear-gradient(45deg, #ffc107, #fd7e14);
+            animation: spin 1s linear infinite;
+        }
+        .voice-indicator.stopped {
+            background: #6c757d;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .transcript {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            min-height: 50px;
+            border-left: 4px solid #007bff;
+        }
+        .command-history {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .command-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .command-item:last-child {
+            border-bottom: none;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .error { color: #dc3545; margin: 10px 0; }
+        .success { color: #28a745; margin: 10px 0; }
+        .language-selector {
+            margin: 10px 0;
+        }
+        .language-selector select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ced4da;
+        }
+        .energy-meter {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .energy-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #ffc107, #dc3545);
+            width: 0%;
+            transition: width 0.1s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Dulaan Voice Control</h1>
+        <p>Control your device using voice commands with AI processing.</p>
+        
+        <div class="container">
+            <h2>Voice Control Status</h2>
+            <div class="voice-indicator stopped" id="voiceIndicator">🎤</div>
+            <div id="voiceStatus" class="status stopped">Voice control stopped</div>
+            
+            <div class="language-selector">
+                <label for="languageSelect">Language:</label>
+                <select id="languageSelect">
+                    <option value="auto">Auto-detect</option>
+                    <option value="en">English</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="it">Italian</option>
+                    <option value="pt">Portuguese</option>
+                    <option value="ru">Russian</option>
+                    <option value="ja">Japanese</option>
+                    <option value="ko">Korean</option>
+                    <option value="zh">Chinese</option>
+                </select>
+            </div>
+            
+            <button id="startVoiceBtn" onclick="startVoiceControl()">🎤 Start Voice Control</button>
+            <button id="stopVoiceBtn" onclick="stopVoiceControl()" disabled>⏹️ Stop Voice Control</button>
+            <button onclick="testMicrophone()">🔊 Test Microphone</button>
+        </div>
+        
+        <div class="container">
+            <h2>Audio Level</h2>
+            <div class="energy-meter">
+                <div class="energy-bar" id="energyBar"></div>
+            </div>
+            <p>Energy Level: <span id="energyValue">0</span>%</p>
+        </div>
+        
+        <div class="container">
+            <h2>Current Transcript</h2>
+            <div class="transcript" id="currentTranscript">
+                <em>Say something to see the transcript here...</em>
+            </div>
+            <div id="processingStatus"></div>
+        </div>
+        
+        <div class="container">
+            <h2>Voice Commands</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                <div>
+                    <h4>Intensity Commands</h4>
+                    <ul>
+                        <li>"Set to low"</li>
+                        <li>"Medium intensity"</li>
+                        <li>"High power"</li>
+                        <li>"Maximum strength"</li>
+                        <li>"Turn off"</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Percentage Commands</h4>
+                    <ul>
+                        <li>"Set to 25 percent"</li>
+                        <li>"Fifty percent"</li>
+                        <li>"Increase to 80%"</li>
+                        <li>"Reduce to 10%"</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Pattern Commands</h4>
+                    <ul>
+                        <li>"Start pulsing"</li>
+                        <li>"Wave pattern"</li>
+                        <li>"Gentle vibration"</li>
+                        <li>"Strong pulses"</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Control Commands</h4>
+                    <ul>
+                        <li>"Stop"</li>
+                        <li>"Pause"</li>
+                        <li>"Resume"</li>
+                        <li>"Reset"</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="container">
+            <h2>Command History</h2>
+            <div class="command-history" id="commandHistory">
+                <em>No commands yet...</em>
+            </div>
+            <button onclick="clearHistory()">Clear History</button>
+        </div>
+        
+        <div class="container">
+            <h2>Settings</h2>
+            <div>
+                <label for="sensitivitySlider">Microphone Sensitivity: <span id="sensitivityValue">50</span>%</label><br>
+                <input type="range" id="sensitivitySlider" min="10" max="100" value="50" style="width: 100%; margin: 10px 0;">
+            </div>
+            <div>
+                <label for="maxEnergySlider">Max Energy Threshold: <span id="maxEnergyValue">7.5</span>%</label><br>
+                <input type="range" id="maxEnergySlider" min="1" max="20" value="7.5" step="0.5" style="width: 100%; margin: 10px 0;">
+            </div>
+            <div>
+                <label>
+                    <input type="checkbox" id="continuousMode"> Continuous listening mode
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dulaan SDK -->
+    <script src="../dulaan-browser.js"></script>
+    
+    <script>
+        // Global state
+        let isVoiceActive = false;
+        let audioProcessor = null;
+        let commandHistory = [];
+        let energyMonitorInterval = null;
+
+        // Initialize when page loads
+        window.addEventListener('load', async () => {
+            try {
+                // Initialize audio processor
+                audioProcessor = new window.AudioProcessor();
+                setupEventListeners();
+                log('Voice control system ready', 'success');
+            } catch (error) {
+                log(`Initialization failed: ${error.message}`, 'error');
+            }
+        });
+
+        function setupEventListeners() {
+            // Sensitivity slider
+            document.getElementById('sensitivitySlider').oninput = function() {
+                document.getElementById('sensitivityValue').textContent = this.value;
+                if (audioProcessor) {
+                    // Adjust audio sensitivity
+                    audioProcessor.setSensitivity(this.value / 100);
+                }
+            };
+
+            // Max energy slider
+            document.getElementById('maxEnergySlider').oninput = function() {
+                document.getElementById('maxEnergyValue').textContent = this.value;
+                if (audioProcessor) {
+                    audioProcessor.setMaxEnergy(this.value / 100);
+                }
+            };
+        }
+
+        // Voice control functions
+        async function startVoiceControl() {
+            try {
+                updateVoiceStatus('starting');
+                
+                // Request microphone permission
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // Start AI voice control mode
+                await window.dulaan.modes.ai.start();
+                
+                isVoiceActive = true;
+                updateVoiceStatus('listening');
+                updateButtons();
+                startEnergyMonitoring();
+                
+                log('Voice control started', 'success');
+                
+                // Setup voice processing callbacks
+                setupVoiceCallbacks();
+                
+            } catch (error) {
+                updateVoiceStatus('stopped');
+                updateButtons();
+                log(`Failed to start voice control: ${error.message}`, 'error');
+            }
+        }
+
+        async function stopVoiceControl() {
+            try {
+                await window.dulaan.modes.ai.stop();
+                isVoiceActive = false;
+                updateVoiceStatus('stopped');
+                updateButtons();
+                stopEnergyMonitoring();
+                log('Voice control stopped', 'success');
+            } catch (error) {
+                log(`Failed to stop voice control: ${error.message}`, 'error');
+            }
+        }
+
+        function setupVoiceCallbacks() {
+            // Mock voice processing callbacks
+            // In a real implementation, these would be connected to the actual audio processor
+            
+            // Simulate transcript updates
+            if (isVoiceActive) {
+                setTimeout(() => {
+                    if (isVoiceActive) {
+                        simulateVoiceProcessing();
+                    }
+                }, 2000);
+            }
+        }
+
+        function simulateVoiceProcessing() {
+            const sampleCommands = [
+                "Set to medium intensity",
+                "Increase to 75 percent",
+                "Start gentle pulsing",
+                "Turn off the device",
+                "Maximum power please",
+                "Reduce to 25 percent"
+            ];
+            
+            const randomCommand = sampleCommands[Math.floor(Math.random() * sampleCommands.length)];
+            
+            updateVoiceStatus('processing');
+            updateTranscript(randomCommand);
+            
+            setTimeout(() => {
+                processVoiceCommand(randomCommand);
+                updateVoiceStatus('listening');
+                
+                // Continue simulation if still active
+                if (isVoiceActive) {
+                    setTimeout(() => {
+                        if (isVoiceActive) {
+                            simulateVoiceProcessing();
+                        }
+                    }, 5000 + Math.random() * 5000);
+                }
+            }, 1500);
+        }
+
+        function processVoiceCommand(transcript) {
+            // Parse the voice command and extract intent
+            const command = parseVoiceCommand(transcript);
+            
+            if (command) {
+                addToHistory(transcript, command);
+                executeCommand(command);
+                log(`Executed command: ${command.action} (${command.value})`, 'success');
+            } else {
+                log(`Could not understand command: "${transcript}"`, 'error');
+            }
+        }
+
+        function parseVoiceCommand(transcript) {
+            const text = transcript.toLowerCase();
+            
+            // Pattern matching for different command types
+            if (text.includes('stop') || text.includes('turn off') || text.includes('off')) {
+                return { action: 'stop', value: 0, type: 'control' };
+            }
+            
+            if (text.includes('maximum') || text.includes('max') || text.includes('full')) {
+                return { action: 'set_intensity', value: 255, type: 'intensity' };
+            }
+            
+            if (text.includes('high')) {
+                return { action: 'set_intensity', value: 200, type: 'intensity' };
+            }
+            
+            if (text.includes('medium') || text.includes('mid')) {
+                return { action: 'set_intensity', value: 128, type: 'intensity' };
+            }
+            
+            if (text.includes('low') || text.includes('gentle')) {
+                return { action: 'set_intensity', value: 64, type: 'intensity' };
+            }
+            
+            // Percentage matching
+            const percentMatch = text.match(/(\d+)\s*(?:percent|%)/);
+            if (percentMatch) {
+                const percent = parseInt(percentMatch[1]);
+                const pwmValue = Math.round((percent / 100) * 255);
+                return { action: 'set_percentage', value: pwmValue, percentage: percent, type: 'percentage' };
+            }
+            
+            // Pattern commands
+            if (text.includes('pulse') || text.includes('pulsing')) {
+                return { action: 'start_pattern', value: 'pulse', type: 'pattern' };
+            }
+            
+            if (text.includes('wave')) {
+                return { action: 'start_pattern', value: 'wave', type: 'pattern' };
+            }
+            
+            return null;
+        }
+
+        async function executeCommand(command) {
+            try {
+                switch (command.action) {
+                    case 'stop':
+                        await window.dulaan.writeMotor(0);
+                        break;
+                    case 'set_intensity':
+                    case 'set_percentage':
+                        await window.dulaan.writeMotor(command.value);
+                        break;
+                    case 'start_pattern':
+                        await startPattern(command.value);
+                        break;
+                }
+            } catch (error) {
+                log(`Failed to execute command: ${error.message}`, 'error');
+            }
+        }
+
+        async function startPattern(patternType) {
+            // Implementation would start the specified pattern
+            log(`Starting ${patternType} pattern`, 'success');
+        }
+
+        // UI update functions
+        function updateVoiceStatus(status) {
+            const indicator = document.getElementById('voiceIndicator');
+            const statusElement = document.getElementById('voiceStatus');
+            
+            indicator.className = `voice-indicator ${status}`;
+            statusElement.className = `status ${status}`;
+            
+            switch (status) {
+                case 'listening':
+                    indicator.textContent = '🎤';
+                    statusElement.textContent = 'Listening for voice commands...';
+                    break;
+                case 'processing':
+                    indicator.textContent = '🔄';
+                    statusElement.textContent = 'Processing voice command...';
+                    break;
+                case 'starting':
+                    indicator.textContent = '⏳';
+                    statusElement.textContent = 'Starting voice control...';
+                    break;
+                case 'stopped':
+                default:
+                    indicator.textContent = '🎤';
+                    statusElement.textContent = 'Voice control stopped';
+                    break;
+            }
+        }
+
+        function updateButtons() {
+            document.getElementById('startVoiceBtn').disabled = isVoiceActive;
+            document.getElementById('stopVoiceBtn').disabled = !isVoiceActive;
+        }
+
+        function updateTranscript(text) {
+            document.getElementById('currentTranscript').textContent = text;
+        }
+
+        function addToHistory(transcript, command) {
+            const timestamp = new Date().toLocaleTimeString();
+            commandHistory.unshift({
+                timestamp,
+                transcript,
+                command,
+                id: Date.now()
+            });
+            
+            // Keep only last 20 commands
+            if (commandHistory.length > 20) {
+                commandHistory = commandHistory.slice(0, 20);
+            }
+            
+            updateHistoryDisplay();
+        }
+
+        function updateHistoryDisplay() {
+            const historyElement = document.getElementById('commandHistory');
+            
+            if (commandHistory.length === 0) {
+                historyElement.innerHTML = '<em>No commands yet...</em>';
+                return;
+            }
+            
+            historyElement.innerHTML = commandHistory.map(item => `
+                <div class="command-item">
+                    <strong>${item.timestamp}</strong><br>
+                    <em>"${item.transcript}"</em><br>
+                    → ${item.command.action}: ${item.command.value}
+                </div>
+            `).join('');
+        }
+
+        function clearHistory() {
+            commandHistory = [];
+            updateHistoryDisplay();
+            log('Command history cleared', 'success');
+        }
+
+        // Energy monitoring
+        function startEnergyMonitoring() {
+            energyMonitorInterval = setInterval(() => {
+                // Simulate energy levels
+                const energy = Math.random() * 100;
+                updateEnergyDisplay(energy);
+            }, 100);
+        }
+
+        function stopEnergyMonitoring() {
+            if (energyMonitorInterval) {
+                clearInterval(energyMonitorInterval);
+                energyMonitorInterval = null;
+                updateEnergyDisplay(0);
+            }
+        }
+
+        function updateEnergyDisplay(energy) {
+            const energyBar = document.getElementById('energyBar');
+            const energyValue = document.getElementById('energyValue');
+            
+            energyBar.style.width = `${energy}%`;
+            energyValue.textContent = energy.toFixed(1);
+        }
+
+        // Test functions
+        async function testMicrophone() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                log('Microphone access granted', 'success');
+                
+                // Stop the stream
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Test audio processing
+                if (audioProcessor) {
+                    log('Audio processor is ready', 'success');
+                } else {
+                    log('Audio processor not initialized', 'error');
+                }
+            } catch (error) {
+                log(`Microphone test failed: ${error.message}`, 'error');
+            }
+        }
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `${timestamp}: ${message}`;
+            
+            const statusElement = document.getElementById('processingStatus');
+            statusElement.className = type;
+            statusElement.textContent = logMessage;
+            
+            console.log(logMessage);
+            
+            // Clear status after 5 seconds
+            setTimeout(() => {
+                if (statusElement.textContent === logMessage) {
+                    statusElement.textContent = '';
+                }
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

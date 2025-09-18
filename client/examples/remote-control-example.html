@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dulaan Remote Control Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .mode-btn {
+            padding: 10px 20px;
+            border: 2px solid #007bff;
+            background: white;
+            color: #007bff;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .mode-btn.active {
+            background: #007bff;
+            color: white;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.hosting { background: #d4edda; color: #155724; }
+        .status.connected { background: #e2e3f0; color: #383d41; }
+        .status.disconnected { background: #f8d7da; color: #721c24; }
+        .status.connecting { background: #fff3cd; color: #856404; }
+        .id-display {
+            font-family: 'Courier New', monospace;
+            font-size: 24px;
+            font-weight: bold;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+            margin: 10px 0;
+            border: 2px dashed #007bff;
+        }
+        .user-list {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .error { color: #dc3545; margin: 10px 0; }
+        .success { color: #28a745; margin: 10px 0; }
+        .hidden { display: none; }
+        .qr-code {
+            text-align: center;
+            margin: 20px 0;
+        }
+        @media (max-width: 600px) {
+            .mode-selector { flex-direction: column; }
+            .id-display { font-size: 18px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Dulaan Remote Control</h1>
+        <p>Share control of your device or connect to someone else's device using 6-character IDs.</p>
+        
+        <!-- Mode Selection -->
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="switchMode('none')">Setup</button>
+            <button class="mode-btn" onclick="switchMode('host')">Host Mode</button>
+            <button class="mode-btn" onclick="switchMode('remote')">Remote Mode</button>
+        </div>
+    </div>
+
+    <!-- Setup Mode -->
+    <div id="setupMode" class="container">
+        <h2>🚀 Getting Started</h2>
+        <p>Choose your mode:</p>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 250px;">
+                <h3>📡 Host Mode</h3>
+                <p>Share your device with others. You'll get a 6-character ID that others can use to connect and control your device.</p>
+                <button onclick="startAsHost()" style="width: 100%;">Start as Host</button>
+            </div>
+            <div style="flex: 1; min-width: 250px;">
+                <h3>📱 Remote Mode</h3>
+                <p>Connect to someone else's device using their 6-character ID to control their device remotely.</p>
+                <button onclick="connectAsRemote()" style="width: 100%;">Connect as Remote</button>
+            </div>
+        </div>
+        
+        <div class="container" style="margin-top: 20px;">
+            <h3>🔧 Quick Actions</h3>
+            <button onclick="generateNewId()">Generate New ID</button>
+            <button onclick="showQRCode()">Show QR Code</button>
+            <div id="generatedId" style="display: none;">
+                <p>Generated ID:</p>
+                <div class="id-display" id="newIdDisplay"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Host Mode -->
+    <div id="hostMode" class="container hidden">
+        <h2>📡 Host Mode - Share Your Device</h2>
+        
+        <div class="container">
+            <h3>Your Host ID</h3>
+            <div class="id-display" id="hostIdDisplay">Starting...</div>
+            <p>Share this ID with others so they can control your device.</p>
+            <button onclick="copyHostId()">📋 Copy ID</button>
+            <button onclick="shareHostId()">📤 Share ID</button>
+            <button onclick="showHostQR()">📱 Show QR Code</button>
+        </div>
+        
+        <div class="container">
+            <h3>Connection Status</h3>
+            <div id="hostStatus" class="status disconnected">Waiting for connections...</div>
+            <div class="user-list">
+                <strong>Connected Users (<span id="userCount">0</span>):</strong>
+                <div id="userList">No users connected</div>
+            </div>
+        </div>
+        
+        <div class="container">
+            <h3>Host Controls</h3>
+            <button onclick="disconnectAllUsers()">Disconnect All Users</button>
+            <button onclick="stopHosting()">Stop Hosting</button>
+            <div id="hostMessages"></div>
+        </div>
+    </div>
+
+    <!-- Remote Mode -->
+    <div id="remoteMode" class="container hidden">
+        <h2>📱 Remote Mode - Control Another Device</h2>
+        
+        <div class="container">
+            <h3>Connect to Host</h3>
+            <input type="text" id="hostIdInput" placeholder="Enter 6-character Host ID" maxlength="6" style="padding: 10px; font-size: 16px; width: 200px; text-transform: uppercase;">
+            <button onclick="connectToHost()">Connect</button>
+            <div id="remoteStatus" class="status disconnected">Not connected</div>
+        </div>
+        
+        <div id="remoteControls" class="container hidden">
+            <h3>Remote Controls</h3>
+            
+            <!-- Manual Control -->
+            <div style="margin: 20px 0;">
+                <h4>Manual Control</h4>
+                <label for="remotePwmSlider">PWM Value: <span id="remotePwmValue">0</span></label><br>
+                <input type="range" id="remotePwmSlider" min="0" max="255" value="0" style="width: 100%; margin: 10px 0;">
+                <br>
+                <button onclick="sendRemotePWM()">Send PWM</button>
+                <button onclick="stopRemoteMotor()">Stop Motor</button>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div style="margin: 20px 0;">
+                <h4>Quick Actions</h4>
+                <button onclick="sendRemoteCommand('manual', 64)">Low (25%)</button>
+                <button onclick="sendRemoteCommand('manual', 128)">Medium (50%)</button>
+                <button onclick="sendRemoteCommand('manual', 192)">High (75%)</button>
+                <button onclick="sendRemoteCommand('manual', 255)">Max (100%)</button>
+            </div>
+            
+            <!-- Pattern Controls -->
+            <div style="margin: 20px 0;">
+                <h4>Pattern Controls</h4>
+                <button onclick="startPulsePattern()">Pulse Pattern</button>
+                <button onclick="startWavePattern()">Wave Pattern</button>
+                <button onclick="stopPattern()">Stop Pattern</button>
+            </div>
+        </div>
+        
+        <div class="container">
+            <h3>Remote Actions</h3>
+            <button onclick="disconnectFromHost()">Disconnect</button>
+            <div id="remoteMessages"></div>
+        </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div id="qrModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; text-align: center;">
+            <h3>QR Code</h3>
+            <div id="qrCodeContainer" class="qr-code">
+                <p>QR Code would be generated here</p>
+                <p style="font-family: monospace; font-size: 18px;" id="qrCodeText"></p>
+            </div>
+            <button onclick="closeQRModal()">Close</button>
+        </div>
+    </div>
+
+    <!-- Dulaan SDK -->
+    <script src="../dulaan-browser.js"></script>
+    
+    <script>
+        // Global state
+        let currentMode = 'none';
+        let hostId = null;
+        let connectedUsers = [];
+        let isConnectedAsRemote = false;
+        let patternInterval = null;
+
+        // Initialize when page loads
+        window.addEventListener('load', async () => {
+            try {
+                // Setup remote control callbacks
+                window.remoteControl.setUICallbacks({
+                    onHostReady: handleHostReady,
+                    onConnectionStatusChange: handleConnectionStatusChange,
+                    onUserListUpdate: handleUserListUpdate,
+                    onError: handleError
+                });
+                
+                log('Remote control system ready', 'success');
+            } catch (error) {
+                log(`Initialization failed: ${error.message}`, 'error');
+            }
+        });
+
+        // Mode switching
+        function switchMode(mode) {
+            // Update button states
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Hide all mode containers
+            document.getElementById('setupMode').classList.toggle('hidden', mode !== 'none');
+            document.getElementById('hostMode').classList.toggle('hidden', mode !== 'host');
+            document.getElementById('remoteMode').classList.toggle('hidden', mode !== 'remote');
+            
+            currentMode = mode;
+        }
+
+        // Host mode functions
+        async function startAsHost() {
+            try {
+                hostId = await window.remoteControl.startAsHost();
+                switchMode('host');
+                document.getElementById('hostIdDisplay').textContent = hostId;
+                log(`Host started with ID: ${hostId}`, 'success');
+            } catch (error) {
+                log(`Failed to start host: ${error.message}`, 'error');
+            }
+        }
+
+        function copyHostId() {
+            if (hostId) {
+                navigator.clipboard.writeText(hostId).then(() => {
+                    log('Host ID copied to clipboard', 'success');
+                }).catch(() => {
+                    log('Failed to copy to clipboard', 'error');
+                });
+            }
+        }
+
+        function shareHostId() {
+            if (hostId && navigator.share) {
+                navigator.share({
+                    title: 'Dulaan Remote Control',
+                    text: `Connect to my device using ID: ${hostId}`,
+                    url: window.location.href
+                });
+            } else if (hostId) {
+                copyHostId();
+                alert(`Share this ID: ${hostId}`);
+            }
+        }
+
+        function showHostQR() {
+            if (hostId) {
+                showQRCode(hostId);
+            }
+        }
+
+        async function disconnectAllUsers() {
+            try {
+                // Implementation would disconnect all users
+                log('All users disconnected', 'success');
+            } catch (error) {
+                log(`Failed to disconnect users: ${error.message}`, 'error');
+            }
+        }
+
+        async function stopHosting() {
+            try {
+                await window.remoteControl.disconnect();
+                switchMode('none');
+                hostId = null;
+                connectedUsers = [];
+                log('Stopped hosting', 'success');
+            } catch (error) {
+                log(`Failed to stop hosting: ${error.message}`, 'error');
+            }
+        }
+
+        // Remote mode functions
+        function connectAsRemote() {
+            switchMode('remote');
+        }
+
+        async function connectToHost() {
+            const inputHostId = document.getElementById('hostIdInput').value.toUpperCase();
+            
+            if (!inputHostId || inputHostId.length !== 6) {
+                log('Please enter a valid 6-character Host ID', 'error');
+                return;
+            }
+
+            try {
+                await window.remoteControl.connectToHost(inputHostId);
+                isConnectedAsRemote = true;
+                document.getElementById('remoteControls').classList.remove('hidden');
+                log(`Connected to host: ${inputHostId}`, 'success');
+            } catch (error) {
+                log(`Failed to connect: ${error.message}`, 'error');
+            }
+        }
+
+        // Remote control functions
+        document.getElementById('remotePwmSlider').oninput = function() {
+            document.getElementById('remotePwmValue').textContent = this.value;
+        };
+
+        async function sendRemotePWM() {
+            const pwmValue = parseInt(document.getElementById('remotePwmSlider').value);
+            await sendRemoteCommand('manual', pwmValue);
+        }
+
+        async function stopRemoteMotor() {
+            await sendRemoteCommand('manual', 0);
+            document.getElementById('remotePwmSlider').value = 0;
+            document.getElementById('remotePwmValue').textContent = 0;
+        }
+
+        async function sendRemoteCommand(mode, value, metadata = {}) {
+            if (!isConnectedAsRemote) {
+                log('Not connected to a host', 'error');
+                return;
+            }
+
+            try {
+                await window.remoteControl.sendCommand(mode, value, metadata);
+                log(`Sent ${mode} command: ${value}`, 'success');
+            } catch (error) {
+                log(`Failed to send command: ${error.message}`, 'error');
+            }
+        }
+
+        // Pattern functions
+        function startPulsePattern() {
+            stopPattern();
+            let intensity = 0;
+            let direction = 1;
+            
+            patternInterval = setInterval(() => {
+                intensity += direction * 25;
+                if (intensity >= 255) {
+                    intensity = 255;
+                    direction = -1;
+                } else if (intensity <= 0) {
+                    intensity = 0;
+                    direction = 1;
+                }
+                sendRemoteCommand('pattern', intensity, { pattern: 'pulse' });
+            }, 200);
+            
+            log('Pulse pattern started', 'success');
+        }
+
+        function startWavePattern() {
+            stopPattern();
+            let step = 0;
+            
+            patternInterval = setInterval(() => {
+                const intensity = Math.round((Math.sin(step * 0.1) + 1) * 127.5);
+                sendRemoteCommand('pattern', intensity, { pattern: 'wave' });
+                step++;
+            }, 100);
+            
+            log('Wave pattern started', 'success');
+        }
+
+        function stopPattern() {
+            if (patternInterval) {
+                clearInterval(patternInterval);
+                patternInterval = null;
+                sendRemoteCommand('manual', 0);
+                log('Pattern stopped', 'success');
+            }
+        }
+
+        async function disconnectFromHost() {
+            try {
+                await window.remoteControl.disconnect();
+                isConnectedAsRemote = false;
+                document.getElementById('remoteControls').classList.add('hidden');
+                document.getElementById('hostIdInput').value = '';
+                stopPattern();
+                switchMode('none');
+                log('Disconnected from host', 'success');
+            } catch (error) {
+                log(`Failed to disconnect: ${error.message}`, 'error');
+            }
+        }
+
+        // Utility functions
+        function generateNewId() {
+            const newId = window.remoteControl.generateId();
+            document.getElementById('newIdDisplay').textContent = newId;
+            document.getElementById('generatedId').style.display = 'block';
+            log(`Generated new ID: ${newId}`, 'success');
+        }
+
+        function showQRCode(id = null) {
+            const qrId = id || document.getElementById('newIdDisplay').textContent;
+            if (qrId) {
+                document.getElementById('qrCodeText').textContent = qrId;
+                document.getElementById('qrModal').classList.remove('hidden');
+            }
+        }
+
+        function closeQRModal() {
+            document.getElementById('qrModal').classList.add('hidden');
+        }
+
+        // Event handlers
+        function handleHostReady(id) {
+            hostId = id;
+            document.getElementById('hostIdDisplay').textContent = id;
+            updateHostStatus('hosting');
+        }
+
+        function handleConnectionStatusChange(status, error) {
+            if (currentMode === 'host') {
+                updateHostStatus(status);
+            } else if (currentMode === 'remote') {
+                updateRemoteStatus(status);
+            }
+            
+            if (error) {
+                log(`Connection error: ${error}`, 'error');
+            }
+        }
+
+        function handleUserListUpdate(users) {
+            connectedUsers = users;
+            document.getElementById('userCount').textContent = users.length;
+            
+            if (users.length === 0) {
+                document.getElementById('userList').textContent = 'No users connected';
+            } else {
+                document.getElementById('userList').innerHTML = users.map(user => 
+                    `<div>👤 User ${user.substring(0, 8)}...</div>`
+                ).join('');
+            }
+        }
+
+        function handleError(message, error) {
+            log(`Error: ${message}`, 'error');
+        }
+
+        function updateHostStatus(status) {
+            const statusElement = document.getElementById('hostStatus');
+            statusElement.className = `status ${status}`;
+            
+            switch (status) {
+                case 'hosting':
+                    statusElement.textContent = `Hosting - Waiting for connections (${connectedUsers.length} connected)`;
+                    break;
+                case 'disconnected':
+                    statusElement.textContent = 'Not hosting';
+                    break;
+                default:
+                    statusElement.textContent = status;
+            }
+        }
+
+        function updateRemoteStatus(status) {
+            const statusElement = document.getElementById('remoteStatus');
+            statusElement.className = `status ${status}`;
+            
+            switch (status) {
+                case 'connected':
+                    statusElement.textContent = 'Connected to host';
+                    break;
+                case 'connecting':
+                    statusElement.textContent = 'Connecting...';
+                    break;
+                case 'disconnected':
+                    statusElement.textContent = 'Not connected';
+                    break;
+                default:
+                    statusElement.textContent = status;
+            }
+        }
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `${timestamp}: ${message}`;
+            
+            // Log to appropriate container
+            let container;
+            if (currentMode === 'host') {
+                container = document.getElementById('hostMessages');
+            } else if (currentMode === 'remote') {
+                container = document.getElementById('remoteMessages');
+            }
+            
+            if (container) {
+                const div = document.createElement('div');
+                div.className = type;
+                div.textContent = logMessage;
+                container.appendChild(div);
+                
+                // Keep only last 5 messages
+                while (container.children.length > 5) {
+                    container.removeChild(container.firstChild);
+                }
+            }
+            
+            console.log(logMessage);
+        }
+
+        // Auto-uppercase input
+        document.getElementById('hostIdInput').addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+        });
+    </script>
+</body>
+</html>
