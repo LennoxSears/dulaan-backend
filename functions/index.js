@@ -66,7 +66,25 @@ exports.makeuppercase = onDocumentCreated(
 exports.storeUserData = onRequest(
     {
         region: "europe-west1",
-        cors: true
+        cors: {
+            origin: [
+                /^https?:\/\/localhost(:\d+)?$/,
+                /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+                /^https?:\/\/.*\.gitpod\.dev$/,
+                /^file:\/\/.*$/,
+                /^capacitor:\/\/.*$/,
+                /^ionic:\/\/.*$/,
+                /^cordova:\/\/.*$/,
+                /^ms-appx-web:\/\/.*$/,
+                /^app:\/\/.*$/,
+                /^tauri:\/\/.*$/,
+                /^http:\/\/.*$/,
+                /^https:\/\/.*$/
+            ],
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+            credentials: true
+        }
     },
     async (req, res) => {
         try {
@@ -153,7 +171,25 @@ exports.storeUserData = onRequest(
 exports.storeUserConsent = onRequest(
     {
         region: "europe-west1",
-        cors: true
+        cors: {
+            origin: [
+                /^https?:\/\/localhost(:\d+)?$/,
+                /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+                /^https?:\/\/.*\.gitpod\.dev$/,
+                /^file:\/\/.*$/,
+                /^capacitor:\/\/.*$/,
+                /^ionic:\/\/.*$/,
+                /^cordova:\/\/.*$/,
+                /^ms-appx-web:\/\/.*$/,
+                /^app:\/\/.*$/,
+                /^tauri:\/\/.*$/,
+                /^http:\/\/.*$/,
+                /^https:\/\/.*$/
+            ],
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+            credentials: true
+        }
     },
     async (req, res) => {
         try {
@@ -299,7 +335,25 @@ exports.storeUserConsent = onRequest(
 exports.getUserConsent = onRequest(
     {
         region: "europe-west1",
-        cors: true
+        cors: {
+            origin: [
+                /^https?:\/\/localhost(:\d+)?$/,
+                /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+                /^https?:\/\/.*\.gitpod\.dev$/,
+                /^file:\/\/.*$/,
+                /^capacitor:\/\/.*$/,
+                /^ionic:\/\/.*$/,
+                /^cordova:\/\/.*$/,
+                /^ms-appx-web:\/\/.*$/,
+                /^app:\/\/.*$/,
+                /^tauri:\/\/.*$/,
+                /^http:\/\/.*$/,
+                /^https:\/\/.*$/
+            ],
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+            credentials: true
+        }
     },
     async (req, res) => {
         try {
@@ -356,7 +410,25 @@ exports.getUserConsent = onRequest(
 exports.speechToTextWithLLM = onRequest(
     {
         region: "europe-west1",
-        cors: true
+        cors: {
+            origin: [
+                /^https?:\/\/localhost(:\d+)?$/,
+                /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+                /^https?:\/\/.*\.gitpod\.dev$/,
+                /^file:\/\/.*$/,
+                /^capacitor:\/\/.*$/,
+                /^ionic:\/\/.*$/,
+                /^cordova:\/\/.*$/,
+                /^ms-appx-web:\/\/.*$/,
+                /^app:\/\/.*$/,
+                /^tauri:\/\/.*$/,
+                /^http:\/\/.*$/,
+                /^https:\/\/.*$/
+            ],
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+            credentials: true
+        }
     },
     async (req, res) => {
         try {
