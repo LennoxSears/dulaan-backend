@@ -31,7 +31,7 @@ https://europe-west1-dulaan-backend.cloudfunctions.net/
 
 **Production (PeerJS Server):**
 ```
-https://peerjs-server-dot-dulaan-backend.appspot.com/peerjs
+https://dulaan-backend.ew.r.appspot.com/peerjs
 ```
 
 ---
@@ -675,7 +675,7 @@ For production use, consider implementing additional rate limiting based on your
 The PeerJS server enables WebRTC peer-to-peer connections for real-time communication. It's deployed on Google App Engine as a separate service from the Cloud Functions.
 
 ### Server URL
-**Production:** `https://peerjs-server-dot-dulaan-backend.appspot.com/peerjs`
+**Production:** `https://dulaan-backend.ew.r.appspot.com/peerjs`
 **Local Development:** `http://localhost:8080/peerjs`
 
 ### Architecture
@@ -693,7 +693,7 @@ The server only handles signaling; actual data flows directly between peers.
 ```javascript
 // Connect to the PeerJS server
 const peer = new Peer('unique-peer-id', {
-  host: 'peerjs-server-dot-dulaan-backend.appspot.com',
+  host: 'dulaan-backend.ew.r.appspot.com',
   port: 443,
   path: '/peerjs',
   secure: true,
@@ -732,7 +732,7 @@ import Peer from 'peerjs';
 class PeerService {
   constructor() {
     this.peer = new Peer({
-      host: 'peerjs-server-dot-dulaan-backend.appspot.com',
+      host: 'dulaan-backend.ew.r.appspot.com',
       port: 443,
       path: '/peerjs',
       secure: true

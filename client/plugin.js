@@ -216,7 +216,7 @@ window.remoteControl = {
         const hostId = `dulaan-host-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
         
         window.remoteControl.peer = new Peer(hostId, {
-            host: 'peerjs-server-dot-dulaan-backend.appspot.com',
+            host: 'dulaan-backend.ew.r.appspot.com',
             port: 443,
             path: '/peerjs',
             secure: true,
@@ -282,7 +282,7 @@ window.remoteControl = {
         }
 
         window.remoteControl.peer = new Peer({
-            host: 'peerjs-server-dot-dulaan-backend.appspot.com',
+            host: 'dulaan-backend.ew.r.appspot.com',
             port: 443,
             path: '/peerjs',
             secure: true,
