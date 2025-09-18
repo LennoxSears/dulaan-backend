@@ -195,46 +195,7 @@ const packageSpeechSegment = async () => {
     }
 };
 
-const recognizePCM = async (int16Data) => {
-    try {
-        // Convert Int16Array to base64 for our API
-        const uint8Array = new Uint8Array(int16Data.buffer);
-        const base64Audio = btoa(String.fromCharCode.apply(null, uint8Array));
 
-        // Use our new speech-to-text API
-        const result = await window.dulaan.speechToText(base64Audio, {
-            encoding: 'LINEAR16',
-            sampleRateHertz: 16000
-        });
-
-        return result.transcription;
-    } catch (error) {
-        console.error('Speech recognition error:', error);
-        throw error;
-    }
-};
-
-const recognizePWM = async (transcript, pwm) => {
-    try {
-        // Convert Int16Array to base64 for our API (if needed)
-        // For this function, we already have the transcript, so we can use it directly
-        
-        // Use our new speech-to-text with LLM API
-        const result = await window.dulaan.speechToTextWithLLM(
-            null, // No audio content needed since we already have transcript
-            pwm,
-            window.msgHis
-        );
-
-        // Update message history
-        window.msgHis = result.msgHis;
-        
-        return result.newPwmValue;
-    } catch (error) {
-        console.error('PWM recognition error:', error);
-        throw error;
-    }
-};
 
 // ===== 6. 音频分块处理（核心逻辑） =====
 const processChunk = (base64Chunk) => {

@@ -36,183 +36,7 @@ https://dulaan-backend.ew.r.appspot.com/peerjs
 
 ---
 
-## 1. Speech-to-Text API
-
-### Endpoint
-`POST /speechToText`
-
-### Description
-Converts audio content to text using Google Cloud Speech-to-Text API.
-
-### Request Headers
-```
-Content-Type: application/json
-```
-
-### Request Body
-```json
-{
-  "audioContent": "base64-encoded-audio-data",  // Required if audioUri not provided
-  "audioUri": "gs://bucket/audio-file.wav",     // Required if audioContent not provided
-  "encoding": "WEBM_OPUS",                      // Optional, default: "WEBM_OPUS"
-  "sampleRateHertz": 48000,                     // Optional, default: 48000
-  "languageCode": "en-US"                       // Optional, enables automatic detection if omitted
-}
-```
-
-### Supported Audio Encodings
-- `WEBM_OPUS` (default)
-- `LINEAR16`
-- `FLAC`
-- `MULAW`
-- `AMR`
-- `AMR_WB`
-- `OGG_OPUS`
-- `SPEEX_WITH_HEADER_BYTE`
-
-### Language Detection
-
-**Automatic Language Detection**: If `languageCode` is not provided, the API automatically detects the language from a comprehensive list of supported languages including:
-
-- `en-US`, `en-GB` (English)
-- `es-ES` (Spanish)
-- `fr-FR` (French) 
-- `de-DE` (German)
-- `it-IT` (Italian)
-- `pt-PT` (Portuguese)
-- `ru-RU` (Russian)
-- `ja-JP` (Japanese)
-- `ko-KR` (Korean)
-- `zh-CN`, `zh-TW` (Chinese)
-- `ar-SA` (Arabic)
-- `hi-IN` (Hindi)
-- `nl-NL` (Dutch)
-- `sv-SE` (Swedish)
-- `da-DK` (Danish)
-- `no-NO` (Norwegian)
-- `fi-FI` (Finnish)
-- `pl-PL` (Polish)
-- `cs-CZ` (Czech)
-- `hu-HU` (Hungarian)
-- `tr-TR` (Turkish)
-- `he-IL` (Hebrew)
-- `th-TH` (Thai)
-- `vi-VN` (Vietnamese)
-- `id-ID` (Indonesian)
-- `ms-MY` (Malay)
-- `tl-PH` (Filipino)
-- `uk-UA` (Ukrainian)
-- And many more...
-
-**Manual Language Selection**: You can still specify a `languageCode` to force recognition in a specific language.
-
-### Response Fields
-
-- `success`: Boolean indicating if the request was successful
-- `transcription`: The transcribed text from the audio
-- `confidence`: Confidence score for the transcription (0.0 to 1.0)
-- `detectedLanguage`: The language code detected by the API (e.g., "en-US", "fr-FR")
-- `autoDetected`: Boolean indicating if language was automatically detected (true) or manually specified (false)
-- `results`: Full results array from Google Cloud Speech-to-Text API
-
-### Response
-
-**Success (200):**
-```json
-{
-  "success": true,
-  "transcription": "Hello, this is the transcribed text.",
-  "confidence": 0.95,
-  "detectedLanguage": "en-US",
-  "autoDetected": true,
-  "results": [
-    {
-      "alternatives": [
-        {
-          "transcript": "Hello, this is the transcribed text.",
-          "confidence": 0.95
-        }
-      ],
-      "languageCode": "en-US"
-    }
-  ]
-}
-```
-
-**Error (400/500):**
-```json
-{
-  "success": false,
-  "error": "Error description",
-  "details": "Detailed error message"
-}
-```
-
-### Example Usage
-
-**JavaScript/Fetch (with automatic language detection):**
-```javascript
-const audioBlob = new Blob([audioData], { type: 'audio/webm' });
-const reader = new FileReader();
-reader.onload = async function() {
-  const base64Audio = reader.result.split(',')[1];
-  
-  const response = await fetch('/speechToText', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      audioContent: base64Audio
-      // languageCode omitted for automatic detection
-    })
-  });
-  
-  const result = await response.json();
-  console.log('Transcription:', result.transcription);
-  console.log('Detected Language:', result.detectedLanguage);
-  console.log('Auto-detected:', result.autoDetected);
-};
-reader.readAsDataURL(audioBlob);
-```
-
-**JavaScript/Fetch (with specific language):**
-```javascript
-// Force specific language recognition
-const response = await fetch('/speechToText', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    audioContent: base64Audio,
-    languageCode: 'es-ES' // Force Spanish recognition
-  })
-});
-```
-
-**cURL (automatic language detection):**
-```bash
-curl -X POST "https://europe-west1-dulaan-backend.cloudfunctions.net/speechToText" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "audioContent": "base64-encoded-audio-data"
-  }'
-```
-
-**cURL (specific language):**
-```bash
-curl -X POST "https://europe-west1-dulaan-backend.cloudfunctions.net/speechToText" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "audioContent": "base64-encoded-audio-data",
-    "languageCode": "fr-FR"
-  }'
-```
-
----
-
-## 2. Speech-to-Text with LLM API
+## 1. Speech-to-Text with LLM API
 
 ### Endpoint
 `POST /speechToTextWithLLM`
@@ -377,7 +201,7 @@ curl -X POST "https://europe-west1-dulaan-backend.cloudfunctions.net/speechToTex
 
 ---
 
-## 3. User Data Storage API
+## 2. User Data Storage API
 
 ### Endpoint
 `POST /storeUserData`
@@ -482,7 +306,7 @@ console.log('User data stored:', result);
 
 ---
 
-## 4. User Consent API
+## 3. User Consent API
 
 ### Endpoints
 
@@ -669,7 +493,7 @@ For production use, consider implementing additional rate limiting based on your
 
 ---
 
-## 5. PeerJS Server (WebRTC Signaling)
+## 4. PeerJS Server (WebRTC Signaling)
 
 ### Overview
 The PeerJS server enables WebRTC peer-to-peer connections for real-time communication. It's deployed on Google App Engine as a separate service from the Cloud Functions.
@@ -842,7 +666,7 @@ npm install
 firebase deploy --only functions
 
 # Deploy specific function
-firebase deploy --only functions:speechToText
+firebase deploy --only functions:speechToTextWithLLM
 ```
 
 For local development:

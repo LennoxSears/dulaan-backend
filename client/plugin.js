@@ -143,33 +143,7 @@ window.dulaan = {
         return result.value.recordDataBase64
     },
 
-    // New API integration functions
-    speechToText: async (audioBase64, options = {}) => {
-        try {
-            const response = await fetch('https://europe-west1-dulaan-backend.cloudfunctions.net/speechToText', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    audioContent: audioBase64,
-                    encoding: options.encoding || 'WEBM_OPUS',
-                    sampleRateHertz: options.sampleRateHertz || 48000,
-                    languageCode: options.languageCode // Optional for auto-detection
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`Speech-to-text API error: ${response.status}`);
-            }
-
-            const result = await response.json();
-            return result;
-        } catch (error) {
-            console.error('Speech-to-text error:', error);
-            throw error;
-        }
-    },
+    // API integration functions
 
     speechToTextWithLLM: async (audioBase64, currentPwm, msgHis = [], options = {}) => {
         try {
