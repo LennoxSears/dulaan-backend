@@ -70,10 +70,10 @@ export const API_CONFIG = {
 // Remote Control Configuration
 export const REMOTE_CONFIG = {
     PEER_SERVER: {
-        host: 'dulaan-backend.ew.r.appspot.com',
-        port: 443,
-        path: '/peerjs',
-        secure: true
+        host: '34.38.33.102',
+        port: 9000,
+        path: '/',
+        secure: false
     },
     
     ICE_SERVERS: [

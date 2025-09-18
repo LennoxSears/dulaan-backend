@@ -18,10 +18,10 @@ class RemoteService {
         
         // PeerJS configuration
         this.peerConfig = {
-            host: 'dulaan-backend.ew.r.appspot.com',
-            port: 443,
-            path: '/peerjs',
-            secure: true,
+            host: '34.38.33.102',
+            port: 9000,
+            path: '/',
+            secure: false,
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },

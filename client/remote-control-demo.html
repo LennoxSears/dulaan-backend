@@ -787,16 +787,13 @@
             initializeAsHost: () => {
                 const hostId = `dulaan-host-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
                 
-                // Option 1: Use default PeerJS cloud server (temporary)
-                window.remoteControl.peer = new Peer(hostId);
-                
-                // Option 2: Use Google Cloud Instance with official PeerJS server (update IP after deployment)
-                // window.remoteControl.peer = new Peer(hostId, {
-                //     host: 'YOUR_INSTANCE_EXTERNAL_IP',  // Replace with your instance's external IP
-                //     port: 9000,
-                //     path: '/',  // Official PeerJS server uses root path
-                //     secure: false  // Set to true if using HTTPS
-                // });
+                // Use your deployed PeerJS server
+                window.remoteControl.peer = new Peer(hostId, {
+                    host: '34.38.33.102',  // Your Google Cloud Instance IP
+                    port: 9000,
+                    path: '/',  // Official PeerJS server uses root path
+                    secure: false  // HTTP connection
+                });
 
                 window.remoteControl.peer.on('open', (id) => {
                     window.remoteControl.isHost = true;
@@ -836,16 +833,13 @@
             },
 
             connectAsRemote: (hostId) => {
-                // Option 1: Use default PeerJS cloud server (temporary)
-                window.remoteControl.peer = new Peer();
-                
-                // Option 2: Use Google Cloud Instance with official PeerJS server (update IP after deployment)
-                // window.remoteControl.peer = new Peer({
-                //     host: 'YOUR_INSTANCE_EXTERNAL_IP',  // Replace with your instance's external IP
-                //     port: 9000,
-                //     path: '/',  // Official PeerJS server uses root path
-                //     secure: false  // Set to true if using HTTPS
-                // });
+                // Use your deployed PeerJS server
+                window.remoteControl.peer = new Peer({
+                    host: '34.38.33.102',  // Your Google Cloud Instance IP
+                    port: 9000,
+                    path: '/',  // Official PeerJS server uses root path
+                    secure: false  // HTTP connection
+                });
 
                 window.remoteControl.peer.on('open', (id) => {
                     log(`Remote peer initialized with ID: ${id}`);
