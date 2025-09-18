@@ -1,5 +1,5 @@
-# Use Node.js 22 LTS
-FROM node:22-alpine
+# Use Node.js 18 LTS (stable for PeerJS)
+FROM node:18-alpine
 
 # Set working directory
 WORKDIR /app
@@ -13,16 +13,12 @@ RUN npm ci --only=production
 # Copy application code
 COPY . .
 
-# Expose port
-EXPOSE 8080
+# Expose port 9000 (standard PeerJS port)
+EXPOSE 9000
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PORT=8080
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8080/_ah/health || exit 1
+ENV PORT=9000
 
 # Start the server
 CMD ["node", "server.js"]

@@ -790,12 +790,12 @@
                 // Option 1: Use default PeerJS cloud server (temporary)
                 window.remoteControl.peer = new Peer(hostId);
                 
-                // Option 2: Use custom server (uncomment when server is fixed)
+                // Option 2: Use custom Google Cloud Instance server (update IP after deployment)
                 // window.remoteControl.peer = new Peer(hostId, {
-                //     host: 'dulaan-backend.ew.r.appspot.com',
-                //     port: 443,
+                //     host: 'YOUR_INSTANCE_EXTERNAL_IP',  // Replace with your instance's external IP
+                //     port: 9000,
                 //     path: '/peerjs',
-                //     secure: true
+                //     secure: false  // Set to true if using HTTPS
                 // });
 
                 window.remoteControl.peer.on('open', (id) => {
@@ -839,12 +839,12 @@
                 // Option 1: Use default PeerJS cloud server (temporary)
                 window.remoteControl.peer = new Peer();
                 
-                // Option 2: Use custom server (uncomment when server is fixed)
+                // Option 2: Use custom Google Cloud Instance server (update IP after deployment)
                 // window.remoteControl.peer = new Peer({
-                //     host: 'dulaan-backend.ew.r.appspot.com',
-                //     port: 443,
+                //     host: 'YOUR_INSTANCE_EXTERNAL_IP',  // Replace with your instance's external IP
+                //     port: 9000,
                 //     path: '/peerjs',
-                //     secure: true
+                //     secure: false  // Set to true if using HTTPS
                 // });
 
                 window.remoteControl.peer.on('open', (id) => {
