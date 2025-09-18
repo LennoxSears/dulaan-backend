@@ -790,11 +790,11 @@
                 // Option 1: Use default PeerJS cloud server (temporary)
                 window.remoteControl.peer = new Peer(hostId);
                 
-                // Option 2: Use custom Google Cloud Instance server (update IP after deployment)
+                // Option 2: Use Google Cloud Instance with official PeerJS server (update IP after deployment)
                 // window.remoteControl.peer = new Peer(hostId, {
                 //     host: 'YOUR_INSTANCE_EXTERNAL_IP',  // Replace with your instance's external IP
                 //     port: 9000,
-                //     path: '/peerjs',
+                //     path: '/',  // Official PeerJS server uses root path
                 //     secure: false  // Set to true if using HTTPS
                 // });
 
@@ -839,11 +839,11 @@
                 // Option 1: Use default PeerJS cloud server (temporary)
                 window.remoteControl.peer = new Peer();
                 
-                // Option 2: Use custom Google Cloud Instance server (update IP after deployment)
+                // Option 2: Use Google Cloud Instance with official PeerJS server (update IP after deployment)
                 // window.remoteControl.peer = new Peer({
                 //     host: 'YOUR_INSTANCE_EXTERNAL_IP',  // Replace with your instance's external IP
                 //     port: 9000,
-                //     path: '/peerjs',
+                //     path: '/',  // Official PeerJS server uses root path
                 //     secure: false  // Set to true if using HTTPS
                 // });
 

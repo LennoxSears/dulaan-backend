@@ -2,7 +2,6 @@
 
 ## Prerequisites
 - Google Cloud SDK installed and authenticated
-- Docker installed locally (for building)
 - Project with billing enabled
 
 ## Step 1: Create a Google Cloud Instance
@@ -12,7 +11,7 @@
 export PROJECT_ID="your-project-id"
 gcloud config set project $PROJECT_ID
 
-# Create a VM instance
+# Create a VM instance with Container-Optimized OS
 gcloud compute instances create dulaan-peerjs-server \
     --zone=europe-west1-b \
     --machine-type=e2-micro \
@@ -39,44 +38,16 @@ gcloud compute firewall-rules create allow-peerjs-server \
     --source-ranges 0.0.0.0/0 \
     --target-tags peerjs-server \
     --description "Allow PeerJS server on port 9000"
-
-# Create firewall rule for HTTP (optional, for health checks)
-gcloud compute firewall-rules create allow-http-8080 \
-    --allow tcp:8080 \
-    --source-ranges 0.0.0.0/0 \
-    --target-tags peerjs-server \
-    --description "Allow HTTP on port 8080"
 ```
 
-## Step 3: Build and Push Docker Image
-
-```bash
-# Build the Docker image
-docker build -t gcr.io/$PROJECT_ID/dulaan-peerjs-server .
-
-# Configure Docker to use gcloud as a credential helper
-gcloud auth configure-docker
-
-# Push the image to Google Container Registry
-docker push gcr.io/$PROJECT_ID/dulaan-peerjs-server
-```
-
-## Step 4: Deploy to the Instance
+## Step 3: Deploy Official PeerJS Server
 
 ```bash
 # SSH into the instance
 gcloud compute ssh dulaan-peerjs-server --zone=europe-west1-b
 
-# On the instance, run these commands:
-# Pull and run the Docker container
-sudo docker pull gcr.io/YOUR_PROJECT_ID/dulaan-peerjs-server
-sudo docker run -d \
-    --name peerjs-server \
-    --restart unless-stopped \
-    -p 9000:9000 \
-    -e NODE_ENV=production \
-    -e PEERJS_KEY=dulaan-peerjs-production-key \
-    gcr.io/YOUR_PROJECT_ID/dulaan-peerjs-server
+# On the instance, run the official PeerJS Docker container
+sudo docker run -p 9000:9000 -d --name peerjs-server --restart unless-stopped peerjs/peerjs-server
 
 # Check if container is running
 sudo docker ps
@@ -85,7 +56,7 @@ sudo docker ps
 sudo docker logs peerjs-server
 ```
 
-## Step 5: Get the External IP
+## Step 4: Get the External IP
 
 ```bash
 # Get the external IP of your instance
@@ -94,15 +65,14 @@ gcloud compute instances describe dulaan-peerjs-server \
     --format='get(networkInterfaces[0].accessConfigs[0].natIP)'
 ```
 
-## Step 6: Test the Deployment
+## Step 5: Test the Deployment
 
 ```bash
 # Test the server (replace EXTERNAL_IP with your instance's IP)
 curl http://EXTERNAL_IP:9000/
-curl http://EXTERNAL_IP:9000/peerjs
 ```
 
-## Step 7: Update Client Configuration
+## Step 6: Update Client Configuration
 
 Update your client code to use the new server:
 
@@ -110,7 +80,7 @@ Update your client code to use the new server:
 window.remoteControl.peer = new Peer(hostId, {
     host: 'EXTERNAL_IP',  // Your instance's external IP
     port: 9000,
-    path: '/peerjs',
+    path: '/',
     secure: false  // Use true if you set up HTTPS
 });
 ```
@@ -121,27 +91,39 @@ window.remoteControl.peer = new Peer(hostId, {
 # SSH into the instance
 gcloud compute ssh dulaan-peerjs-server --zone=europe-west1-b
 
-# Install certbot
+# Install nginx for SSL termination
 sudo apt update
-sudo apt install -y certbot
+sudo apt install -y nginx certbot python3-certbot-nginx
 
 # Get SSL certificate (you'll need a domain name)
-sudo certbot certonly --standalone -d your-domain.com
+sudo certbot --nginx -d your-domain.com
 
-# Update Docker run command to include SSL
-sudo docker stop peerjs-server
-sudo docker rm peerjs-server
-sudo docker run -d \
-    --name peerjs-server \
-    --restart unless-stopped \
-    -p 80:8080 \
-    -p 443:9000 \
-    -v /etc/letsencrypt:/etc/letsencrypt:ro \
-    -e NODE_ENV=production \
-    -e PEERJS_KEY=dulaan-peerjs-production-key \
-    -e SSL_CERT=/etc/letsencrypt/live/your-domain.com/fullchain.pem \
-    -e SSL_KEY=/etc/letsencrypt/live/your-domain.com/privkey.pem \
-    gcr.io/YOUR_PROJECT_ID/dulaan-peerjs-server
+# Configure nginx to proxy to PeerJS server
+sudo tee /etc/nginx/sites-available/peerjs > /dev/null <<EOF
+server {
+    listen 443 ssl;
+    server_name your-domain.com;
+    
+    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+    
+    location / {
+        proxy_pass http://localhost:9000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+
+sudo ln -s /etc/nginx/sites-available/peerjs /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
 ## Monitoring and Maintenance
@@ -153,10 +135,10 @@ sudo docker ps
 sudo docker logs peerjs-server
 
 # Update the container
-sudo docker pull gcr.io/YOUR_PROJECT_ID/dulaan-peerjs-server
+sudo docker pull peerjs/peerjs-server
 sudo docker stop peerjs-server
 sudo docker rm peerjs-server
-# Run the docker run command again
+sudo docker run -p 9000:9000 -d --name peerjs-server --restart unless-stopped peerjs/peerjs-server
 
 # Monitor instance
 gcloud compute instances list

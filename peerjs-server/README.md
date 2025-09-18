@@ -1,15 +1,15 @@
 # Dulaan PeerJS Server
 
-A WebRTC signaling server for peer-to-peer communication using PeerJS, deployed on Google App Engine.
+A WebRTC signaling server for peer-to-peer communication using the official PeerJS Docker image, deployed on Google Cloud Instance.
 
 ## Overview
 
-This PeerJS server enables WebRTC peer-to-peer connections for the Dulaan application. It handles:
+This deployment uses the official PeerJS Docker image for WebRTC peer-to-peer connections. Benefits:
 
-- **Peer Registration**: Manages peer IDs and connection metadata
-- **Signaling**: Facilitates WebRTC offer/answer exchange between peers
-- **Connection Management**: Tracks active connections and handles disconnections
-- **CORS Support**: Configured for cross-origin requests from web clients
+- **Zero Maintenance**: Uses the official `peerjs/peerjs-server` Docker image
+- **Battle Tested**: Maintained by the PeerJS team
+- **Simple Deployment**: Single Docker command deployment
+- **Cost Effective**: Runs on Google Cloud Instance (e2-micro free tier)
 
 ## Architecture
 
@@ -21,84 +21,48 @@ Client A ←→ PeerJS Server ←→ Client B
 
 The server only handles signaling; actual data flows directly between peers.
 
-## Local Development
+## Quick Deployment
 
 ### Prerequisites
 
-- Node.js 22+
-- npm or yarn
-- Google Cloud SDK (for deployment)
+- Google Cloud SDK installed and authenticated
+- Project with billing enabled
 
-### Setup
+### Deploy to Google Cloud Instance
 
-1. **Install dependencies:**
+1. **Create instance and deploy:**
    ```bash
-   cd peerjs-server
-   npm install
+   # Create VM instance
+   gcloud compute instances create dulaan-peerjs-server \
+       --zone=europe-west1-b \
+       --machine-type=e2-micro \
+       --tags=peerjs-server \
+       --image-family=cos-stable \
+       --image-project=cos-cloud
+
+   # Create firewall rule
+   gcloud compute firewall-rules create allow-peerjs-server \
+       --allow tcp:9000 \
+       --target-tags peerjs-server
+
+   # SSH and run Docker container
+   gcloud compute ssh dulaan-peerjs-server --zone=europe-west1-b
+   sudo docker run -p 9000:9000 -d --name peerjs-server --restart unless-stopped peerjs/peerjs-server
    ```
 
-2. **Start development server:**
+2. **Get external IP:**
    ```bash
-   npm run dev
+   gcloud compute instances describe dulaan-peerjs-server \
+       --zone=europe-west1-b \
+       --format='get(networkInterfaces[0].accessConfigs[0].natIP)'
    ```
 
-3. **Test the server:**
+3. **Test deployment:**
    ```bash
-   curl http://localhost:8080/
+   curl http://EXTERNAL_IP:9000/
    ```
 
-### Environment Variables
-
-- `PORT`: Server port (default: 8080)
-- `NODE_ENV`: Environment mode (development/production)
-- `PEERJS_KEY`: Authentication key for PeerJS API calls
-- `ALLOW_DISCOVERY`: Enable peer discovery endpoint (default: false)
-
-## Deployment to Google App Engine
-
-### Prerequisites
-
-1. **Install Google Cloud SDK:**
-   ```bash
-   # macOS
-   brew install google-cloud-sdk
-   
-   # Or download from: https://cloud.google.com/sdk/docs/install
-   ```
-
-2. **Authenticate:**
-   ```bash
-   gcloud auth login
-   gcloud config set project YOUR_PROJECT_ID
-   ```
-
-3. **Enable App Engine:**
-   ```bash
-   gcloud app create --region=europe-west1
-   ```
-
-### Deploy
-
-1. **Deploy to App Engine:**
-   ```bash
-   cd peerjs-server
-   npm run deploy
-   ```
-
-2. **View deployment:**
-   ```bash
-   gcloud app browse --service=peerjs-server
-   ```
-
-### Configuration
-
-The `app.yaml` file configures:
-
-- **Runtime**: Node.js 22
-- **Scaling**: 1-10 instances with CPU-based scaling
-- **Health Checks**: Readiness and liveness probes
-- **Session Affinity**: Enabled for WebSocket connections
-- **Security**: Peer discovery disabled in production
+See `DEPLOY_INSTANCE.md` for detailed instructions.
 
 ## Client Usage
 
@@ -107,10 +71,10 @@ The `app.yaml` file configures:
 ```javascript
 // Connect to the PeerJS server
 const peer = new Peer('unique-peer-id', {
-  host: 'your-app-id.appspot.com',
-  port: 443,
-  path: '/peerjs',
-  secure: true
+  host: 'YOUR_INSTANCE_EXTERNAL_IP',
+  port: 9000,
+  path: '/',
+  secure: false  // Set to true if using HTTPS
 });
 
 // Handle connection events
@@ -141,10 +105,10 @@ import Peer from 'peerjs';
 class PeerService {
   constructor() {
     this.peer = new Peer({
-      host: 'your-app-id.appspot.com',
-      port: 443,
-      path: '/peerjs',
-      secure: true,
+      host: 'YOUR_INSTANCE_EXTERNAL_IP',
+      port: 9000,
+      path: '/',
+      secure: false,  // Set to true if using HTTPS
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
