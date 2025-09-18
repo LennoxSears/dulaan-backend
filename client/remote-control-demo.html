@@ -185,10 +185,11 @@
         <p>Connect to another user's device using their Host ID.</p>
         
         <div>
-            <input type="text" id="hostIdInput" placeholder="Enter Host ID" style="width: 300px;">
+            <input type="text" id="hostIdInput" placeholder="Enter 6-character Host ID (e.g., ABC123)" style="width: 300px; text-transform: uppercase;" maxlength="6">
             <button onclick="connectToHost()" id="connectBtn">Connect to Host</button>
             <button onclick="disconnectFromHost()" id="disconnectBtn" disabled>Disconnect</button>
         </div>
+        <p style="font-size: 12px; color: #666;">Host ID format: 6 characters using A-Z and 0-9 only</p>
         
         <div class="status disconnected" id="remoteStatus">
             Not connected to any host
@@ -647,9 +648,14 @@
 
         // Remote Functions (using real stream.js remote control)
         function connectToHost() {
-            const hostId = document.getElementById('hostIdInput').value.trim();
+            const hostId = document.getElementById('hostIdInput').value.trim().toUpperCase();
             if (!hostId) {
                 alert('Please enter a Host ID');
+                return;
+            }
+            
+            if (!isValidId(hostId)) {
+                alert('Invalid Host ID format. Must be exactly 6 characters using A-Z and 0-9 only.');
                 return;
             }
             
@@ -780,12 +786,29 @@
             }
         }
 
+        // Generate 6-character unique ID
+        function generateShortId() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            for (let i = 0; i < 6; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        // Validate ID format
+        function isValidId(id) {
+            if (!id || typeof id !== 'string') return false;
+            if (id.length !== 6) return false;
+            return /^[A-Z0-9]+$/.test(id);
+        }
+
         // Initialize remote control implementation
         window.remoteControl = {
             ...window.remoteControl,
 
             initializeAsHost: () => {
-                const hostId = `dulaan-host-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+                const hostId = generateShortId();
                 
                 // Use your deployed PeerJS server
                 window.remoteControl.peer = new Peer(hostId, {
@@ -833,6 +856,12 @@
             },
 
             connectAsRemote: (hostId) => {
+                // Validate host ID format
+                if (!isValidId(hostId)) {
+                    log(`Error: Invalid host ID format. Must be 6 characters (A-Z, 0-9)`);
+                    return;
+                }
+
                 // Use your deployed PeerJS server
                 window.remoteControl.peer = new Peer({
                     host: '34.38.33.102',  // Your Google Cloud Instance IP

@@ -83,7 +83,11 @@ export const REMOTE_CONFIG = {
     
     HEARTBEAT_INTERVAL: 30000,
     CONNECTION_TIMEOUT: 10000,
-    RECONNECT_ATTEMPTS: 3
+    RECONNECT_ATTEMPTS: 3,
+    
+    // ID Generation
+    ID_LENGTH: 6,
+    ID_CHARS: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 };
 
 // Consent Configuration
@@ -174,6 +178,33 @@ export const SDK_INFO = {
     DESCRIPTION: 'Motor control system with voice, ambient, and remote control capabilities',
     AUTHOR: 'Dulaan Team',
     LICENSE: 'MIT'
+};
+
+// Utility Functions
+export const UTILS = {
+    /**
+     * Generate a short 6-character unique ID for peer connections
+     * @returns {string} 6-character alphanumeric ID
+     */
+    generateShortId: () => {
+        const chars = REMOTE_CONFIG.ID_CHARS;
+        let result = '';
+        for (let i = 0; i < REMOTE_CONFIG.ID_LENGTH; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+    },
+    
+    /**
+     * Validate if an ID is in the correct format
+     * @param {string} id - ID to validate
+     * @returns {boolean} True if valid
+     */
+    isValidId: (id) => {
+        if (!id || typeof id !== 'string') return false;
+        if (id.length !== REMOTE_CONFIG.ID_LENGTH) return false;
+        return /^[A-Z0-9]+$/.test(id);
+    }
 };
 
 // Legacy global access for backward compatibility

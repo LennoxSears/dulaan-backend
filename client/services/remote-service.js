@@ -46,8 +46,8 @@ class RemoteService {
             this.peer.destroy();
         }
 
-        // Generate unique host ID
-        const hostId = `dulaan-host-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        // Generate unique 6-character host ID
+        const hostId = this.generateShortId();
         
         this.peer = new Peer(hostId, this.peerConfig);
 
@@ -293,6 +293,30 @@ class RemoteService {
             clearInterval(this.heartbeatInterval);
             this.heartbeatInterval = null;
         }
+    }
+
+    /**
+     * Generate a short 6-character unique ID for peer connections
+     * @returns {string} 6-character alphanumeric ID
+     */
+    generateShortId() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let result = '';
+        for (let i = 0; i < 6; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+    }
+
+    /**
+     * Validate if an ID is in the correct format
+     * @param {string} id - ID to validate
+     * @returns {boolean} True if valid
+     */
+    isValidId(id) {
+        if (!id || typeof id !== 'string') return false;
+        if (id.length !== 6) return false;
+        return /^[A-Z0-9]+$/.test(id);
     }
 }
 
