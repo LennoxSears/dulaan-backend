@@ -225,7 +225,7 @@ window.dulaan = {
                 ...consentData
             };
 
-            const response = await fetch('https://europe-west1-dulaan-backend.cloudfunctions.net/storeUserConsent', {
+            const response = await fetch('https://storeuserconsent-qveg3gkwxa-ew.a.run.app', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -249,7 +249,7 @@ window.dulaan = {
     // API integration functions
     speechToTextWithLLM: async (audioBase64, currentPwm, msgHis = [], options = {}) => {
         try {
-            const response = await fetch('https://europe-west1-dulaan-backend.cloudfunctions.net/speechToTextWithLLM', {
+            const response = await fetch('https://speechtotextwithllm-qveg3gkwxa-ew.a.run.app', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

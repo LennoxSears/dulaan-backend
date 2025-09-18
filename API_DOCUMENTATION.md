@@ -772,7 +772,7 @@ npm install
 firebase deploy --only functions
 
 # Deploy specific function
-firebase deploy --only functions:speechToTextWithLLM
+firebase deploy --only functions
 ```
 
 For local development:
