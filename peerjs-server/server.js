@@ -40,7 +40,7 @@ const server = app.listen(PORT, () => {
 // Create PeerJS server
 const peerServer = ExpressPeerServer(server, {
   debug: process.env.NODE_ENV !== 'production',
-  path: '/',
+  path: '/peerjs',
   
   // Security and connection settings
   key: process.env.PEERJS_KEY || 'dulaan-peerjs-key',
@@ -80,7 +80,7 @@ peerServer.on('disconnect', (client) => {
 });
 
 // Mount PeerJS server
-app.use('/peerjs', peerServer);
+app.use('/', peerServer);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
