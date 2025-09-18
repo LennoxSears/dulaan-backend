@@ -258,107 +258,75 @@
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@thumbmarkjs/thumbmarkjs/dist/thumbmark.umd.js"></script>
     
-    <!-- Simulate the plugin and stream functionality -->
+    <!-- Mock Capacitor and BLE for demo -->
     <script>
-        // Simulate window objects for demo
+        // Mock Capacitor for demo environment
+        window.Capacitor = {
+            Plugins: {
+                VoiceRecorder: {
+                    requestAudioRecordingPermission: async () => ({ value: true }),
+                    startRecording: async () => ({ value: true }),
+                    stopRecording: async () => ({ 
+                        value: { 
+                            recordDataBase64: 'mock_audio_data_' + Date.now() 
+                        } 
+                    })
+                }
+            }
+        };
+
+        // Mock BLE functions for demo
+        window.BleClient = {
+            initialize: async () => console.log('BLE initialized (mock)'),
+            requestDevice: async () => ({ deviceId: 'mock_device_123' }),
+            connect: async () => console.log('BLE connected (mock)'),
+            write: async (deviceId, service, characteristic, value) => {
+                console.log(`BLE write (mock): ${deviceId}, ${service}, ${characteristic}, ${value}`);
+            },
+            disconnect: async () => console.log('BLE disconnected (mock)')
+        };
+
+        // Mock BLE utility functions
+        window.textToDataView = (text) => new DataView(new ArrayBuffer(text.length));
+        window.hexStringToDataView = (hex) => new DataView(new ArrayBuffer(hex.length / 2));
+        
+        // Mock device address for demo
+        window.deviceAddress = 'mock_device_123';
+    </script>
+    
+    <!-- Include actual plugin and stream files -->
+    <script src="plugin.js"></script>
+    <script src="stream.js"></script>
+    
+    <!-- Demo functionality -->
+    <script>
+        // Initialize demo state (these will be used by the real plugin/stream files)
         window.current_pwm = 0;
         window.touchValue = 0;
         window.maxEnergy = 0.075;
         window.msgHis = [];
         
-        // Mock functions for demo (replace with actual implementations)
-        window.dulaan = {
-            write: (pwm) => {
+        // Mock BLE write functions for demo (only mock the hardware interface)
+        const originalWrite = window.dulaan?.write;
+        const originalWriteForce = window.dulaan?.writeForce;
+        
+        // Override only the BLE write functions to add demo logging
+        if (window.dulaan) {
+            const realWrite = window.dulaan.write;
+            const realWriteForce = window.dulaan.writeForce;
+            
+            window.dulaan.write = (pwm) => {
                 log(`Motor write: ${pwm}`);
                 updateCurrentPwm(pwm);
-            },
-            writeForce: (pwm) => {
+                // Don't call real BLE write in demo
+            };
+            
+            window.dulaan.writeForce = (pwm) => {
                 log(`Motor write (force): ${pwm}`);
                 updateCurrentPwm(pwm);
-            },
-            
-            // Device fingerprinting functions
-            generateDeviceId: async () => {
-                try {
-                    if (typeof ThumbmarkJS === 'undefined') {
-                        console.warn('ThumbmarkJS not available, falling back to basic fingerprint');
-                        const basicFingerprint = {
-                            userAgent: navigator.userAgent,
-                            language: navigator.language,
-                            platform: navigator.platform,
-                            screen: `${screen.width}x${screen.height}`,
-                            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-                        };
-                        
-                        const fingerprintString = JSON.stringify(basicFingerprint);
-                        let hash = 0;
-                        for (let i = 0; i < fingerprintString.length; i++) {
-                            const char = fingerprintString.charCodeAt(i);
-                            hash = ((hash << 5) - hash) + char;
-                            hash = hash & hash;
-                        }
-                        return Math.abs(hash).toString(16);
-                    }
-
-                    const tm = new ThumbmarkJS.Thumbmark({
-                        exclude: ['permissions'],
-                        timeout: 3000,
-                        logging: false
-                    });
-                    
-                    const result = await tm.get();
-                    return result.thumbmark;
-                } catch (error) {
-                    console.error('Error generating device ID:', error);
-                    return 'fallback_' + Date.now() + '_' + Math.random().toString(36).substring(2);
-                }
-            },
-
-            getDeviceId: async () => {
-                try {
-                    let deviceId = localStorage.getItem('dulaan_device_id');
-                    
-                    if (!deviceId) {
-                        deviceId = await window.dulaan.generateDeviceId();
-                        localStorage.setItem('dulaan_device_id', deviceId);
-                        log('Generated new device ID: ' + deviceId);
-                    }
-                    
-                    return deviceId;
-                } catch (error) {
-                    console.error('Error getting device ID:', error);
-                    return 'error_' + Date.now();
-                }
-            },
-
-            collectUserConsent: async (consentData) => {
-                try {
-                    const deviceId = await window.dulaan.getDeviceId();
-                    
-                    const consentPayload = {
-                        deviceId: deviceId,
-                        timestamp: new Date().toISOString(),
-                        userAgent: navigator.userAgent,
-                        ...consentData
-                    };
-
-                    // For demo, just log the consent data
-                    log('Consent collected: ' + JSON.stringify(consentPayload, null, 2));
-                    
-                    // In real implementation, this would call the Cloud Function
-                    // const response = await fetch('https://europe-west1-dulaan-backend.cloudfunctions.net/storeUserConsent', {
-                    //     method: 'POST',
-                    //     headers: { 'Content-Type': 'application/json' },
-                    //     body: JSON.stringify(consentPayload)
-                    // });
-
-                    return { success: true, deviceId: deviceId };
-                } catch (error) {
-                    console.error('Error collecting user consent:', error);
-                    throw error;
-                }
-            }
-        };
+                // Don't call real BLE write in demo
+            };
+        }
 
         // Initialize remote control object
         window.remoteControl = {
@@ -463,7 +431,7 @@
             document.getElementById('logs').innerHTML = '';
         }
 
-        // Consent Functions
+        // Consent Functions (using real plugin.js functions)
         async function initializeDeviceId() {
             try {
                 const deviceId = await window.dulaan.getDeviceId();
@@ -502,12 +470,13 @@
                     return;
                 }
 
+                // Use real consent collection from plugin.js
                 const result = await window.dulaan.collectUserConsent(consentData);
                 
                 if (result.success) {
                     document.getElementById('consentStatus').className = 'status connected';
                     document.getElementById('consentStatus').textContent = 'Consent collected successfully';
-                    log('User consent submitted successfully');
+                    log('User consent submitted successfully to Firebase');
                     
                     // Store consent status locally
                     localStorage.setItem('dulaan_consent_given', 'true');
@@ -532,6 +501,7 @@
                     revoked: true
                 };
 
+                // Use real consent collection from plugin.js
                 const result = await window.dulaan.collectUserConsent(consentData);
                 
                 document.getElementById('consentStatus').className = 'status disconnected';
@@ -546,7 +516,7 @@
                 localStorage.removeItem('dulaan_consent_given');
                 localStorage.removeItem('dulaan_consent_timestamp');
                 
-                log('User consent revoked');
+                log('User consent revoked in Firebase');
             } catch (error) {
                 log('Error revoking consent: ' + error.message);
                 alert('Failed to revoke consent: ' + error.message);
@@ -567,19 +537,89 @@
             }
         }
 
-        // Host Functions
+        // Control Mode Functions (using real stream.js functionality)
+        function startAIControl() {
+            log('Starting AI voice control...');
+            // Use real AI streaming from stream.js
+            if (typeof window.startStreaming === 'function') {
+                window.startStreaming();
+                document.getElementById('aiStartBtn').disabled = true;
+                document.getElementById('aiStopBtn').disabled = false;
+                document.getElementById('lastAICommand').textContent = 'Listening...';
+                log('AI control started - speak to control the device');
+            } else {
+                log('AI streaming not available - stream.js not loaded properly');
+            }
+        }
+
+        function stopAIControl() {
+            log('Stopping AI voice control...');
+            if (typeof window.stopStreaming === 'function') {
+                window.stopStreaming();
+                document.getElementById('aiStartBtn').disabled = false;
+                document.getElementById('aiStopBtn').disabled = true;
+                document.getElementById('lastAICommand').textContent = 'Stopped';
+            }
+        }
+
+        function startAmbientControl() {
+            log('Starting ambient sound control...');
+            // Use real ambient processing from stream.js
+            if (typeof window.startAbi === 'function') {
+                window.startAbi();
+                document.getElementById('ambientStartBtn').disabled = true;
+                document.getElementById('ambientStopBtn').disabled = false;
+                log('Ambient control started - make sounds to control the device');
+            } else {
+                log('Ambient processing not available - stream.js not loaded properly');
+            }
+        }
+
+        function stopAmbientControl() {
+            log('Stopping ambient sound control...');
+            if (typeof window.stopAbi === 'function') {
+                window.stopAbi();
+                document.getElementById('ambientStartBtn').disabled = false;
+                document.getElementById('ambientStopBtn').disabled = true;
+            }
+        }
+
+        // Host Functions (using real stream.js remote control)
         function startAsHost() {
             log('Starting as host...');
-            const hostId = window.remoteControl.initializeAsHost();
-            updateConnectionStatus();
+            
+            // Use real remote host function from stream.js
+            if (typeof window.startRemoteHost === 'function') {
+                const hostId = window.startRemoteHost();
+                document.getElementById('hostId').textContent = hostId || 'Generating...';
+                document.getElementById('hostIdContainer').style.display = 'block';
+                document.getElementById('startHostBtn').disabled = true;
+                document.getElementById('stopHostBtn').disabled = false;
+                log(`Host started with ID: ${hostId || 'pending...'}`);
+            } else {
+                // Fallback to demo remote control
+                const hostId = window.remoteControl.initializeAsHost();
+                updateConnectionStatus();
+            }
         }
 
         function stopRemoteControl() {
             log('Stopping remote control...');
-            window.remoteControl.disconnect();
-            document.getElementById('hostIdContainer').style.display = 'none';
-            updateConnectionStatus();
-            updateRemoteUsers();
+            
+            // Use real remote control stop from stream.js
+            if (typeof window.stopRemoteControl === 'function') {
+                window.stopRemoteControl();
+                document.getElementById('hostIdContainer').style.display = 'none';
+                document.getElementById('startHostBtn').disabled = false;
+                document.getElementById('stopHostBtn').disabled = true;
+                log('Remote control stopped');
+            } else {
+                // Fallback to demo remote control
+                window.remoteControl.disconnect();
+                document.getElementById('hostIdContainer').style.display = 'none';
+                updateConnectionStatus();
+                updateRemoteUsers();
+            }
         }
 
         function copyHostId() {
@@ -589,7 +629,7 @@
             });
         }
 
-        // Remote Functions
+        // Remote Functions (using real stream.js remote control)
         function connectToHost() {
             const hostId = document.getElementById('hostIdInput').value.trim();
             if (!hostId) {
@@ -598,7 +638,17 @@
             }
             
             log(`Connecting to host: ${hostId}`);
-            window.remoteControl.connectAsRemote(hostId);
+            
+            // Use real remote connection from stream.js
+            if (typeof window.connectToRemoteHost === 'function') {
+                window.connectToRemoteHost(hostId);
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                log('Attempting to connect using stream.js...');
+            } else {
+                // Fallback to demo remote control
+                window.remoteControl.connectAsRemote(hostId);
+            }
         }
 
         function disconnectFromHost() {
@@ -648,7 +698,14 @@
 
         function startTouchControl() {
             log('Starting touch control...');
-            if (window.remoteControl.isRemote) {
+            document.getElementById('touchStartBtn').disabled = true;
+            document.getElementById('touchStopBtn').disabled = false;
+            
+            // Use real touch control from stream.js
+            if (typeof window.startTouch === 'function') {
+                window.startTouch();
+                log('Touch control started - use the slider to control intensity');
+            } else if (window.remoteControl.isRemote) {
                 log('Remote touch control started');
             } else {
                 log('Local touch control started');
@@ -657,7 +714,13 @@
 
         function stopTouchControl() {
             log('Stopping touch control...');
-            if (window.remoteControl.isRemote) {
+            document.getElementById('touchStartBtn').disabled = false;
+            document.getElementById('touchStopBtn').disabled = true;
+            
+            // Use real touch control from stream.js
+            if (typeof window.stopTouch === 'function') {
+                window.stopTouch();
+            } else if (window.remoteControl.isRemote) {
                 window.remoteControl.sendControlCommand('touch', 0);
             } else {
                 window.dulaan.write(0);
@@ -682,6 +745,7 @@
             } else {
                 window.dulaan.write(pwmValue);
             }
+            log(`Touch control: ${value}% (PWM: ${pwmValue})`);
         }
 
         function updateManualValue() {
@@ -848,7 +912,13 @@
         initializeDeviceId();
         checkExistingConsent();
         
-        log('Remote control demo initialized');
+        // Enable control buttons for demo
+        document.getElementById('aiStartBtn').disabled = false;
+        document.getElementById('ambientStartBtn').disabled = false;
+        document.getElementById('touchStartBtn').disabled = false;
+        document.getElementById('manualSendBtn').disabled = false;
+        
+        log('Remote control demo initialized with real plugin.js and stream.js');
     </script>
 </body>
 </html>
