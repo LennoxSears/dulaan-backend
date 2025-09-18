@@ -143,8 +143,110 @@ window.dulaan = {
         return result.value.recordDataBase64
     },
 
-    // API integration functions
+    // Device fingerprinting and user identification
+    generateDeviceId: async () => {
+        try {
+            // Check if ThumbmarkJS is available
+            if (typeof ThumbmarkJS === 'undefined') {
+                console.warn('ThumbmarkJS not available, falling back to basic fingerprint');
+                // Fallback to basic browser fingerprint
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                ctx.textBaseline = 'top';
+                ctx.font = '14px Arial';
+                ctx.fillText('Device fingerprint', 2, 2);
+                const canvasFingerprint = canvas.toDataURL();
+                
+                const basicFingerprint = {
+                    userAgent: navigator.userAgent,
+                    language: navigator.language,
+                    platform: navigator.platform,
+                    screen: `${screen.width}x${screen.height}`,
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    canvas: canvasFingerprint.slice(-50) // Last 50 chars
+                };
+                
+                // Create a simple hash
+                const fingerprintString = JSON.stringify(basicFingerprint);
+                let hash = 0;
+                for (let i = 0; i < fingerprintString.length; i++) {
+                    const char = fingerprintString.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash; // Convert to 32-bit integer
+                }
+                return Math.abs(hash).toString(16);
+            }
 
+            // Use ThumbmarkJS for advanced fingerprinting
+            const tm = new ThumbmarkJS.Thumbmark({
+                exclude: ['permissions'], // Exclude permissions for faster generation
+                timeout: 3000,
+                logging: false
+            });
+            
+            const result = await tm.get();
+            return result.thumbmark;
+        } catch (error) {
+            console.error('Error generating device ID:', error);
+            // Ultimate fallback
+            return 'fallback_' + Date.now() + '_' + Math.random().toString(36).substring(2);
+        }
+    },
+
+    // Get or create cached device ID
+    getDeviceId: async () => {
+        try {
+            // Check if we have a cached device ID
+            let deviceId = localStorage.getItem('dulaan_device_id');
+            
+            if (!deviceId) {
+                // Generate new device ID
+                deviceId = await window.dulaan.generateDeviceId();
+                localStorage.setItem('dulaan_device_id', deviceId);
+                console.log('Generated new device ID:', deviceId);
+            }
+            
+            return deviceId;
+        } catch (error) {
+            console.error('Error getting device ID:', error);
+            return 'error_' + Date.now();
+        }
+    },
+
+    // Collect user consent with device fingerprinting
+    collectUserConsent: async (consentData) => {
+        try {
+            const deviceId = await window.dulaan.getDeviceId();
+            
+            const consentPayload = {
+                deviceId: deviceId,
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+                ...consentData
+            };
+
+            const response = await fetch('https://europe-west1-dulaan-backend.cloudfunctions.net/storeUserConsent', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(consentPayload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`Consent storage failed: ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log('User consent stored successfully:', result);
+            return result;
+        } catch (error) {
+            console.error('Error collecting user consent:', error);
+            throw error;
+        }
+    },
+
+    // API integration functions
     speechToTextWithLLM: async (audioBase64, currentPwm, msgHis = [], options = {}) => {
         try {
             const response = await fetch('https://europe-west1-dulaan-backend.cloudfunctions.net/speechToTextWithLLM', {

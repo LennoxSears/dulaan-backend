@@ -564,11 +564,14 @@ exports.storeUserConsent = onRequest(
                 return res.status(405).json({ error: 'Method not allowed. Use POST or PUT.' });
             }
 
-            // Validate required fields
-            const { userId, consent } = req.body;
+            // Validate required fields - now using deviceId from thumbmarkjs
+            const { deviceId, userId, consent } = req.body;
             
-            if (!userId) {
-                return res.status(400).json({ error: 'Missing required field: userId' });
+            // Use deviceId as primary identifier, fallback to userId for backward compatibility
+            const identifier = deviceId || userId;
+            
+            if (!identifier) {
+                return res.status(400).json({ error: 'Missing required field: deviceId (or userId for backward compatibility)' });
             }
 
             if (!consent || typeof consent !== 'object') {
@@ -577,10 +580,10 @@ exports.storeUserConsent = onRequest(
                 });
             }
 
-            // Validate consent structure (basic validation)
+            // Validate consent structure (basic validation) - updated for thumbmarkjs integration
             const validConsentFields = [
                 'analytics', 'marketing', 'functional', 'necessary',
-                'dataProcessing', 'cookies', 'thirdParty'
+                'dataProcessing', 'cookies', 'thirdParty', 'remoteControl'
             ];
 
             const hasValidConsentField = Object.keys(consent).some(key => 
@@ -594,9 +597,10 @@ exports.storeUserConsent = onRequest(
                 });
             }
 
-            // Prepare consent data document
+            // Prepare consent data document with thumbmarkjs integration
             const consentData = {
-                userId: userId,
+                deviceId: identifier, // Primary identifier from thumbmarkjs
+                userId: userId || null, // Optional legacy field
                 consent: consent,
                 consentVersion: req.body.consentVersion || '1.0',
                 consentDate: new Date().toISOString(),
@@ -604,12 +608,17 @@ exports.storeUserConsent = onRequest(
                 // Store additional metadata
                 userAgent: req.headers['user-agent'] || null,
                 ipAddress: req.headers['x-forwarded-for'] || req.connection.remoteAddress || null,
-                consentSource: req.body.consentSource || 'web'
+                consentSource: req.body.consentSource || 'web',
+                // Thumbmarkjs specific fields
+                deviceFingerprint: req.body.deviceFingerprint || null,
+                fingerprintMethod: deviceId ? 'thumbmarkjs' : 'legacy',
+                timestamp: req.body.timestamp || new Date().toISOString(),
+                purpose: req.body.purpose || 'unspecified'
             };
 
-            // Store consent data in Firestore
+            // Store consent data in Firestore using deviceId as document ID
             const db = getFirestore();
-            const consentRef = db.collection('userConsent').doc(userId);
+            const consentRef = db.collection('userConsent').doc(identifier);
             
             // Check if consent data already exists
             const existingConsent = await consentRef.get();
@@ -631,20 +640,27 @@ exports.storeUserConsent = onRequest(
                     userAgent: consentData.userAgent,
                     ipAddress: consentData.ipAddress,
                     consentSource: consentData.consentSource,
+                    // Thumbmarkjs specific fields
+                    deviceFingerprint: consentData.deviceFingerprint,
+                    fingerprintMethod: consentData.fingerprintMethod,
+                    purpose: consentData.purpose,
                     // Keep history of consent changes
                     previousConsent: existingData.consent,
                     previousConsentDate: existingData.consentDate
                 });
                 
                 logger.log('User consent updated', { 
-                    userId, 
+                    deviceId: identifier,
+                    userId: userId,
                     previousConsent: existingData.consent,
-                    newConsent: updatedConsent
+                    newConsent: updatedConsent,
+                    fingerprintMethod: consentData.fingerprintMethod
                 });
                 
                 res.json({
                     success: true,
                     message: 'User consent updated successfully',
+                    deviceId: identifier,
                     userId: userId,
                     consent: updatedConsent,
                     action: 'updated'
@@ -653,11 +669,17 @@ exports.storeUserConsent = onRequest(
                 // Create new consent document
                 await consentRef.set(consentData);
                 
-                logger.log('User consent created', { userId, consent });
+                logger.log('User consent created', { 
+                    deviceId: identifier, 
+                    userId: userId,
+                    consent: consent,
+                    fingerprintMethod: consentData.fingerprintMethod
+                });
                 
                 res.json({
                     success: true,
                     message: 'User consent stored successfully',
+                    deviceId: identifier,
                     userId: userId,
                     consent: consent,
                     action: 'created'
