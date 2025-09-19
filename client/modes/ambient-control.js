@@ -122,17 +122,3 @@ export class AmbientControl {
     }
 }
 
-// Legacy global functions for backward compatibility
-if (typeof window !== 'undefined') {
-    window.startAbi = async () => {
-        if (window.dulaan && window.dulaan.modes && window.dulaan.modes.ambient) {
-            return await window.dulaan.modes.ambient.start();
-        }
-    };
-    
-    window.stopAbi = async () => {
-        if (window.dulaan && window.dulaan.modes && window.dulaan.modes.ambient) {
-            return await window.dulaan.modes.ambient.stop();
-        }
-    };
-}

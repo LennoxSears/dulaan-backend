@@ -86,26 +86,3 @@ export class TouchControl {
     }
 }
 
-// Legacy global functions for backward compatibility
-if (typeof window !== 'undefined') {
-    window.startTouch = async () => {
-        if (window.dulaan && window.dulaan.modes && window.dulaan.modes.touch) {
-            return await window.dulaan.modes.touch.start();
-        }
-    };
-    
-    window.stopTouch = async () => {
-        if (window.dulaan && window.dulaan.modes && window.dulaan.modes.touch) {
-            return await window.dulaan.modes.touch.stop();
-        }
-    };
-    
-    // Legacy touch value handling
-    window.touchValue = 0;
-    
-    if (window.dulaan && window.dulaan.modes && window.dulaan.modes.touch) {
-        window.dulaan.modes.touch.setUpdateCallback((value) => {
-            window.touchValue = Math.round((value / 255) * 100);
-        });
-    }
-}

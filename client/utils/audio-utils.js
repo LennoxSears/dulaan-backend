@@ -167,7 +167,7 @@ export const AudioFormat = {
     }
 };
 
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.audioUtils = {
         base64ToFloat32Array,

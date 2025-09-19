@@ -154,17 +154,3 @@ export class AIVoiceControl {
     }
 }
 
-// Legacy global functions for backward compatibility
-if (typeof window !== 'undefined') {
-    window.startStreaming = async () => {
-        if (window.dulaan && window.dulaan.modes && window.dulaan.modes.ai) {
-            return await window.dulaan.modes.ai.start();
-        }
-    };
-    
-    window.stopStreaming = async () => {
-        if (window.dulaan && window.dulaan.modes && window.dulaan.modes.ai) {
-            return await window.dulaan.modes.ai.stop();
-        }
-    };
-}

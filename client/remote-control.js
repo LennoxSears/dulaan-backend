@@ -378,14 +378,7 @@ export class RemoteControl {
 // Create singleton instance
 export const remoteControl = new RemoteControl();
 
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.remoteControl = remoteControl;
-    
-    // Legacy functions
-    window.startRemoteHost = () => remoteControl.startAsHost();
-    window.connectToRemoteHost = (id) => remoteControl.connectToHost(id);
-    window.sendRemoteCommand = (mode, value, metadata) => remoteControl.sendCommand(mode, value, metadata);
-    window.generateRemoteId = () => remoteControl.generateId();
-    window.getRemoteStatus = () => remoteControl.getStatus();
 }

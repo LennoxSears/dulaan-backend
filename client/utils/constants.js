@@ -207,7 +207,7 @@ export const UTILS = {
     }
 };
 
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.DULAAN_CONSTANTS = {
         BLE_CONFIG,

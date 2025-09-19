@@ -326,25 +326,9 @@ const remoteService = new RemoteService();
 // Export both class and instance
 export { RemoteService, remoteService };
 
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.remoteService = remoteService;
     
-    // Legacy remoteControl object for backward compatibility
-    window.remoteControl = {
-        peer: null,
-        connections: remoteService.connections,
-        remoteUsers: remoteService.remoteUsers,
-        isHost: false,
-        isRemote: false,
-        isControlledByRemote: false,
-        hostId: null,
-        lastRemoteCommand: null,
-        
-        initializeAsHost: () => remoteService.initializeAsHost(),
-        connectAsRemote: (hostId) => remoteService.connectAsRemote(hostId),
-        sendControlCommand: (mode, value, data) => remoteService.sendControlCommand(mode, value, data),
-        handleRemoteCommand: (data, userId) => remoteService.handleRemoteCommand(data, userId),
-        disconnect: () => remoteService.disconnect()
-    };
+
 }

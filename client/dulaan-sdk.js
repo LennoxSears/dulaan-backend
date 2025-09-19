@@ -301,28 +301,7 @@ class DulaanSDK {
         };
     }
 
-    /**
-     * Legacy compatibility methods
-     */
-    async write(pwmValue) {
-        return await this.setMotorPower(pwmValue);
-    }
 
-    async writeForce(pwmValue) {
-        return await this.setMotorPower(pwmValue);
-    }
-
-    async generateDeviceId() {
-        return await this.consent.generateDeviceId();
-    }
-
-    async collectUserConsent(consentData) {
-        return await this.consent.collectUserConsent(consentData);
-    }
-
-    async speechToTextWithLLM(audioBase64, currentPwm, msgHis = [], options = {}) {
-        return await this.api.speechToTextWithLLM(audioBase64, currentPwm, msgHis, options);
-    }
 }
 
 // Create singleton instance
@@ -331,22 +310,8 @@ const dulaan = new DulaanSDK();
 // Export both class and instance
 export { DulaanSDK, dulaan };
 
-// Global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.dulaan = dulaan;
     window.DulaanSDK = DulaanSDK;
-    
-    // Legacy global variables for backward compatibility
-    window.current_pwm = 0;
-    window.aiValue = 0;
-    window.msgHis = [];
-    window.maxEnergy = 0.075;
-    
-    // Update legacy variables when motor state changes
-    const originalWrite = dulaan.motor.write.bind(dulaan.motor);
-    dulaan.motor.write = async function(pwmValue) {
-        const result = await originalWrite(pwmValue);
-        window.current_pwm = dulaan.motor.getCurrentPwm();
-        return result;
-    };
 }

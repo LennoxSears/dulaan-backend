@@ -135,7 +135,7 @@ const apiService = new ApiService();
 // Export both class and instance
 export { ApiService, apiService };
 
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.apiService = apiService;
 }

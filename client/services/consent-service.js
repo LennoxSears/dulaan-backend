@@ -266,7 +266,7 @@ const consentService = new ConsentService();
 // Export both class and instance
 export { ConsentService, consentService };
 
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.consentService = consentService;
 }
