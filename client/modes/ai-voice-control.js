@@ -1,15 +1,27 @@
 /**
  * AI Voice Control Mode
- * Handles voice recognition and AI-powered motor control
+ * Handles voice recognition and AI-powered motor control using streaming
  */
 
 export class AIVoiceControl {
     constructor(sdk) {
         this.sdk = sdk;
         this.isActive = false;
-        this.audioInterval = null;
-        this.syncInterval = null;
+
         this.messageHistory = [];
+        
+        // Audio state for streaming (using existing audio processor)
+        this.audioState = {
+            isSpeaking: false,
+            silenceCounter: 0,
+            SILENCE_THRESHOLD: 0.05,
+            ZERO_CROSSING: 0.1,
+            SILENCE_TIMEOUT: 25,
+            MIN_SPEECH_DURATION: 10,
+            lastChunkSize: 0,
+            lastRMS: 0,
+            lastZeroCrossings: 0
+        };
     }
 
     async start() {
@@ -25,13 +37,21 @@ export class AIVoiceControl {
                 throw new Error('Audio recording permission denied');
             }
 
-            // Start audio recording
-            await window.Capacitor.Plugins.VoiceRecorder.startRecording();
+            // Remove any existing listeners
+            await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
+            
+            // Add streaming listener for real-time audio chunks
+            window.Capacitor.Plugins.VoiceRecorder.addListener('audioChunk', (data) => {
+                this.processAudioChunk(data.chunk);
+            });
+
+            // Start audio streaming (not recording)
+            await window.Capacitor.Plugins.VoiceRecorder.startStreaming();
             
             this.isActive = true;
             this.startAudioProcessing();
             
-            console.log('AI Voice Control started');
+            console.log('AI Voice Control started with streaming');
             return true;
         } catch (error) {
             console.error('Failed to start AI Voice Control:', error);
@@ -45,8 +65,9 @@ export class AIVoiceControl {
         }
 
         try {
-            // Stop audio recording
-            await window.Capacitor.Plugins.VoiceRecorder.stopRecording();
+            // Remove listeners and stop streaming
+            await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
+            await window.Capacitor.Plugins.VoiceRecorder.stopStreaming();
             
             this.stopAudioProcessing();
             this.isActive = false;
@@ -58,35 +79,13 @@ export class AIVoiceControl {
     }
 
     startAudioProcessing() {
-        // Process audio chunks for speech detection
-        this.audioInterval = setInterval(async () => {
-            try {
-                const result = await window.Capacitor.Plugins.VoiceRecorder.stopRecording();
-                const base64Audio = result.value.recordDataBase64;
-                
-                if (base64Audio) {
-                    await this.processAudioChunk(base64Audio);
-                }
-                
-                // Restart recording for continuous capture
-                await window.Capacitor.Plugins.VoiceRecorder.startRecording();
-            } catch (error) {
-                console.error('Audio processing error:', error);
-            }
-        }, 1000); // Process every second
-
-        // Sync with speech processing
+        // Only sync with speech processing - audio chunks are handled by streaming listener
         this.syncInterval = setInterval(async () => {
             await this.packageAndProcessSpeech();
         }, 3000); // Check for speech every 3 seconds
     }
 
     stopAudioProcessing() {
-        if (this.audioInterval) {
-            clearInterval(this.audioInterval);
-            this.audioInterval = null;
-        }
-        
         if (this.syncInterval) {
             clearInterval(this.syncInterval);
             this.syncInterval = null;

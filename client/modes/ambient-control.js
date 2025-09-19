@@ -7,7 +7,7 @@ export class AmbientControl {
     constructor(sdk) {
         this.sdk = sdk;
         this.isActive = false;
-        this.audioInterval = null;
+
     }
 
     async start() {
@@ -23,13 +23,20 @@ export class AmbientControl {
                 throw new Error('Audio recording permission denied');
             }
 
-            // Start audio recording
-            await window.Capacitor.Plugins.VoiceRecorder.startRecording();
+            // Remove any existing listeners
+            await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
+            
+            // Add streaming listener for real-time audio chunks
+            window.Capacitor.Plugins.VoiceRecorder.addListener('audioChunk', (data) => {
+                this.processAmbientAudio(data.chunk);
+            });
+
+            // Start audio streaming (not recording)
+            await window.Capacitor.Plugins.VoiceRecorder.startStreaming();
             
             this.isActive = true;
-            this.startAudioProcessing();
             
-            console.log('Ambient Control started');
+            console.log('Ambient Control started with streaming');
             return true;
         } catch (error) {
             console.error('Failed to start Ambient Control:', error);
@@ -43,10 +50,10 @@ export class AmbientControl {
         }
 
         try {
-            // Stop audio recording
-            await window.Capacitor.Plugins.VoiceRecorder.stopRecording();
+            // Remove listeners and stop streaming
+            await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
+            await window.Capacitor.Plugins.VoiceRecorder.stopStreaming();
             
-            this.stopAudioProcessing();
             this.isActive = false;
             
             // Set motor to 0 when stopping
@@ -58,31 +65,7 @@ export class AmbientControl {
         }
     }
 
-    startAudioProcessing() {
-        // Process audio chunks for ambient sound control
-        this.audioInterval = setInterval(async () => {
-            try {
-                const result = await window.Capacitor.Plugins.VoiceRecorder.stopRecording();
-                const base64Audio = result.value.recordDataBase64;
-                
-                if (base64Audio) {
-                    await this.processAmbientAudio(base64Audio);
-                }
-                
-                // Restart recording for continuous capture
-                await window.Capacitor.Plugins.VoiceRecorder.startRecording();
-            } catch (error) {
-                console.error('Ambient audio processing error:', error);
-            }
-        }, 100); // Process every 100ms for responsive ambient control
-    }
 
-    stopAudioProcessing() {
-        if (this.audioInterval) {
-            clearInterval(this.audioInterval);
-            this.audioInterval = null;
-        }
-    }
 
     async processAmbientAudio(base64Chunk) {
         try {
