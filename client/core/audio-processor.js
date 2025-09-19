@@ -72,13 +72,12 @@ class AudioProcessor {
             bitsPerSample: 16,
             bufferSize: 1600
         };
-
-        // Processing intervals
-        this.audioInterval = null;
-        this.syncInterval = null;
         
         // Energy settings
         this.maxEnergy = 0.075;
+        
+        // Speech processing callback
+        this.onSpeechSegmentReady = null;
     }
 
     /**
@@ -110,7 +109,7 @@ class AudioProcessor {
     }
 
     /**
-     * Detect silence in audio data
+     * Detect silence in audio data (matches stream.js logic exactly)
      */
     detectSilence(pcmData, threshold, zeroRatio) {
         let energy = 0;
@@ -118,7 +117,7 @@ class AudioProcessor {
         
         for (let i = 0; i < pcmData.length; i++) {
             energy += pcmData[i] ** 2;
-            if (i > 0 && Math.sign(pcmData[i]) !== Math.sign(pcmData[i - 1])) {
+            if (i > 0 && (Math.sign(pcmData[i]) !== Math.sign(pcmData[i - 1]))) {
                 zeroCrossings++;
             }
         }
@@ -127,9 +126,10 @@ class AudioProcessor {
         const zeroRate = zeroCrossings / pcmData.length;
         
         this.audioState.lastRMS = rms;
-        this.audioState.lastZeroCrossings = zeroRate;
+        this.audioState.lastZeroCrossings = zeroCrossings;
         
-        return rms < threshold && zeroRate < zeroRatio;
+        // Return true if silent (matches stream.js: NOT (rms > threshold && zeroCrossings > threshold))
+        return !(rms > threshold && zeroCrossings > (pcmData.length * zeroRatio));
     }
 
     /**
@@ -146,14 +146,15 @@ class AudioProcessor {
     }
 
     /**
-     * Process audio chunk for ambient control
+     * Process audio chunk for speech detection (matches stream.js logic)
      */
     processAudioChunk(base64Chunk) {
         try {
             const pcmData = this.base64ToFloat32Array(base64Chunk);
             if (pcmData.length === 0) return null;
 
-            this.audioState.ringBuffer.push(pcmData);
+            // Update chunk size for minimum duration calculation
+            this.audioState.lastChunkSize = pcmData.length;
             
             const isSilent = this.detectSilence(
                 pcmData, 
@@ -161,14 +162,34 @@ class AudioProcessor {
                 this.audioState.ZERO_CROSSING
             );
 
-            if (isSilent) {
-                this.audioState.silenceCounter++;
-                if (this.audioState.silenceCounter >= this.audioState.SILENCE_TIMEOUT) {
-                    this.audioState.isSpeaking = false;
-                }
-            } else {
+            // Speech activity detection (matches stream.js)
+            if (!isSilent) {
                 this.audioState.silenceCounter = 0;
+                if (!this.audioState.isSpeaking) {
+                    console.log(
+                        `[Speech Detected] Energy: ${this.audioState.lastRMS.toFixed(4)}, ` +
+                        `Zero crossings: ${this.audioState.lastZeroCrossings}`
+                    );
+                }
                 this.audioState.isSpeaking = true;
+            } else if (this.audioState.isSpeaking) {
+                this.audioState.silenceCounter++;
+            }
+
+            // Write to ring buffer
+            const written = this.audioState.ringBuffer.push(pcmData);
+            if (written < pcmData.length) {
+                console.warn("Buffer overflow, discarding", pcmData.length - written, "samples");
+                this.audioState.ringBuffer.reset();
+            }
+
+            // Silence timeout triggers speech packaging (matches stream.js)
+            const minSamples = this.audioState.MIN_SPEECH_DURATION * this.audioState.lastChunkSize;
+            if (
+                this.audioState.silenceCounter >= this.audioState.SILENCE_TIMEOUT &&
+                this.audioState.ringBuffer.count > minSamples
+            ) {
+                this.triggerSpeechPackaging();
             }
 
             return {
@@ -207,30 +228,56 @@ class AudioProcessor {
     }
 
     /**
-     * Package speech segment for AI processing
+     * Trigger speech packaging when silence detected (matches stream.js)
      */
-    async packageSpeechSegment() {
+    triggerSpeechPackaging() {
+        if (this.onSpeechSegmentReady) {
+            // Call the registered callback with packaged speech data
+            const speechData = this.packageSpeechSegmentSync();
+            if (speechData) {
+                this.onSpeechSegmentReady(speechData);
+            }
+        }
+    }
+
+    /**
+     * Package speech segment synchronously (matches stream.js logic)
+     */
+    packageSpeechSegmentSync() {
         try {
-            if (!this.audioState.isSpeaking) {
-                return null;
+            const pcmData = this.audioState.ringBuffer.readAll();
+            if (pcmData.length === 0) return null;
+
+            // Convert to Int16 to reduce transmission size (matches stream.js)
+            const int16Data = new Int16Array(pcmData.length);
+            for (let i = 0; i < pcmData.length; i++) {
+                const scaled = Math.max(-1, Math.min(1, pcmData[i])) * 32767;
+                int16Data[i] = Math.max(-32768, Math.min(32767, scaled));
             }
 
-            const audioData = this.audioState.ringBuffer.readAll();
-            if (audioData.length === 0) {
-                return null;
-            }
+            console.log("[Speech Packaging] PCM segment:", int16Data.length, "samples");
 
-            // Convert Float32Array to base64
-            const uint8Array = new Uint8Array(audioData.buffer);
-            const base64Audio = btoa(String.fromCharCode.apply(null, uint8Array));
-
+            // Reset state (matches stream.js)
             this.audioState.ringBuffer.reset();
+            this.audioState.isSpeaking = false;
+            this.audioState.silenceCounter = 0;
+
+            // Convert to base64 for transmission
+            const uint8Array = new Uint8Array(int16Data.buffer);
+            const base64Audio = btoa(String.fromCharCode.apply(null, uint8Array));
             
             return base64Audio;
         } catch (error) {
             console.error("Speech packaging failed:", error);
             return null;
         }
+    }
+
+    /**
+     * Package speech segment for AI processing (legacy method for compatibility)
+     */
+    async packageSpeechSegment() {
+        return this.packageSpeechSegmentSync();
     }
 
     /**
@@ -264,6 +311,20 @@ class AudioProcessor {
      */
     getMaxEnergy() {
         return this.maxEnergy;
+    }
+
+    /**
+     * Register callback for when speech segment is ready
+     */
+    setSpeechSegmentCallback(callback) {
+        this.onSpeechSegmentReady = callback;
+    }
+
+    /**
+     * Remove speech segment callback
+     */
+    removeSpeechSegmentCallback() {
+        this.onSpeechSegmentReady = null;
     }
 }
 

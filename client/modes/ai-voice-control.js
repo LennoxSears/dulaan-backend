@@ -49,7 +49,7 @@ export class AIVoiceControl {
             await window.Capacitor.Plugins.VoiceRecorder.startStreaming();
             
             this.isActive = true;
-            this.startAudioProcessing();
+            this.setupSpeechProcessing();
             
             console.log('AI Voice Control started with streaming');
             return true;
@@ -69,7 +69,7 @@ export class AIVoiceControl {
             await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
             await window.Capacitor.Plugins.VoiceRecorder.stopStreaming();
             
-            this.stopAudioProcessing();
+            this.cleanupSpeechProcessing();
             this.isActive = false;
             
             console.log('AI Voice Control stopped');
@@ -78,18 +78,16 @@ export class AIVoiceControl {
         }
     }
 
-    startAudioProcessing() {
-        // Only sync with speech processing - audio chunks are handled by streaming listener
-        this.syncInterval = setInterval(async () => {
-            await this.packageAndProcessSpeech();
-        }, 3000); // Check for speech every 3 seconds
+    setupSpeechProcessing() {
+        // Register callback for silence-triggered speech processing (matches stream.js)
+        this.sdk.audio.setSpeechSegmentCallback(async (speechData) => {
+            await this.processSpeechSegment(speechData);
+        });
     }
 
-    stopAudioProcessing() {
-        if (this.syncInterval) {
-            clearInterval(this.syncInterval);
-            this.syncInterval = null;
-        }
+    cleanupSpeechProcessing() {
+        // Remove speech processing callback
+        this.sdk.audio.removeSpeechSegmentCallback();
     }
 
     async processAudioChunk(base64Chunk) {
@@ -101,32 +99,28 @@ export class AIVoiceControl {
         }
     }
 
-    async packageAndProcessSpeech() {
+    async processSpeechSegment(speechData) {
         try {
-            const speechData = await this.sdk.audio.packageSpeechSegment();
+            console.log('Processing speech with AI...');
             
-            if (speechData) {
-                console.log('Processing speech with AI...');
+            const result = await this.sdk.api.speechToTextWithLLM(
+                speechData,
+                this.sdk.motor.getCurrentPwm(),
+                this.messageHistory
+            );
+            
+            if (result.success) {
+                // Update motor based on AI response
+                await this.sdk.motor.write(result.newPwmValue);
                 
-                const result = await this.sdk.api.speechToTextWithLLM(
-                    speechData,
-                    this.sdk.motor.getCurrentPwm(),
-                    this.messageHistory
-                );
+                // Update message history
+                this.messageHistory = result.msgHis;
                 
-                if (result.success) {
-                    // Update motor based on AI response
-                    await this.sdk.motor.write(result.newPwmValue);
-                    
-                    // Update message history
-                    this.messageHistory = result.msgHis;
-                    
-                    console.log(`AI Response: ${result.response}`);
-                    console.log(`PWM updated to: ${result.newPwmValue}`);
-                    
-                    // Trigger event for UI updates
-                    this.onAIResponse(result);
-                }
+                console.log(`AI Response: ${result.response}`);
+                console.log(`PWM updated to: ${result.newPwmValue}`);
+                
+                // Trigger event for UI updates
+                this.onAIResponse(result);
             }
         } catch (error) {
             console.error('Speech processing error:', error);
