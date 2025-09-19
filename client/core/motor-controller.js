@@ -3,7 +3,7 @@
  * Handles low-level hardware communication with the motor device
  */
 
-import { BleClient, textToDataView, hexStringToDataView } from '@capacitor-community/bluetooth-le';
+import { BleClient, hexStringToDataView } from '@capacitor-community/bluetooth-le';
 
 class MotorController {
     constructor() {
@@ -91,7 +91,7 @@ class MotorController {
                 this.deviceAddress,
                 this.SERVICE_UUID,
                 this.CHARACTERISTIC_UUID,
-                hexValue
+                hexStringToDataView(hexValue)
             );
             
             this.currentPwm = pwm;
