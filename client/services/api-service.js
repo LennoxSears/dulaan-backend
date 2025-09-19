@@ -43,7 +43,7 @@ class ApiService {
                     msgHis: msgHis,
                     audioContent: audioBase64,
                     currentPwm: currentPwm,
-                    geminiApiKey: this.apiKey
+                    geminiApiKey: this.apiKey,
                     encoding: requestOptions.encoding,
                     sampleRateHertz: requestOptions.sampleRateHertz,
                     languageCode: requestOptions.languageCode

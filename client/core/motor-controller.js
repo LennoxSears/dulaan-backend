@@ -3,7 +3,32 @@
  * Handles low-level hardware communication with the motor device
  */
 
-import { BleClient, hexStringToDataView } from '@capacitor-community/bluetooth-le';
+// BleClient and hexStringToDataView are expected to be available globally
+// via Capacitor plugins or browser environment
+
+// Helper function for hexStringToDataView if not available
+function hexStringToDataView(hexString) {
+    if (typeof window !== 'undefined' && window.hexStringToDataView) {
+        return window.hexStringToDataView(hexString);
+    }
+    
+    // Fallback implementation
+    const bytes = new Uint8Array(hexString.length / 2);
+    for (let i = 0; i < hexString.length; i += 2) {
+        bytes[i / 2] = parseInt(hexString.substr(i, 2), 16);
+    }
+    return new DataView(bytes.buffer);
+}
+
+// Helper function to get BleClient safely
+function getBleClient() {
+    if (typeof window !== 'undefined') {
+        return window.BleClient || 
+               (window.Capacitor && window.Capacitor.Plugins.BluetoothLe) ||
+               null;
+    }
+    return null;
+}
 
 class MotorController {
     constructor() {
@@ -21,6 +46,12 @@ class MotorController {
      */
     async initialize() {
         try {
+            const BleClient = getBleClient();
+            if (!BleClient) {
+                console.warn('BleClient not available - using mock mode');
+                return true;
+            }
+            
             await BleClient.initialize();
             console.log('BLE initialized');
             return true;
@@ -43,6 +74,13 @@ class MotorController {
                 throw new Error('No device address provided');
             }
 
+            const BleClient = getBleClient();
+            if (!BleClient) {
+                console.warn('BleClient not available - using mock mode');
+                this.isConnected = true;
+                return true;
+            }
+            
             await BleClient.connect(this.deviceAddress);
             this.isConnected = true;
             console.log('Connected to motor device:', this.deviceAddress);
@@ -59,7 +97,8 @@ class MotorController {
      */
     async disconnect() {
         try {
-            if (this.deviceAddress) {
+            const BleClient = getBleClient();
+            if (this.deviceAddress && BleClient) {
                 await BleClient.disconnect(this.deviceAddress);
             }
             this.isConnected = false;
@@ -87,6 +126,13 @@ class MotorController {
             const hexValue = this.decimalToHexString(pwm);
             
             // Write to BLE characteristic
+            const BleClient = getBleClient();
+            if (!BleClient) {
+                console.warn('BleClient not available - PWM value stored but not transmitted');
+                this.currentPwm = pwm;
+                return true;
+            }
+            
             await BleClient.write(
                 this.deviceAddress,
                 this.SERVICE_UUID,

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Dulaan Bundle</title>
+</head>
+<body>
+    <h1>Dulaan Bundle Test</h1>
+    <div id="status">Loading...</div>
+    <div id="components"></div>
+    
+    <script src="dulaan-browser-bundled.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const statusDiv = document.getElementById('status');
+            const componentsDiv = document.getElementById('components');
+            
+            try {
+                // Test if bundle loaded correctly
+                if (typeof window.dulaan !== 'undefined') {
+                    statusDiv.innerHTML = '✅ Bundle loaded successfully!';
+                    statusDiv.style.color = 'green';
+                    
+                    // List available components
+                    if (window.DULAAN_COMPONENTS) {
+                        const components = Object.keys(window.DULAAN_COMPONENTS);
+                        componentsDiv.innerHTML = '<h3>Available Components:</h3><ul>' + 
+                            components.map(c => `<li>${c}</li>`).join('') + '</ul>';
+                    }
+                    
+                    // Test basic functionality
+                    console.log('Dulaan SDK:', window.dulaan);
+                    console.log('Components:', window.DULAAN_COMPONENTS);
+                    
+                } else {
+                    statusDiv.innerHTML = '❌ Bundle failed to load';
+                    statusDiv.style.color = 'red';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = '❌ Error: ' + error.message;
+                statusDiv.style.color = 'red';
+                console.error('Bundle test error:', error);
+            }
+        });
+    </script>
+</body>
+</html>

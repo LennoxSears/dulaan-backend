@@ -274,14 +274,7 @@ class DulaanSDK {
 
 }
 
-// Create singleton instance
-const dulaan = new DulaanSDK();
+// Export class for bundling
+export { DulaanSDK };
 
-// Export both class and instance
-export { DulaanSDK, dulaan };
-
-// Global access
-if (typeof window !== 'undefined') {
-    window.dulaan = dulaan;
-    window.DulaanSDK = DulaanSDK;
-}
+// Note: Global instance creation is handled by the build script
