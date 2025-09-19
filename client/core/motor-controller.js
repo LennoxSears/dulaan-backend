@@ -103,12 +103,7 @@ class MotorController {
         }
     }
 
-    /**
-     * Force write PWM value (same as write, kept for compatibility)
-     */
-    async writeForce(pwmValue) {
-        return this.write(pwmValue);
-    }
+
 
     /**
      * Get current PWM value
@@ -153,20 +148,7 @@ const motorController = new MotorController();
 // Export both the class and instance for flexibility
 export { MotorController, motorController };
 
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.motorController = motorController;
-    
-    // Legacy BLE object for backward compatibility
-    window.ble = {
-        write: async (deviceId, service, characteristic, value) => {
-            try {
-                await BleClient.write(deviceId, service, characteristic, value);
-                return true;
-            } catch (error) {
-                console.error('BLE write error:', error);
-                return false;
-            }
-        }
-    };
 }

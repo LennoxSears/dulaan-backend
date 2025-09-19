@@ -43,16 +43,16 @@ console.log('Generated ID:', id);
 
 ```javascript
 // Connect to motor (requires device address)
-await window.dulaan.connectMotor('your-device-address');
+await window.dulaan.connect('your-device-address');
 
 // Check connection status
-const isConnected = window.dulaan.isMotorConnected();
+const isConnected = window.dulaan.isConnected();
 
 // Send PWM value (0-255)
-await window.dulaan.writeMotor(128); // 50% intensity
+await window.dulaan.setPower(128); // 50% intensity
 
 // Disconnect motor
-await window.dulaan.disconnectMotor();
+await window.dulaan.disconnect();
 ```
 
 ### PWM Control Examples
@@ -70,7 +70,7 @@ function percentToPWM(percent) {
     return Math.round((percent / 100) * 255);
 }
 
-await window.dulaan.writeMotor(percentToPWM(75)); // 75% = 191 PWM
+await window.dulaan.setPower(percentToPWM(75)); // 75% = 191 PWM
 ```
 
 ### Error Handling
@@ -78,7 +78,7 @@ await window.dulaan.writeMotor(percentToPWM(75)); // 75% = 191 PWM
 ```javascript
 async function safeMotorControl(pwmValue) {
     try {
-        await window.dulaan.writeMotor(pwmValue);
+        await window.dulaan.setPower(pwmValue);
         console.log(`Motor set to ${pwmValue}`);
     } catch (error) {
         console.error('Motor control failed:', error.message);
@@ -97,16 +97,15 @@ async function safeMotorControl(pwmValue) {
 ### Simple Remote Control
 
 ```javascript
-// Generate and start hosting
-const hostId = window.dulaan.generateId();
-await window.dulaan.startRemoteControl(hostId);
+// Start hosting and get ID
+const hostId = await window.dulaan.startHost();
 console.log('Share this ID:', hostId); // Share with others
 
 // Connect to someone else's device
-await window.dulaan.connectToRemote('ABC123');
+await window.dulaan.connectToHost('ABC123');
 
 // Send remote commands
-await window.dulaan.sendRemoteCommand('manual', 128);
+await window.dulaan.sendCommand('manual', 128);
 ```
 
 ### Advanced Remote Control
@@ -165,13 +164,13 @@ window.remoteControl.setUICallbacks({
 
 ```javascript
 // Start voice control mode
-await window.dulaan.modes.ai.start();
+await window.dulaan.startMode('ai');
 
-// Stop voice control
-await window.dulaan.modes.ai.stop();
+// Stop current mode
+await window.dulaan.stopMode();
 
-// Check if voice control is active
-const isActive = window.dulaan.modes.ai.isActive();
+// Check current mode
+const currentMode = window.dulaan.getCurrentMode();
 ```
 
 ### Voice Control with Custom Settings
@@ -184,7 +183,7 @@ const voiceConfig = {
     maxEnergy: 0.075
 };
 
-await window.dulaan.modes.ai.start(voiceConfig);
+await window.dulaan.startMode('ai');
 
 // Voice commands that work:
 // "Set to low" -> PWM 64
@@ -212,10 +211,10 @@ window.dulaan.modes.ai.setCallbacks({
 
 ```javascript
 // Start ambient sound control
-await window.dulaan.modes.ambient.start();
+await window.dulaan.startMode('ambient');
 
 // Stop ambient control
-await window.dulaan.modes.ambient.stop();
+await window.dulaan.stopMode();
 
 // The motor will respond to ambient sound levels automatically
 ```
@@ -232,7 +231,7 @@ const ambientConfig = {
     smoothing: 0.3          // Audio smoothing (0-1)
 };
 
-await window.dulaan.modes.ambient.start(ambientConfig);
+await window.dulaan.startMode('ambient');
 ```
 
 ### Ambient Control Events
@@ -255,17 +254,14 @@ window.dulaan.modes.ambient.setCallbacks({
 ### Basic Touch Control
 
 ```javascript
-// Set touch value (0-100%)
-window.dulaan.touchValue = 50;
-
 // Start touch control mode
-await window.dulaan.modes.touch.start();
+await window.dulaan.startMode('touch');
 
-// Update touch value
-window.dulaan.touchValue = 75;
+// Update touch value directly
+await window.dulaan.setPower(128); // 0-255 PWM value
 
 // Stop touch control
-await window.dulaan.modes.touch.stop();
+await window.dulaan.stopMode();
 ```
 
 ### Touch Control with UI
@@ -714,7 +710,7 @@ if (window.location.hostname === 'localhost') {
                 const deviceAddress = prompt('Enter device address (or leave empty for demo):');
                 
                 if (deviceAddress) {
-                    await window.dulaan.connectMotor(deviceAddress);
+                    await window.dulaan.connect(deviceAddress);
                 } else {
                     console.log('Demo mode: Motor connection simulated');
                 }
@@ -729,7 +725,7 @@ if (window.location.hostname === 'localhost') {
         
         async function disconnectMotor() {
             try {
-                await window.dulaan.disconnectMotor();
+                await window.dulaan.disconnect();
                 isConnected = false;
                 updateStatus();
                 showMessage('Motor disconnected');
@@ -751,7 +747,7 @@ if (window.location.hostname === 'localhost') {
             }
             
             try {
-                await window.dulaan.writeMotor(value);
+                await window.dulaan.setPower(value);
                 document.getElementById('pwmSlider').value = value;
                 document.getElementById('pwmValue').textContent = value;
                 showMessage(`PWM set to ${value}`);
@@ -790,7 +786,7 @@ if (window.location.hostname === 'localhost') {
         // Control mode functions
         async function startVoice() {
             try {
-                await window.dulaan.modes.ai.start();
+                await window.dulaan.startMode('ai');
                 showMessage('Voice control started - try saying "set to medium"');
             } catch (error) {
                 showMessage('Voice control failed: ' + error.message, true);
@@ -799,7 +795,7 @@ if (window.location.hostname === 'localhost') {
         
         async function startAmbient() {
             try {
-                await window.dulaan.modes.ambient.start();
+                await window.dulaan.startMode('ambient');
                 showMessage('Ambient control started - make some noise!');
             } catch (error) {
                 showMessage('Ambient control failed: ' + error.message, true);
@@ -808,9 +804,7 @@ if (window.location.hostname === 'localhost') {
         
         async function stopAllModes() {
             try {
-                await window.dulaan.modes.ai.stop();
-                await window.dulaan.modes.ambient.stop();
-                await window.dulaan.modes.touch.stop();
+                await window.dulaan.stopMode();
                 showMessage('All control modes stopped');
             } catch (error) {
                 showMessage('Stop failed: ' + error.message, true);

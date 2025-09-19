@@ -65,9 +65,7 @@ npm run dev    # Start development with auto-rebuild
 - **`test-bundle.html`** - 🧪 Automated tests for bundle verification
 - **`test-remote-control.html`** - 🎯 Dedicated remote control module testing
 
-### Legacy Files (Deprecated)
-- **`plugin.js`** - ⚠️ DEPRECATED: Use `dulaan-browser.js` instead
-- **`stream.js`** - ⚠️ DEPRECATED: Use `dulaan-browser.js` instead
+
 
 ## 🎯 Development Workflow
 
@@ -206,7 +204,7 @@ window.sendRemoteCommand('touch', 128); // PWM 0-255
 
 ### Cloud Functions Endpoints
 
-Update the API endpoints in `dulaan-browser.js` (or legacy `plugin.js`):
+Update the API endpoints in `dulaan-browser.js`:
 
 ```javascript
 // Production endpoints
@@ -226,7 +224,7 @@ const PEERJS_SERVER = {
 
 Configure your API keys:
 ```javascript
-// In dulaan-browser.js (or legacy plugin.js) - speechToTextWithLLM function
+// In dulaan-browser.js - speechToTextWithLLM function
 const GEMINI_API_KEY = 'your-gemini-api-key-here';
 ```
 
@@ -421,7 +419,7 @@ let onDisconnect = (deviceId) => {
 
 Enable debug logging:
 ```javascript
-// In dulaan-browser.js (or legacy plugin.js)
+// In dulaan-browser.js
 window.DEBUG_MODE = true;
 
 // Enhanced logging
@@ -450,4 +448,4 @@ const log = (message, data = null) => {
 2. Configure PeerJS server settings
 3. Update API keys and security settings
 
-This integration provides a seamless upgrade path while maintaining backward compatibility with existing functionality.
+This integration provides a clean, modern API for motor control functionality.

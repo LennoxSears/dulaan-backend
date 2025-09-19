@@ -4,16 +4,27 @@
  */
 
 class ApiService {
-    constructor() {
+    constructor(config = {}) {
         this.baseUrls = {
             speechToTextWithLLM: 'https://speechtotextwithllm-qveg3gkwxa-ew.a.run.app',
-            storeUserData: 'https://storeuserdata-qveg3gkwxa-ew.a.run.app'
+            storeUserData: 'https://storeuserdata-qveg3gkwxa-ew.a.run.app',
+            ...config.endpoints
         };
         
         this.defaultOptions = {
             encoding: 'WEBM_OPUS',
-            sampleRateHertz: 48000
+            sampleRateHertz: 48000,
+            ...config.options
         };
+        
+        this.apiKey = config.apiKey || null;
+    }
+
+    /**
+     * Set API key securely
+     */
+    setApiKey(apiKey) {
+        this.apiKey = apiKey;
     }
 
     /**
@@ -32,7 +43,7 @@ class ApiService {
                     msgHis: msgHis,
                     audioContent: audioBase64,
                     currentPwm: currentPwm,
-                    geminiApiKey: 'AQ.Ab8RN6KGpvk0TlA0Z1nwdrQ-FH2v2WIk1hrnBjixpurRp6YtuA', // Move to config
+                    geminiApiKey: this.apiKey
                     encoding: requestOptions.encoding,
                     sampleRateHertz: requestOptions.sampleRateHertz,
                     languageCode: requestOptions.languageCode
@@ -135,7 +146,7 @@ const apiService = new ApiService();
 // Export both class and instance
 export { ApiService, apiService };
 
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.apiService = apiService;
 }

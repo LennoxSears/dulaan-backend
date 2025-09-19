@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-18T12:02:47.554Z
+ * Generated on: 2025-09-19T03:31:22.333Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -236,7 +236,7 @@ const UTILS = {
     }
 };
 
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.DULAAN_CONSTANTS = {
         BLE_CONFIG,
@@ -425,7 +425,7 @@ const AudioFormat = {
     }
 };
 
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.audioUtils = {
         base64ToFloat32Array,
@@ -548,12 +548,7 @@ class MotorController {
         }
     }
 
-    /**
-     * Force write PWM value (same as write, kept for compatibility)
-     */
-    async writeForce(pwmValue) {
-        return this.write(pwmValue);
-    }
+
 
     /**
      * Get current PWM value
@@ -596,22 +591,9 @@ class MotorController {
 const motorController = new MotorController();
 
 // Export both the class and instance for flexibility
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.motorController = motorController;
-    
-    // Legacy BLE object for backward compatibility
-    window.ble = {
-        write: async (deviceId, service, characteristic, value) => {
-            try {
-                await BleClient.write(deviceId, service, characteristic, value);
-                return true;
-            } catch (error) {
-                console.error('BLE write error:', error);
-                return false;
-            }
-        }
-    };
 }
 
     // ============================================================================
@@ -891,7 +873,7 @@ class AudioProcessor {
 const audioProcessor = new AudioProcessor();
 
 // Export both class and instance
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.audioProcessor = audioProcessor;
     window.AUDIO_STATE = audioProcessor.audioState;
@@ -908,16 +890,27 @@ if (typeof window !== 'undefined') {
  */
 
 class ApiService {
-    constructor() {
+    constructor(config = {}) {
         this.baseUrls = {
             speechToTextWithLLM: 'https://speechtotextwithllm-qveg3gkwxa-ew.a.run.app',
-            storeUserData: 'https://storeuserdata-qveg3gkwxa-ew.a.run.app'
+            storeUserData: 'https://storeuserdata-qveg3gkwxa-ew.a.run.app',
+            ...config.endpoints
         };
         
         this.defaultOptions = {
             encoding: 'WEBM_OPUS',
-            sampleRateHertz: 48000
+            sampleRateHertz: 48000,
+            ...config.options
         };
+        
+        this.apiKey = config.apiKey || null;
+    }
+
+    /**
+     * Set API key securely
+     */
+    setApiKey(apiKey) {
+        this.apiKey = apiKey;
     }
 
     /**
@@ -936,7 +929,7 @@ class ApiService {
                     msgHis: msgHis,
                     audioContent: audioBase64,
                     currentPwm: currentPwm,
-                    geminiApiKey: 'AQ.Ab8RN6KGpvk0TlA0Z1nwdrQ-FH2v2WIk1hrnBjixpurRp6YtuA', // Move to config
+                    geminiApiKey: this.apiKey
                     encoding: requestOptions.encoding,
                     sampleRateHertz: requestOptions.sampleRateHertz,
                     languageCode: requestOptions.languageCode
@@ -1037,7 +1030,7 @@ class ApiService {
 const apiService = new ApiService();
 
 // Export both class and instance
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.apiService = apiService;
 }
@@ -1312,7 +1305,7 @@ class ConsentService {
 const consentService = new ConsentService();
 
 // Export both class and instance
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.consentService = consentService;
 }
@@ -1647,27 +1640,11 @@ class RemoteService {
 const remoteService = new RemoteService();
 
 // Export both class and instance
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.remoteService = remoteService;
     
-    // Legacy remoteControl object for backward compatibility
-    window.remoteControl = {
-        peer: null,
-        connections: remoteService.connections,
-        remoteUsers: remoteService.remoteUsers,
-        isHost: false,
-        isRemote: false,
-        isControlledByRemote: false,
-        hostId: null,
-        lastRemoteCommand: null,
-        
-        initializeAsHost: () => remoteService.initializeAsHost(),
-        connectAsRemote: (hostId) => remoteService.connectAsRemote(hostId),
-        sendControlCommand: (mode, value, data) => remoteService.sendControlCommand(mode, value, data),
-        handleRemoteCommand: (data, userId) => remoteService.handleRemoteCommand(data, userId),
-        disconnect: () => remoteService.disconnect()
-    };
+
 }
 
     // ============================================================================
@@ -1830,20 +1807,7 @@ class AIVoiceControl {
     }
 }
 
-// Legacy global functions for backward compatibility
-if (typeof window !== 'undefined') {
-    window.startStreaming = async () => {
-        if (window.dulaan && window.dulaan.modes && window.dulaan.modes.ai) {
-            return await window.dulaan.modes.ai.start();
-        }
-    };
-    
-    window.stopStreaming = async () => {
-        if (window.dulaan && window.dulaan.modes && window.dulaan.modes.ai) {
-            return await window.dulaan.modes.ai.stop();
-        }
-    };
-}
+
 
     // ============================================================================
     // modes/ambient-control.js
@@ -1973,20 +1937,7 @@ class AmbientControl {
     }
 }
 
-// Legacy global functions for backward compatibility
-if (typeof window !== 'undefined') {
-    window.startAbi = async () => {
-        if (window.dulaan && window.dulaan.modes && window.dulaan.modes.ambient) {
-            return await window.dulaan.modes.ambient.start();
-        }
-    };
-    
-    window.stopAbi = async () => {
-        if (window.dulaan && window.dulaan.modes && window.dulaan.modes.ambient) {
-            return await window.dulaan.modes.ambient.stop();
-        }
-    };
-}
+
 
     // ============================================================================
     // modes/touch-control.js
@@ -2080,29 +2031,7 @@ class TouchControl {
     }
 }
 
-// Legacy global functions for backward compatibility
-if (typeof window !== 'undefined') {
-    window.startTouch = async () => {
-        if (window.dulaan && window.dulaan.modes && window.dulaan.modes.touch) {
-            return await window.dulaan.modes.touch.start();
-        }
-    };
-    
-    window.stopTouch = async () => {
-        if (window.dulaan && window.dulaan.modes && window.dulaan.modes.touch) {
-            return await window.dulaan.modes.touch.stop();
-        }
-    };
-    
-    // Legacy touch value handling
-    window.touchValue = 0;
-    
-    if (window.dulaan && window.dulaan.modes && window.dulaan.modes.touch) {
-        window.dulaan.modes.touch.setUpdateCallback((value) => {
-            window.touchValue = Math.round((value / 255) * 100);
-        });
-    }
-}
+
 
     // ============================================================================
     // remote-control.js
@@ -2484,16 +2413,9 @@ class RemoteControl {
 // Create singleton instance
 const remoteControl = new RemoteControl();
 
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.remoteControl = remoteControl;
-    
-    // Legacy functions
-    window.startRemoteHost = () => remoteControl.startAsHost();
-    window.connectToRemoteHost = (id) => remoteControl.connectToHost(id);
-    window.sendRemoteCommand = (mode, value, metadata) => remoteControl.sendCommand(mode, value, metadata);
-    window.generateRemoteId = () => remoteControl.generateId();
-    window.getRemoteStatus = () => remoteControl.getStatus();
 }
 
     // ============================================================================
@@ -2584,69 +2506,40 @@ class DulaanSDK {
     /**
      * Motor Control API
      */
-    async connectMotor(deviceAddress) {
+    async connect(deviceAddress) {
         return await this.motor.connect(deviceAddress);
     }
 
-    async disconnectMotor() {
+    async disconnect() {
         return await this.motor.disconnect();
     }
 
-    async setMotorPower(pwmValue) {
+    async setPower(pwmValue) {
         return await this.motor.write(pwmValue);
     }
 
-    getMotorPower() {
+    getPower() {
         return this.motor.getCurrentPwm();
     }
 
-    isMotorConnected() {
+    isConnected() {
         return this.motor.isMotorConnected();
     }
 
     /**
      * Control Modes API
      */
-    async startAIControl() {
-        await this.stopCurrentMode();
-        this.currentMode = 'ai';
-        return await this.modes.ai.start();
-    }
-
-    async stopAIControl() {
-        if (this.currentMode === 'ai') {
-            await this.modes.ai.stop();
-            this.currentMode = null;
+    async startMode(mode) {
+        if (!this.modes[mode]) {
+            throw new Error(`Unknown mode: ${mode}`);
         }
+        
+        await this.stopMode();
+        this.currentMode = mode;
+        return await this.modes[mode].start();
     }
 
-    async startAmbientControl() {
-        await this.stopCurrentMode();
-        this.currentMode = 'ambient';
-        return await this.modes.ambient.start();
-    }
-
-    async stopAmbientControl() {
-        if (this.currentMode === 'ambient') {
-            await this.modes.ambient.stop();
-            this.currentMode = null;
-        }
-    }
-
-    async startTouchControl() {
-        await this.stopCurrentMode();
-        this.currentMode = 'touch';
-        return await this.modes.touch.start();
-    }
-
-    async stopTouchControl() {
-        if (this.currentMode === 'touch') {
-            await this.modes.touch.stop();
-            this.currentMode = null;
-        }
-    }
-
-    async stopCurrentMode() {
+    async stopMode() {
         if (this.currentMode) {
             await this.modes[this.currentMode].stop();
             this.currentMode = null;
@@ -2657,37 +2550,36 @@ class DulaanSDK {
         return this.currentMode;
     }
 
+    getCurrentMode() {
+        return this.currentMode;
+    }
+
     /**
      * Remote Control API
      */
-    startAsHost() {
-        const hostId = this.remote.initializeAsHost();
-        
-        if (this.config.remote.autoHeartbeat) {
-            this.remote.startHeartbeat(this.config.remote.heartbeatInterval);
-        }
-        
-        return hostId;
+    generateId() {
+        return UTILS.generateShortId();
     }
 
-    connectToHost(hostId) {
-        this.remote.connectAsRemote(hostId);
-        
-        if (this.config.remote.autoHeartbeat) {
-            this.remote.startHeartbeat(this.config.remote.heartbeatInterval);
-        }
+    async startHost(hostId) {
+        const id = hostId || this.generateId();
+        await this.remote.initializeAsHost(id);
+        return id;
     }
 
-    sendRemoteCommand(mode, value, data = {}) {
+    async connectToHost(hostId) {
+        return await this.remote.connectAsRemote(hostId);
+    }
+
+    async sendCommand(mode, value, data = {}) {
         return this.remote.sendControlCommand(mode, value, data);
     }
 
-    disconnectRemote() {
-        this.remote.stopHeartbeat();
+    disconnect() {
         this.remote.disconnect();
     }
 
-    getRemoteStatus() {
+    getStatus() {
         return this.remote.getStatus();
     }
 
@@ -2698,15 +2590,15 @@ class DulaanSDK {
         return await this.consent.getDeviceId();
     }
 
-    async collectConsent(consentData) {
+    async setConsent(consentData) {
         return await this.consent.collectUserConsent(consentData);
     }
 
-    async revokeConsent() {
+    async clearConsent() {
         return await this.consent.revokeConsent();
     }
 
-    getConsentStatus() {
+    getConsent() {
         return this.consent.getConsentSummary();
     }
 
@@ -2715,14 +2607,14 @@ class DulaanSDK {
     }
 
     /**
-     * Audio Processing API
+     * Audio API
      */
-    setMaxEnergy(energy) {
+    setAudioSensitivity(energy) {
         this.audio.setMaxEnergy(energy);
         this.config.audio.maxEnergy = energy;
     }
 
-    getMaxEnergy() {
+    getAudioSensitivity() {
         return this.audio.getMaxEnergy();
     }
 
@@ -2756,7 +2648,7 @@ class DulaanSDK {
     handleRemoteCommand(data, userId) {
         if (data.type === 'control_command') {
             if (typeof data.value === 'number' && data.value >= 0 && data.value <= 255) {
-                this.setMotorPower(data.value);
+                this.setPower(data.value);
                 console.log(`Remote command from ${userId}: ${data.mode} = ${data.value}`);
             }
         }
@@ -2792,52 +2684,17 @@ class DulaanSDK {
         };
     }
 
-    /**
-     * Legacy compatibility methods
-     */
-    async write(pwmValue) {
-        return await this.setMotorPower(pwmValue);
-    }
 
-    async writeForce(pwmValue) {
-        return await this.setMotorPower(pwmValue);
-    }
-
-    async generateDeviceId() {
-        return await this.consent.generateDeviceId();
-    }
-
-    async collectUserConsent(consentData) {
-        return await this.consent.collectUserConsent(consentData);
-    }
-
-    async speechToTextWithLLM(audioBase64, currentPwm, msgHis = [], options = {}) {
-        return await this.api.speechToTextWithLLM(audioBase64, currentPwm, msgHis, options);
-    }
 }
 
 // Create singleton instance
 const dulaan = new DulaanSDK();
 
 // Export both class and instance
-// Global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.dulaan = dulaan;
     window.DulaanSDK = DulaanSDK;
-    
-    // Legacy global variables for backward compatibility
-    window.current_pwm = 0;
-    window.aiValue = 0;
-    window.msgHis = [];
-    window.maxEnergy = 0.075;
-    
-    // Update legacy variables when motor state changes
-    const originalWrite = dulaan.motor.write.bind(dulaan.motor);
-    dulaan.motor.write = async function(pwmValue) {
-        const result = await originalWrite(pwmValue);
-        window.current_pwm = dulaan.motor.getCurrentPwm();
-        return result;
-    };
 }
 
     // ============================================================================

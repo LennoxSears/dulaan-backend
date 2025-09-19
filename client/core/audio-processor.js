@@ -273,7 +273,7 @@ const audioProcessor = new AudioProcessor();
 // Export both class and instance
 export { AudioProcessor, audioProcessor, RingBuffer };
 
-// Legacy global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.audioProcessor = audioProcessor;
     window.AUDIO_STATE = audioProcessor.audioState;

@@ -146,7 +146,7 @@ The `remote-control.js` module provides high-level orchestration for remote cont
 - **Event Handling**: Simplified callbacks for connection events
 - **Command Validation**: Input validation and error handling
 - **Demo Utilities**: Ready-to-use demo functions and mock implementations
-- **Legacy Compatibility**: Backward compatibility with existing APIs
+- **Clean Architecture**: Modern ES6 modules with clear separation of concerns
 
 ### Usage Examples
 
@@ -237,14 +237,14 @@ After building, use the bundle in HTML:
 - **Caching**: Browser can cache the single bundle file
 - **Development**: Modular structure improves code organization and maintainability
 
-## Migration from Legacy
+## Development Best Practices
 
-If migrating from the old monolithic structure:
+When working with the modular structure:
 
 1. **Backup**: The build script automatically backs up `dulaan-browser.js`
-2. **Test**: Use the test files to ensure functionality is preserved
+2. **Test**: Use the test files to verify functionality after changes
 3. **Update**: HTML files are automatically updated to use the new bundle
-4. **Verify**: Check that all features work as expected
+4. **Verify**: Check that all features work as expected after modifications
 
 ## Contributing
 

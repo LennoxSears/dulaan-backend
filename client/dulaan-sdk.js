@@ -93,69 +93,40 @@ class DulaanSDK {
     /**
      * Motor Control API
      */
-    async connectMotor(deviceAddress) {
+    async connect(deviceAddress) {
         return await this.motor.connect(deviceAddress);
     }
 
-    async disconnectMotor() {
+    async disconnect() {
         return await this.motor.disconnect();
     }
 
-    async setMotorPower(pwmValue) {
+    async setPower(pwmValue) {
         return await this.motor.write(pwmValue);
     }
 
-    getMotorPower() {
+    getPower() {
         return this.motor.getCurrentPwm();
     }
 
-    isMotorConnected() {
+    isConnected() {
         return this.motor.isMotorConnected();
     }
 
     /**
      * Control Modes API
      */
-    async startAIControl() {
-        await this.stopCurrentMode();
-        this.currentMode = 'ai';
-        return await this.modes.ai.start();
-    }
-
-    async stopAIControl() {
-        if (this.currentMode === 'ai') {
-            await this.modes.ai.stop();
-            this.currentMode = null;
+    async startMode(mode) {
+        if (!this.modes[mode]) {
+            throw new Error(`Unknown mode: ${mode}`);
         }
+        
+        await this.stopMode();
+        this.currentMode = mode;
+        return await this.modes[mode].start();
     }
 
-    async startAmbientControl() {
-        await this.stopCurrentMode();
-        this.currentMode = 'ambient';
-        return await this.modes.ambient.start();
-    }
-
-    async stopAmbientControl() {
-        if (this.currentMode === 'ambient') {
-            await this.modes.ambient.stop();
-            this.currentMode = null;
-        }
-    }
-
-    async startTouchControl() {
-        await this.stopCurrentMode();
-        this.currentMode = 'touch';
-        return await this.modes.touch.start();
-    }
-
-    async stopTouchControl() {
-        if (this.currentMode === 'touch') {
-            await this.modes.touch.stop();
-            this.currentMode = null;
-        }
-    }
-
-    async stopCurrentMode() {
+    async stopMode() {
         if (this.currentMode) {
             await this.modes[this.currentMode].stop();
             this.currentMode = null;
@@ -166,37 +137,36 @@ class DulaanSDK {
         return this.currentMode;
     }
 
+    getCurrentMode() {
+        return this.currentMode;
+    }
+
     /**
      * Remote Control API
      */
-    startAsHost() {
-        const hostId = this.remote.initializeAsHost();
-        
-        if (this.config.remote.autoHeartbeat) {
-            this.remote.startHeartbeat(this.config.remote.heartbeatInterval);
-        }
-        
-        return hostId;
+    generateId() {
+        return UTILS.generateShortId();
     }
 
-    connectToHost(hostId) {
-        this.remote.connectAsRemote(hostId);
-        
-        if (this.config.remote.autoHeartbeat) {
-            this.remote.startHeartbeat(this.config.remote.heartbeatInterval);
-        }
+    async startHost(hostId) {
+        const id = hostId || this.generateId();
+        await this.remote.initializeAsHost(id);
+        return id;
     }
 
-    sendRemoteCommand(mode, value, data = {}) {
+    async connectToHost(hostId) {
+        return await this.remote.connectAsRemote(hostId);
+    }
+
+    async sendCommand(mode, value, data = {}) {
         return this.remote.sendControlCommand(mode, value, data);
     }
 
-    disconnectRemote() {
-        this.remote.stopHeartbeat();
+    disconnect() {
         this.remote.disconnect();
     }
 
-    getRemoteStatus() {
+    getStatus() {
         return this.remote.getStatus();
     }
 
@@ -207,15 +177,15 @@ class DulaanSDK {
         return await this.consent.getDeviceId();
     }
 
-    async collectConsent(consentData) {
+    async setConsent(consentData) {
         return await this.consent.collectUserConsent(consentData);
     }
 
-    async revokeConsent() {
+    async clearConsent() {
         return await this.consent.revokeConsent();
     }
 
-    getConsentStatus() {
+    getConsent() {
         return this.consent.getConsentSummary();
     }
 
@@ -224,14 +194,14 @@ class DulaanSDK {
     }
 
     /**
-     * Audio Processing API
+     * Audio API
      */
-    setMaxEnergy(energy) {
+    setAudioSensitivity(energy) {
         this.audio.setMaxEnergy(energy);
         this.config.audio.maxEnergy = energy;
     }
 
-    getMaxEnergy() {
+    getAudioSensitivity() {
         return this.audio.getMaxEnergy();
     }
 
@@ -265,7 +235,7 @@ class DulaanSDK {
     handleRemoteCommand(data, userId) {
         if (data.type === 'control_command') {
             if (typeof data.value === 'number' && data.value >= 0 && data.value <= 255) {
-                this.setMotorPower(data.value);
+                this.setPower(data.value);
                 console.log(`Remote command from ${userId}: ${data.mode} = ${data.value}`);
             }
         }
@@ -301,28 +271,7 @@ class DulaanSDK {
         };
     }
 
-    /**
-     * Legacy compatibility methods
-     */
-    async write(pwmValue) {
-        return await this.setMotorPower(pwmValue);
-    }
 
-    async writeForce(pwmValue) {
-        return await this.setMotorPower(pwmValue);
-    }
-
-    async generateDeviceId() {
-        return await this.consent.generateDeviceId();
-    }
-
-    async collectUserConsent(consentData) {
-        return await this.consent.collectUserConsent(consentData);
-    }
-
-    async speechToTextWithLLM(audioBase64, currentPwm, msgHis = [], options = {}) {
-        return await this.api.speechToTextWithLLM(audioBase64, currentPwm, msgHis, options);
-    }
 }
 
 // Create singleton instance
@@ -331,22 +280,8 @@ const dulaan = new DulaanSDK();
 // Export both class and instance
 export { DulaanSDK, dulaan };
 
-// Global access for backward compatibility
+// Global access
 if (typeof window !== 'undefined') {
     window.dulaan = dulaan;
     window.DulaanSDK = DulaanSDK;
-    
-    // Legacy global variables for backward compatibility
-    window.current_pwm = 0;
-    window.aiValue = 0;
-    window.msgHis = [];
-    window.maxEnergy = 0.075;
-    
-    // Update legacy variables when motor state changes
-    const originalWrite = dulaan.motor.write.bind(dulaan.motor);
-    dulaan.motor.write = async function(pwmValue) {
-        const result = await originalWrite(pwmValue);
-        window.current_pwm = dulaan.motor.getCurrentPwm();
-        return result;
-    };
 }
