@@ -185,18 +185,45 @@ function updateHtmlFiles() {
     }
 }
 
+/**
+ * Replace main bundle and clean up
+ */
+function deployBundle() {
+    const bundledPath = path.join(__dirname, 'dulaan-browser-bundled.js');
+    const mainPath = path.join(__dirname, 'dulaan-browser.js');
+    const oldPath = path.join(__dirname, 'dulaan-browser-old.js');
+    
+    if (fs.existsSync(bundledPath)) {
+        fs.copyFileSync(bundledPath, mainPath);
+        fs.unlinkSync(bundledPath);
+        
+        if (fs.existsSync(oldPath)) {
+            fs.unlinkSync(oldPath);
+        }
+        
+        console.log('✅ Bundle deployed and cleaned up');
+    }
+}
+
 // Main execution
 if (require.main === module) {
     try {
         const bundlePath = createBundle();
         updateHtmlFiles();
         
+        // Auto-deploy if --deploy flag is passed
+        if (process.argv.includes('--deploy')) {
+            deployBundle();
+        }
+        
         console.log('\n🎉 Build completed successfully!');
-        console.log('\n📋 Next steps:');
-        console.log('1. Test the new bundle in your HTML files');
-        console.log('2. If everything works, replace dulaan-browser.js with dulaan-browser-bundled.js');
-        console.log('3. Continue developing in the modular files (services/, core/, etc.)');
-        console.log('4. Run this build script whenever you make changes');
+        
+        if (!process.argv.includes('--deploy')) {
+            console.log('\n📋 Next steps:');
+            console.log('1. Test the new bundle in your HTML files');
+            console.log('2. Run "node build.js --deploy" to replace main bundle');
+            console.log('3. Continue developing in the modular files');
+        }
         
     } catch (error) {
         console.error('❌ Build failed:', error.message);
