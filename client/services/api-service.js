@@ -12,8 +12,8 @@ class ApiService {
         };
         
         this.defaultOptions = {
-            encoding: 'WEBM_OPUS',
-            sampleRateHertz: 48000,
+            encoding: 'LINEAR16',  // Changed to match Int16 PCM data from client
+            sampleRateHertz: 16000, // Changed to match actual audio processing rate
             ...config.options
         };
         
