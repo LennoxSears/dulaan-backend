@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Motor Controller Scan Feature</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        .log { background-color: #f8f9fa; padding: 10px; margin: 10px 0; border-left: 4px solid #007bff; font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+        .controls { margin: 20px 0; }
+        .controls button { margin: 5px; padding: 10px 15px; }
+        .device-info { background-color: #e9ecef; padding: 10px; margin: 10px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Motor Controller Scan Feature Test</h1>
+    
+    <div id="status" class="status info">Loading...</div>
+    
+    <div class="controls">
+        <h3>BLE Scan and Connection Test</h3>
+        <button onclick="testScanFeature()">Test Scan Feature</button>
+        <button onclick="testScanAndConnect()">Test Scan & Connect</button>
+        <button onclick="testManualConnect()">Test Manual Connect</button>
+        <button onclick="testDisconnect()">Test Disconnect</button>
+        <button onclick="checkConnectionStatus()">Check Status</button>
+    </div>
+    
+    <div id="deviceInfo" class="device-info" style="display: none;">
+        <h4>Device Information</h4>
+        <div id="deviceDetails"></div>
+    </div>
+    
+    <div id="log" class="log"></div>
+    
+    <script src="dulaan-browser-bundled.js"></script>
+    <script>
+        let logDiv = document.getElementById('log');
+        let statusDiv = document.getElementById('status');
+        let deviceInfoDiv = document.getElementById('deviceInfo');
+        let deviceDetailsDiv = document.getElementById('deviceDetails');
+        let motorController = null;
+        
+        function log(message) {
+            console.log(message);
+            logDiv.textContent += new Date().toLocaleTimeString() + ': ' + message + '\n';
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function setStatus(message, type = 'info') {
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + type;
+        }
+        
+        function updateDeviceInfo() {
+            if (motorController) {
+                const isConnected = motorController.isMotorConnected();
+                const deviceAddress = motorController.getDeviceAddress();
+                const targetName = motorController.getTargetDeviceName();
+                const scanResults = motorController.getScanResults();
+                
+                deviceDetailsDiv.innerHTML = `
+                    <strong>Connection Status:</strong> ${isConnected ? '✅ Connected' : '❌ Disconnected'}<br>
+                    <strong>Device Address:</strong> ${deviceAddress || 'None'}<br>
+                    <strong>Target Device Name:</strong> ${targetName}<br>
+                    <strong>Scan Results:</strong> ${scanResults.length} device(s) found<br>
+                    <strong>Current PWM:</strong> ${motorController.getCurrentPwm()}
+                `;
+                deviceInfoDiv.style.display = 'block';
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                if (typeof window.dulaan !== 'undefined' && window.DULAAN_COMPONENTS) {
+                    setStatus('✅ Bundle loaded successfully!', 'success');
+                    log('Dulaan SDK loaded with motor controller');
+                    
+                    // Get motor controller instance
+                    motorController = window.dulaan.motor;
+                    
+                    if (motorController) {
+                        log('✅ Motor controller available');
+                        log('Target device name: ' + motorController.getTargetDeviceName());
+                        
+                        // Set up callbacks
+                        motorController.setScanResultCallback((device) => {
+                            log(`🔍 Device found: ${device.name} (${device.deviceId})`);
+                            updateDeviceInfo();
+                        });
+                        
+                        motorController.setDisconnectCallback((deviceId) => {
+                            log(`🔌 Device disconnected: ${deviceId}`);
+                            setStatus('Device disconnected', 'warning');
+                            updateDeviceInfo();
+                        });
+                        
+                        updateDeviceInfo();
+                    } else {
+                        log('❌ Motor controller not available');
+                    }
+                } else {
+                    setStatus('❌ Bundle failed to load', 'error');
+                }
+            } catch (error) {
+                setStatus('❌ Error: ' + error.message, 'error');
+                log('Bundle test error: ' + error.message);
+            }
+        });
+        
+        async function testScanFeature() {
+            log('\n=== Testing Scan Feature ===');
+            
+            try {
+                if (!motorController) {
+                    log('❌ Motor controller not available');
+                    return;
+                }
+                
+                setStatus('Scanning for devices...', 'info');
+                log('Starting BLE scan for motor devices...');
+                
+                const scanStarted = await motorController.scan(5000); // 5 second scan
+                
+                if (scanStarted) {
+                    log('✅ Scan started successfully');
+                    
+                    // Wait for scan to complete
+                    setTimeout(() => {
+                        const results = motorController.getScanResults();
+                        log(`Scan completed. Found ${results.length} target device(s)`);
+                        
+                        if (results.length > 0) {
+                            setStatus(`Found ${results.length} device(s)`, 'success');
+                            results.forEach((device, index) => {
+                                log(`Device ${index + 1}: ${device.name} - ${device.deviceId}`);
+                            });
+                        } else {
+                            setStatus('No devices found', 'warning');
+                            log('No target devices found. Make sure the motor device is nearby and powered on.');
+                        }
+                        
+                        updateDeviceInfo();
+                    }, 6000);
+                } else {
+                    log('❌ Failed to start scan');
+                    setStatus('Scan failed to start', 'error');
+                }
+                
+            } catch (error) {
+                log('❌ Scan test failed: ' + error.message);
+                setStatus('Scan error: ' + error.message, 'error');
+            }
+        }
+        
+        async function testScanAndConnect() {
+            log('\n=== Testing Scan and Connect ===');
+            
+            try {
+                if (!motorController) {
+                    log('❌ Motor controller not available');
+                    return;
+                }
+                
+                setStatus('Scanning and connecting...', 'info');
+                log('Starting scan and connect process...');
+                
+                const connected = await motorController.scanAndConnect(8000); // 8 second scan
+                
+                if (connected) {
+                    log('✅ Successfully scanned and connected to motor device');
+                    setStatus('Connected to motor device', 'success');
+                } else {
+                    log('❌ Failed to scan and connect');
+                    setStatus('Connection failed', 'error');
+                }
+                
+                updateDeviceInfo();
+                
+            } catch (error) {
+                log('❌ Scan and connect test failed: ' + error.message);
+                setStatus('Connection error: ' + error.message, 'error');
+            }
+        }
+        
+        async function testManualConnect() {
+            log('\n=== Testing Manual Connect ===');
+            
+            try {
+                if (!motorController) {
+                    log('❌ Motor controller not available');
+                    return;
+                }
+                
+                const deviceAddress = motorController.getDeviceAddress();
+                
+                if (!deviceAddress) {
+                    log('❌ No device address available. Run scan first.');
+                    setStatus('No device address - scan first', 'warning');
+                    return;
+                }
+                
+                setStatus('Connecting to device...', 'info');
+                log(`Attempting to connect to: ${deviceAddress}`);
+                
+                const connected = await motorController.connect();
+                
+                if (connected) {
+                    log('✅ Successfully connected to motor device');
+                    setStatus('Connected to motor device', 'success');
+                    
+                    // Test a PWM write
+                    log('Testing PWM write...');
+                    await motorController.write(50);
+                    log('PWM test write completed');
+                } else {
+                    log('❌ Failed to connect to motor device');
+                    setStatus('Connection failed', 'error');
+                }
+                
+                updateDeviceInfo();
+                
+            } catch (error) {
+                log('❌ Manual connect test failed: ' + error.message);
+                setStatus('Connection error: ' + error.message, 'error');
+            }
+        }
+        
+        async function testDisconnect() {
+            log('\n=== Testing Disconnect ===');
+            
+            try {
+                if (!motorController) {
+                    log('❌ Motor controller not available');
+                    return;
+                }
+                
+                if (!motorController.isMotorConnected()) {
+                    log('⚠️ Motor not connected');
+                    setStatus('Motor not connected', 'warning');
+                    return;
+                }
+                
+                setStatus('Disconnecting...', 'info');
+                log('Disconnecting from motor device...');
+                
+                await motorController.disconnect();
+                log('✅ Disconnected from motor device');
+                setStatus('Disconnected', 'info');
+                
+                updateDeviceInfo();
+                
+            } catch (error) {
+                log('❌ Disconnect test failed: ' + error.message);
+                setStatus('Disconnect error: ' + error.message, 'error');
+            }
+        }
+        
+        function checkConnectionStatus() {
+            log('\n=== Checking Connection Status ===');
+            
+            if (!motorController) {
+                log('❌ Motor controller not available');
+                return;
+            }
+            
+            const isConnected = motorController.isMotorConnected();
+            const isScanning = motorController.isScanningActive();
+            const deviceAddress = motorController.getDeviceAddress();
+            const scanResults = motorController.getScanResults();
+            
+            log(`Connection Status: ${isConnected ? 'Connected' : 'Disconnected'}`);
+            log(`Scanning Status: ${isScanning ? 'Active' : 'Inactive'}`);
+            log(`Device Address: ${deviceAddress || 'None'}`);
+            log(`Scan Results: ${scanResults.length} device(s)`);
+            log(`Current PWM: ${motorController.getCurrentPwm()}`);
+            
+            if (isConnected) {
+                setStatus('Motor connected and ready', 'success');
+            } else if (deviceAddress) {
+                setStatus('Device found but not connected', 'warning');
+            } else {
+                setStatus('No device found - scan needed', 'info');
+            }
+            
+            updateDeviceInfo();
+        }
+    </script>
+</body>
+</html>

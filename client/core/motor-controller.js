@@ -35,10 +35,18 @@ class MotorController {
         this.deviceAddress = null;
         this.isConnected = false;
         this.currentPwm = 0;
+        this.isScanning = false;
+        this.scanResults = [];
+        this.onScanResult = null;
+        this.onDisconnect = null;
         
         // BLE service and characteristic UUIDs
         this.SERVICE_UUID = "0000FFE0-0000-1000-8000-00805F9B34FB";
         this.CHARACTERISTIC_UUID = "0000FFE1-0000-1000-8000-00805F9B34FB";
+        
+        // Device identification
+        this.TARGET_DEVICE_NAME = "XKL-Q086-BT";
+        this.SCAN_TIMEOUT = 10000; // 10 seconds default
     }
 
     /**
@@ -62,6 +70,103 @@ class MotorController {
     }
 
     /**
+     * Scan for motor devices (based on plugin.js implementation)
+     */
+    async scan(timeout = this.SCAN_TIMEOUT) {
+        if (this.isScanning) {
+            console.warn('Scan already in progress');
+            return false;
+        }
+
+        try {
+            const BleClient = getBleClient();
+            if (!BleClient) {
+                console.warn('BleClient not available - cannot scan');
+                return false;
+            }
+
+            await BleClient.initialize();
+            this.isScanning = true;
+            this.scanResults = [];
+            
+            console.log('Starting BLE scan for motor devices...');
+            
+            await BleClient.requestLEScan({}, (result) => {
+                console.log('Scan result:', JSON.stringify(result));
+                
+                // Filter for target device name (matches plugin.js)
+                if (result.device.name === this.TARGET_DEVICE_NAME) {
+                    console.log('Found target device:', result.device.deviceId);
+                    this.deviceAddress = result.device.deviceId;
+                    this.scanResults.push(result.device);
+                    
+                    // Trigger callback if set
+                    if (this.onScanResult) {
+                        this.onScanResult(result.device);
+                    }
+                }
+            });
+
+            // Stop scan after timeout
+            setTimeout(async () => {
+                if (this.isScanning) {
+                    await this.stopScan();
+                }
+            }, timeout);
+
+            return true;
+        } catch (error) {
+            console.error('Failed to start scan:', error);
+            this.isScanning = false;
+            return false;
+        }
+    }
+
+    /**
+     * Stop BLE scanning
+     */
+    async stopScan() {
+        if (!this.isScanning) {
+            return;
+        }
+
+        try {
+            const BleClient = getBleClient();
+            if (BleClient) {
+                await BleClient.stopLEScan();
+            }
+            this.isScanning = false;
+            console.log('BLE scan stopped');
+        } catch (error) {
+            console.error('Failed to stop scan:', error);
+        }
+    }
+
+    /**
+     * Scan and connect to motor device automatically
+     */
+    async scanAndConnect(timeout = this.SCAN_TIMEOUT) {
+        try {
+            console.log('Scanning for motor device...');
+            await this.scan(timeout);
+            
+            // Wait for scan to complete
+            await new Promise(resolve => setTimeout(resolve, timeout + 1000));
+            
+            if (this.deviceAddress) {
+                console.log('Device found, attempting to connect...');
+                return await this.connect();
+            } else {
+                console.warn('No motor device found during scan');
+                return false;
+            }
+        } catch (error) {
+            console.error('Scan and connect failed:', error);
+            return false;
+        }
+    }
+
+    /**
      * Connect to motor device
      */
     async connect(deviceAddress = null) {
@@ -71,7 +176,7 @@ class MotorController {
             }
             
             if (!this.deviceAddress) {
-                throw new Error('No device address provided');
+                throw new Error('No device address provided. Use scan() or scanAndConnect() first.');
             }
 
             const BleClient = getBleClient();
@@ -81,7 +186,18 @@ class MotorController {
                 return true;
             }
             
-            await BleClient.connect(this.deviceAddress);
+            // Set up disconnect callback (matches plugin.js pattern)
+            const disconnectCallback = (deviceId) => {
+                this.isConnected = false;
+                this.deviceAddress = null;
+                console.log(`Motor device ${deviceId} disconnected`);
+                
+                if (this.onDisconnect) {
+                    this.onDisconnect(deviceId);
+                }
+            };
+            
+            await BleClient.connect(this.deviceAddress, disconnectCallback);
             this.isConnected = true;
             console.log('Connected to motor device:', this.deviceAddress);
             return true;
@@ -185,6 +301,48 @@ class MotorController {
      */
     setDeviceAddress(address) {
         this.deviceAddress = address;
+    }
+
+    /**
+     * Get scan results
+     */
+    getScanResults() {
+        return [...this.scanResults];
+    }
+
+    /**
+     * Check if currently scanning
+     */
+    isScanningActive() {
+        return this.isScanning;
+    }
+
+    /**
+     * Set scan result callback
+     */
+    setScanResultCallback(callback) {
+        this.onScanResult = callback;
+    }
+
+    /**
+     * Set disconnect callback
+     */
+    setDisconnectCallback(callback) {
+        this.onDisconnect = callback;
+    }
+
+    /**
+     * Set target device name for scanning
+     */
+    setTargetDeviceName(name) {
+        this.TARGET_DEVICE_NAME = name;
+    }
+
+    /**
+     * Get target device name
+     */
+    getTargetDeviceName() {
+        return this.TARGET_DEVICE_NAME;
     }
 }
 
