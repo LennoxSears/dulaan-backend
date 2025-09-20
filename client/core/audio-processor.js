@@ -205,25 +205,53 @@ class AudioProcessor {
     }
 
     /**
-     * Process audio chunk for ambient control (ABI)
+     * Process audio chunk for ambient control (matches stream.js processAbiChunk)
      */
     processAbiChunk(base64Chunk) {
         try {
             const pcmData = this.base64ToFloat32Array(base64Chunk);
-            if (pcmData.length === 0) return null;
+            if (pcmData.length === 0) return;
 
-            this.audioState.abiBuffer.push(pcmData);
+            // Update chunk size
+            this.audioState.lastChunkSize = pcmData.length;
             
-            const energy = this.audioState.lastRMS;
-            const pwmValue = this.audio2PWM(this.maxEnergy);
-
-            return {
-                energy: energy,
-                pwmValue: pwmValue
-            };
+            // Write to ambient buffer (matches stream.js)
+            const written = this.audioState.abiBuffer.push(pcmData);
+            if (written < pcmData.length) {
+                console.warn("ABI buffer overflow, discarding", pcmData.length - written, "samples");
+                this.audioState.abiBuffer.reset();
+            }
         } catch (error) {
             console.error("ABI chunk processing failed:", error);
-            return null;
+        }
+    }
+
+    /**
+     * Calculate ambient PWM value from accumulated buffer data (matches stream.js audio2PWM)
+     */
+    calculateAmbientPWM(maxEnergy) {
+        try {
+            const pcmData = this.audioState.abiBuffer.readAll();
+            if (pcmData.length === 0) {
+                return -1;
+            }
+            
+            let energy = 0;
+            for (let i = 0; i < pcmData.length; i++) {
+                if (isNaN(pcmData[i])) {
+                    pcmData[i] = 0;
+                }
+                energy += pcmData[i] ** 2;
+            }
+            
+            const rms = Math.sqrt(energy / pcmData.length);
+            this.audioState.lastRMS = rms;
+            
+            const pwmValue = Math.round((rms / maxEnergy) * 255);
+            return pwmValue > 255 ? 255 : pwmValue;
+        } catch (error) {
+            console.error("Ambient PWM calculation failed:", error);
+            return -1;
         }
     }
 
@@ -297,6 +325,13 @@ class AudioProcessor {
      */
     getAudioState() {
         return { ...this.audioState };
+    }
+
+    /**
+     * Legacy method for compatibility (deprecated - use calculateAmbientPWM)
+     */
+    audio2PWM(maxEnergy) {
+        return this.calculateAmbientPWM(maxEnergy);
     }
 
     /**
