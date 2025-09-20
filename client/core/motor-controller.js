@@ -23,8 +23,7 @@ function hexStringToDataView(hexString) {
 // Helper function to get BleClient safely
 function getBleClient() {
     if (typeof window !== 'undefined') {
-        return window.BleClient || 
-               (window.Capacitor && window.Capacitor.Plugins.BluetoothLe) ||
+        return window.BleClient ||
                null;
     }
     return null;

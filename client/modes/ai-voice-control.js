@@ -95,7 +95,7 @@ export class AIVoiceControl {
         
         if (result) {
             // Update UI or handle speech detection
-            console.log(`Speech detected: ${result.isSpeaking}, Energy: ${result.energy.toFixed(4)}`);
+            // console.log(`Speech detected: ${result.isSpeaking}, Energy: ${result.energy.toFixed(4)}`);
         }
     }
 

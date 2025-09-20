@@ -74,7 +74,7 @@ export class AmbientControl {
             // Only save audio data to buffer - no instant PWM writing (matches stream.js)
             this.sdk.audio.processAbiChunk(base64Chunk);
         } catch (error) {
-            console.error('Ambient processing error:', error);
+            //console.error('Ambient processing error:', error);
         }
     }
 
