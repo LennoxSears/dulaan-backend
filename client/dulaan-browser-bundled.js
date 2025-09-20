@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-20T13:04:31.330Z
+ * Generated on: 2025-09-20T17:34:20.749Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -77,7 +77,7 @@ const PWM_CONFIG = {
 // API Configuration
 const API_CONFIG = {
     ENDPOINTS: {
-        SPEECH_TO_TEXT_LLM: 'https://europe-west1-dulaan-backend.cloudfunctions.net/speechToTextWithLLM',
+        SPEECH_TO_TEXT_LLM: 'https://speechtotextwithllm-qveg3gkwxa-ew.a.run.app',
         STORE_USER_DATA: 'https://storeuserdata-qveg3gkwxa-ew.a.run.app',
         STORE_USER_CONSENT: 'https://storeuserconsent-qveg3gkwxa-ew.a.run.app',
         GET_USER_CONSENT: 'https://getuserconsent-qveg3gkwxa-ew.a.run.app'
@@ -1225,7 +1225,7 @@ class ApiService {
     constructor(config = {}) {
         this.baseUrls = {
             speechToTextWithLLM: 'https://europe-west1-dulaan-backend.cloudfunctions.net/speechToTextWithLLM',
-            storeUserData: 'https://storeuserdata-qveg3gkwxa-ew.a.run.app',
+            storeUserData: 'https://europe-west1-dulaan-backend.cloudfunctions.net/storeUserData',
             ...config.endpoints
         };
         
