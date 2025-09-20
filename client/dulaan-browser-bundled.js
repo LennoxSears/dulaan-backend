@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-19T05:39:16.320Z
+ * Generated on: 2025-09-20T09:56:22.151Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -450,6 +450,33 @@ if (typeof window !== 'undefined') {
  * Handles low-level hardware communication with the motor device
  */
 
+// BleClient and hexStringToDataView are expected to be available globally
+// via Capacitor plugins or browser environment
+
+// Helper function for hexStringToDataView if not available
+function hexStringToDataView(hexString) {
+    if (typeof window !== 'undefined' && window.hexStringToDataView) {
+        return window.hexStringToDataView(hexString);
+    }
+    
+    // Fallback implementation
+    const bytes = new Uint8Array(hexString.length / 2);
+    for (let i = 0; i < hexString.length; i += 2) {
+        bytes[i / 2] = parseInt(hexString.substr(i, 2), 16);
+    }
+    return new DataView(bytes.buffer);
+}
+
+// Helper function to get BleClient safely
+function getBleClient() {
+    if (typeof window !== 'undefined') {
+        return window.BleClient || 
+               (window.Capacitor && window.Capacitor.Plugins.BluetoothLe) ||
+               null;
+    }
+    return null;
+}
+
 class MotorController {
     constructor() {
         this.deviceAddress = null;
@@ -466,6 +493,12 @@ class MotorController {
      */
     async initialize() {
         try {
+            const BleClient = getBleClient();
+            if (!BleClient) {
+                console.warn('BleClient not available - using mock mode');
+                return true;
+            }
+            
             await BleClient.initialize();
             console.log('BLE initialized');
             return true;
@@ -488,6 +521,13 @@ class MotorController {
                 throw new Error('No device address provided');
             }
 
+            const BleClient = getBleClient();
+            if (!BleClient) {
+                console.warn('BleClient not available - using mock mode');
+                this.isConnected = true;
+                return true;
+            }
+            
             await BleClient.connect(this.deviceAddress);
             this.isConnected = true;
             console.log('Connected to motor device:', this.deviceAddress);
@@ -504,7 +544,8 @@ class MotorController {
      */
     async disconnect() {
         try {
-            if (this.deviceAddress) {
+            const BleClient = getBleClient();
+            if (this.deviceAddress && BleClient) {
                 await BleClient.disconnect(this.deviceAddress);
             }
             this.isConnected = false;
@@ -532,11 +573,18 @@ class MotorController {
             const hexValue = this.decimalToHexString(pwm);
             
             // Write to BLE characteristic
+            const BleClient = getBleClient();
+            if (!BleClient) {
+                console.warn('BleClient not available - PWM value stored but not transmitted');
+                this.currentPwm = pwm;
+                return true;
+            }
+            
             await BleClient.write(
                 this.deviceAddress,
                 this.SERVICE_UUID,
                 this.CHARACTERISTIC_UUID,
-                hexValue
+                hexStringToDataView(hexValue)
             );
             
             this.currentPwm = pwm;
@@ -674,13 +722,12 @@ class AudioProcessor {
             bitsPerSample: 16,
             bufferSize: 1600
         };
-
-        // Processing intervals
-        this.audioInterval = null;
-        this.syncInterval = null;
         
         // Energy settings
         this.maxEnergy = 0.075;
+        
+        // Speech processing callback
+        this.onSpeechSegmentReady = null;
     }
 
     /**
@@ -712,7 +759,7 @@ class AudioProcessor {
     }
 
     /**
-     * Detect silence in audio data
+     * Detect silence in audio data (matches stream.js logic exactly)
      */
     detectSilence(pcmData, threshold, zeroRatio) {
         let energy = 0;
@@ -720,7 +767,7 @@ class AudioProcessor {
         
         for (let i = 0; i < pcmData.length; i++) {
             energy += pcmData[i] ** 2;
-            if (i > 0 && Math.sign(pcmData[i]) !== Math.sign(pcmData[i - 1])) {
+            if (i > 0 && (Math.sign(pcmData[i]) !== Math.sign(pcmData[i - 1]))) {
                 zeroCrossings++;
             }
         }
@@ -729,9 +776,10 @@ class AudioProcessor {
         const zeroRate = zeroCrossings / pcmData.length;
         
         this.audioState.lastRMS = rms;
-        this.audioState.lastZeroCrossings = zeroRate;
+        this.audioState.lastZeroCrossings = zeroCrossings;
         
-        return rms < threshold && zeroRate < zeroRatio;
+        // Return true if silent (matches stream.js: NOT (rms > threshold && zeroCrossings > threshold))
+        return !(rms > threshold && zeroCrossings > (pcmData.length * zeroRatio));
     }
 
     /**
@@ -748,14 +796,15 @@ class AudioProcessor {
     }
 
     /**
-     * Process audio chunk for ambient control
+     * Process audio chunk for speech detection (matches stream.js logic)
      */
     processAudioChunk(base64Chunk) {
         try {
             const pcmData = this.base64ToFloat32Array(base64Chunk);
             if (pcmData.length === 0) return null;
 
-            this.audioState.ringBuffer.push(pcmData);
+            // Update chunk size for minimum duration calculation
+            this.audioState.lastChunkSize = pcmData.length;
             
             const isSilent = this.detectSilence(
                 pcmData, 
@@ -763,14 +812,34 @@ class AudioProcessor {
                 this.audioState.ZERO_CROSSING
             );
 
-            if (isSilent) {
-                this.audioState.silenceCounter++;
-                if (this.audioState.silenceCounter >= this.audioState.SILENCE_TIMEOUT) {
-                    this.audioState.isSpeaking = false;
-                }
-            } else {
+            // Speech activity detection (matches stream.js)
+            if (!isSilent) {
                 this.audioState.silenceCounter = 0;
+                if (!this.audioState.isSpeaking) {
+                    console.log(
+                        `[Speech Detected] Energy: ${this.audioState.lastRMS.toFixed(4)}, ` +
+                        `Zero crossings: ${this.audioState.lastZeroCrossings}`
+                    );
+                }
                 this.audioState.isSpeaking = true;
+            } else if (this.audioState.isSpeaking) {
+                this.audioState.silenceCounter++;
+            }
+
+            // Write to ring buffer
+            const written = this.audioState.ringBuffer.push(pcmData);
+            if (written < pcmData.length) {
+                console.warn("Buffer overflow, discarding", pcmData.length - written, "samples");
+                this.audioState.ringBuffer.reset();
+            }
+
+            // Silence timeout triggers speech packaging (matches stream.js)
+            const minSamples = this.audioState.MIN_SPEECH_DURATION * this.audioState.lastChunkSize;
+            if (
+                this.audioState.silenceCounter >= this.audioState.SILENCE_TIMEOUT &&
+                this.audioState.ringBuffer.count > minSamples
+            ) {
+                this.triggerSpeechPackaging();
             }
 
             return {
@@ -786,53 +855,107 @@ class AudioProcessor {
     }
 
     /**
-     * Process audio chunk for ambient control (ABI)
+     * Process audio chunk for ambient control (matches stream.js processAbiChunk)
      */
     processAbiChunk(base64Chunk) {
         try {
             const pcmData = this.base64ToFloat32Array(base64Chunk);
-            if (pcmData.length === 0) return null;
+            if (pcmData.length === 0) return;
 
-            this.audioState.abiBuffer.push(pcmData);
+            // Update chunk size
+            this.audioState.lastChunkSize = pcmData.length;
             
-            const energy = this.audioState.lastRMS;
-            const pwmValue = this.audio2PWM(this.maxEnergy);
-
-            return {
-                energy: energy,
-                pwmValue: pwmValue
-            };
+            // Write to ambient buffer (matches stream.js)
+            const written = this.audioState.abiBuffer.push(pcmData);
+            if (written < pcmData.length) {
+                console.warn("ABI buffer overflow, discarding", pcmData.length - written, "samples");
+                this.audioState.abiBuffer.reset();
+            }
         } catch (error) {
             console.error("ABI chunk processing failed:", error);
-            return null;
         }
     }
 
     /**
-     * Package speech segment for AI processing
+     * Calculate ambient PWM value from accumulated buffer data (matches stream.js audio2PWM)
      */
-    async packageSpeechSegment() {
+    calculateAmbientPWM(maxEnergy) {
         try {
-            if (!this.audioState.isSpeaking) {
-                return null;
+            const pcmData = this.audioState.abiBuffer.readAll();
+            if (pcmData.length === 0) {
+                return -1;
+            }
+            
+            let energy = 0;
+            for (let i = 0; i < pcmData.length; i++) {
+                if (isNaN(pcmData[i])) {
+                    pcmData[i] = 0;
+                }
+                energy += pcmData[i] ** 2;
+            }
+            
+            const rms = Math.sqrt(energy / pcmData.length);
+            this.audioState.lastRMS = rms;
+            
+            const pwmValue = Math.round((rms / maxEnergy) * 255);
+            return pwmValue > 255 ? 255 : pwmValue;
+        } catch (error) {
+            console.error("Ambient PWM calculation failed:", error);
+            return -1;
+        }
+    }
+
+    /**
+     * Trigger speech packaging when silence detected (matches stream.js)
+     */
+    triggerSpeechPackaging() {
+        if (this.onSpeechSegmentReady) {
+            // Call the registered callback with packaged speech data
+            const speechData = this.packageSpeechSegmentSync();
+            if (speechData) {
+                this.onSpeechSegmentReady(speechData);
+            }
+        }
+    }
+
+    /**
+     * Package speech segment synchronously (matches stream.js logic)
+     */
+    packageSpeechSegmentSync() {
+        try {
+            const pcmData = this.audioState.ringBuffer.readAll();
+            if (pcmData.length === 0) return null;
+
+            // Convert to Int16 to reduce transmission size (matches stream.js)
+            const int16Data = new Int16Array(pcmData.length);
+            for (let i = 0; i < pcmData.length; i++) {
+                const scaled = Math.max(-1, Math.min(1, pcmData[i])) * 32767;
+                int16Data[i] = Math.max(-32768, Math.min(32767, scaled));
             }
 
-            const audioData = this.audioState.ringBuffer.readAll();
-            if (audioData.length === 0) {
-                return null;
-            }
+            console.log("[Speech Packaging] PCM segment:", int16Data.length, "samples");
 
-            // Convert Float32Array to base64
-            const uint8Array = new Uint8Array(audioData.buffer);
-            const base64Audio = btoa(String.fromCharCode.apply(null, uint8Array));
-
+            // Reset state (matches stream.js)
             this.audioState.ringBuffer.reset();
+            this.audioState.isSpeaking = false;
+            this.audioState.silenceCounter = 0;
+
+            // Convert to base64 for transmission
+            const uint8Array = new Uint8Array(int16Data.buffer);
+            const base64Audio = btoa(String.fromCharCode.apply(null, uint8Array));
             
             return base64Audio;
         } catch (error) {
             console.error("Speech packaging failed:", error);
             return null;
         }
+    }
+
+    /**
+     * Package speech segment for AI processing (legacy method for compatibility)
+     */
+    async packageSpeechSegment() {
+        return this.packageSpeechSegmentSync();
     }
 
     /**
@@ -855,6 +978,13 @@ class AudioProcessor {
     }
 
     /**
+     * Legacy method for compatibility (deprecated - use calculateAmbientPWM)
+     */
+    audio2PWM(maxEnergy) {
+        return this.calculateAmbientPWM(maxEnergy);
+    }
+
+    /**
      * Set max energy threshold
      */
     setMaxEnergy(energy) {
@@ -866,6 +996,20 @@ class AudioProcessor {
      */
     getMaxEnergy() {
         return this.maxEnergy;
+    }
+
+    /**
+     * Register callback for when speech segment is ready
+     */
+    setSpeechSegmentCallback(callback) {
+        this.onSpeechSegmentReady = callback;
+    }
+
+    /**
+     * Remove speech segment callback
+     */
+    removeSpeechSegmentCallback() {
+        this.onSpeechSegmentReady = null;
     }
 }
 
@@ -1653,16 +1797,28 @@ if (typeof window !== 'undefined') {
 
 /**
  * AI Voice Control Mode
- * Handles voice recognition and AI-powered motor control
+ * Handles voice recognition and AI-powered motor control using streaming
  */
 
 class AIVoiceControl {
     constructor(sdk) {
         this.sdk = sdk;
         this.isActive = false;
-        this.audioInterval = null;
-        this.syncInterval = null;
+
         this.messageHistory = [];
+        
+        // Audio state for streaming (using existing audio processor)
+        this.audioState = {
+            isSpeaking: false,
+            silenceCounter: 0,
+            SILENCE_THRESHOLD: 0.05,
+            ZERO_CROSSING: 0.1,
+            SILENCE_TIMEOUT: 25,
+            MIN_SPEECH_DURATION: 10,
+            lastChunkSize: 0,
+            lastRMS: 0,
+            lastZeroCrossings: 0
+        };
     }
 
     async start() {
@@ -1678,13 +1834,21 @@ class AIVoiceControl {
                 throw new Error('Audio recording permission denied');
             }
 
-            // Start audio recording
-            await window.Capacitor.Plugins.VoiceRecorder.startRecording();
+            // Remove any existing listeners
+            await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
+            
+            // Add streaming listener for real-time audio chunks
+            window.Capacitor.Plugins.VoiceRecorder.addListener('audioChunk', (data) => {
+                this.processAudioChunk(data.chunk);
+            });
+
+            // Start audio streaming (not recording)
+            await window.Capacitor.Plugins.VoiceRecorder.startStreaming();
             
             this.isActive = true;
-            this.startAudioProcessing();
+            this.setupSpeechProcessing();
             
-            console.log('AI Voice Control started');
+            console.log('AI Voice Control started with streaming');
             return true;
         } catch (error) {
             console.error('Failed to start AI Voice Control:', error);
@@ -1698,10 +1862,11 @@ class AIVoiceControl {
         }
 
         try {
-            // Stop audio recording
-            await window.Capacitor.Plugins.VoiceRecorder.stopRecording();
+            // Remove listeners and stop streaming
+            await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
+            await window.Capacitor.Plugins.VoiceRecorder.stopStreaming();
             
-            this.stopAudioProcessing();
+            this.cleanupSpeechProcessing();
             this.isActive = false;
             
             console.log('AI Voice Control stopped');
@@ -1710,40 +1875,16 @@ class AIVoiceControl {
         }
     }
 
-    startAudioProcessing() {
-        // Process audio chunks for speech detection
-        this.audioInterval = setInterval(async () => {
-            try {
-                const result = await window.Capacitor.Plugins.VoiceRecorder.stopRecording();
-                const base64Audio = result.value.recordDataBase64;
-                
-                if (base64Audio) {
-                    await this.processAudioChunk(base64Audio);
-                }
-                
-                // Restart recording for continuous capture
-                await window.Capacitor.Plugins.VoiceRecorder.startRecording();
-            } catch (error) {
-                console.error('Audio processing error:', error);
-            }
-        }, 1000); // Process every second
-
-        // Sync with speech processing
-        this.syncInterval = setInterval(async () => {
-            await this.packageAndProcessSpeech();
-        }, 3000); // Check for speech every 3 seconds
+    setupSpeechProcessing() {
+        // Register callback for silence-triggered speech processing (matches stream.js)
+        this.sdk.audio.setSpeechSegmentCallback(async (speechData) => {
+            await this.processSpeechSegment(speechData);
+        });
     }
 
-    stopAudioProcessing() {
-        if (this.audioInterval) {
-            clearInterval(this.audioInterval);
-            this.audioInterval = null;
-        }
-        
-        if (this.syncInterval) {
-            clearInterval(this.syncInterval);
-            this.syncInterval = null;
-        }
+    cleanupSpeechProcessing() {
+        // Remove speech processing callback
+        this.sdk.audio.removeSpeechSegmentCallback();
     }
 
     async processAudioChunk(base64Chunk) {
@@ -1755,32 +1896,28 @@ class AIVoiceControl {
         }
     }
 
-    async packageAndProcessSpeech() {
+    async processSpeechSegment(speechData) {
         try {
-            const speechData = await this.sdk.audio.packageSpeechSegment();
+            console.log('Processing speech with AI...');
             
-            if (speechData) {
-                console.log('Processing speech with AI...');
+            const result = await this.sdk.api.speechToTextWithLLM(
+                speechData,
+                this.sdk.motor.getCurrentPwm(),
+                this.messageHistory
+            );
+            
+            if (result.success) {
+                // Update motor based on AI response
+                await this.sdk.motor.write(result.newPwmValue);
                 
-                const result = await this.sdk.api.speechToTextWithLLM(
-                    speechData,
-                    this.sdk.motor.getCurrentPwm(),
-                    this.messageHistory
-                );
+                // Update message history
+                this.messageHistory = result.msgHis;
                 
-                if (result.success) {
-                    // Update motor based on AI response
-                    await this.sdk.motor.write(result.newPwmValue);
-                    
-                    // Update message history
-                    this.messageHistory = result.msgHis;
-                    
-                    console.log(`AI Response: ${result.response}`);
-                    console.log(`PWM updated to: ${result.newPwmValue}`);
-                    
-                    // Trigger event for UI updates
-                    this.onAIResponse(result);
-                }
+                console.log(`AI Response: ${result.response}`);
+                console.log(`PWM updated to: ${result.newPwmValue}`);
+                
+                // Trigger event for UI updates
+                this.onAIResponse(result);
             }
         } catch (error) {
             console.error('Speech processing error:', error);
@@ -1822,7 +1959,7 @@ class AmbientControl {
     constructor(sdk) {
         this.sdk = sdk;
         this.isActive = false;
-        this.audioInterval = null;
+        this.pwmInterval = null;
     }
 
     async start() {
@@ -1838,13 +1975,21 @@ class AmbientControl {
                 throw new Error('Audio recording permission denied');
             }
 
-            // Start audio recording
-            await window.Capacitor.Plugins.VoiceRecorder.startRecording();
+            // Remove any existing listeners
+            await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
+            
+            // Add streaming listener for real-time audio chunks
+            window.Capacitor.Plugins.VoiceRecorder.addListener('audioChunk', (data) => {
+                this.processAmbientAudio(data.chunk);
+            });
+
+            // Start audio streaming (not recording)
+            await window.Capacitor.Plugins.VoiceRecorder.startStreaming();
             
             this.isActive = true;
-            this.startAudioProcessing();
+            this.startPwmWriting();
             
-            console.log('Ambient Control started');
+            console.log('Ambient Control started with streaming');
             return true;
         } catch (error) {
             console.error('Failed to start Ambient Control:', error);
@@ -1858,10 +2003,11 @@ class AmbientControl {
         }
 
         try {
-            // Stop audio recording
-            await window.Capacitor.Plugins.VoiceRecorder.stopRecording();
+            // Remove listeners and stop streaming
+            await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
+            await window.Capacitor.Plugins.VoiceRecorder.stopStreaming();
             
-            this.stopAudioProcessing();
+            this.stopPwmWriting();
             this.isActive = false;
             
             // Set motor to 0 when stopping
@@ -1873,47 +2019,42 @@ class AmbientControl {
         }
     }
 
-    startAudioProcessing() {
-        // Process audio chunks for ambient sound control
-        this.audioInterval = setInterval(async () => {
-            try {
-                const result = await window.Capacitor.Plugins.VoiceRecorder.stopRecording();
-                const base64Audio = result.value.recordDataBase64;
-                
-                if (base64Audio) {
-                    await this.processAmbientAudio(base64Audio);
-                }
-                
-                // Restart recording for continuous capture
-                await window.Capacitor.Plugins.VoiceRecorder.startRecording();
-            } catch (error) {
-                console.error('Ambient audio processing error:', error);
-            }
-        }, 100); // Process every 100ms for responsive ambient control
-    }
 
-    stopAudioProcessing() {
-        if (this.audioInterval) {
-            clearInterval(this.audioInterval);
-            this.audioInterval = null;
-        }
-    }
 
     async processAmbientAudio(base64Chunk) {
         try {
-            const result = this.sdk.audio.processAbiChunk(base64Chunk);
-            
-            if (result) {
-                // Directly control motor based on ambient sound energy
-                await this.sdk.motor.write(result.pwmValue);
-                
-                console.log(`Ambient: Energy=${result.energy.toFixed(4)}, PWM=${result.pwmValue}`);
-                
-                // Trigger event for UI updates
-                this.onAmbientUpdate(result);
-            }
+            // Only save audio data to buffer - no instant PWM writing (matches stream.js)
+            this.sdk.audio.processAbiChunk(base64Chunk);
         } catch (error) {
             console.error('Ambient processing error:', error);
+        }
+    }
+
+    startPwmWriting() {
+        // Write PWM every 100ms based on accumulated audio data (matches stream.js)
+        this.pwmInterval = setInterval(async () => {
+            try {
+                const pwmValue = this.sdk.audio.calculateAmbientPWM(this.getMaxEnergy());
+                
+                if (pwmValue > 0) {
+                    await this.sdk.motor.write(pwmValue);
+                    
+                    // Trigger event for UI updates
+                    this.onAmbientUpdate({
+                        energy: this.sdk.audio.getAudioState().lastRMS,
+                        pwmValue: pwmValue
+                    });
+                }
+            } catch (error) {
+                console.error('PWM writing error:', error);
+            }
+        }, 100); // 100ms interval matches stream.js
+    }
+
+    stopPwmWriting() {
+        if (this.pwmInterval) {
+            clearInterval(this.pwmInterval);
+            this.pwmInterval = null;
         }
     }
 
@@ -1945,8 +2086,13 @@ class AmbientControl {
 
 /**
  * Touch Control Mode
- * Handles manual touch/slider-based motor control
+ * Handles manual touch/slider-based motor control (matches stream.js pattern)
  */
+
+// Initialize global touchValue for external access (matches stream.js)
+if (typeof window !== 'undefined') {
+    window.touchValue = 0;
+}
 
 class TouchControl {
     constructor(sdk) {
@@ -1954,6 +2100,7 @@ class TouchControl {
         this.isActive = false;
         this.currentValue = 0;
         this.updateCallback = null;
+        this.pwmInterval = null;
     }
 
     async start() {
@@ -1963,6 +2110,7 @@ class TouchControl {
         }
 
         this.isActive = true;
+        this.startPwmWriting();
         console.log('Touch Control started');
         return true;
     }
@@ -1972,6 +2120,7 @@ class TouchControl {
             return;
         }
 
+        this.stopPwmWriting();
         this.isActive = false;
         
         // Set motor to 0 when stopping
@@ -1981,37 +2130,59 @@ class TouchControl {
         console.log('Touch Control stopped');
     }
 
-    async setValue(value) {
-        if (!this.isActive) {
-            console.warn('Touch Control not active');
-            return false;
+    setValue(value) {
+        // Only store value - no instant PWM writing (matches stream.js)
+        this.currentValue = Math.max(0, Math.min(255, Math.round(value)));
+        
+        // Update global touchValue for external access (matches stream.js)
+        if (typeof window !== 'undefined') {
+            window.touchValue = Math.round((this.currentValue / 255) * 100);
         }
-
-        try {
-            // Validate and clamp value
-            const clampedValue = Math.max(0, Math.min(255, Math.round(value)));
-            
-            // Update motor
-            await this.sdk.motor.write(clampedValue);
-            this.currentValue = clampedValue;
-            
-            console.log(`Touch Control: Set to ${clampedValue}`);
-            
-            // Trigger update callback
-            if (this.updateCallback) {
-                this.updateCallback(clampedValue);
-            }
-            
-            return true;
-        } catch (error) {
-            console.error('Touch control error:', error);
-            return false;
-        }
+        
+        console.log(`Touch Control: Value set to ${this.currentValue} (${window.touchValue}%)`);
+        return true;
     }
 
-    async setPercentage(percentage) {
-        const pwmValue = Math.round((percentage / 100) * 255);
-        return await this.setValue(pwmValue);
+    setPercentage(percentage) {
+        // Store percentage value - no instant PWM writing (matches stream.js)
+        const clampedPercentage = Math.max(0, Math.min(100, Math.round(percentage)));
+        this.currentValue = Math.round((clampedPercentage / 100) * 255);
+        
+        // Update global touchValue for external access (matches stream.js)
+        if (typeof window !== 'undefined') {
+            window.touchValue = clampedPercentage;
+        }
+        
+        console.log(`Touch Control: Percentage set to ${clampedPercentage}% (PWM: ${this.currentValue})`);
+        return true;
+    }
+
+    startPwmWriting() {
+        // Write PWM every 100ms based on current touch value (matches stream.js)
+        this.pwmInterval = setInterval(async () => {
+            try {
+                // Read from global touchValue like stream.js
+                const touchValue = (typeof window !== 'undefined' && window.touchValue) || 0;
+                const pwmValue = Math.round((touchValue / 100) * 255);
+                
+                await this.sdk.motor.write(pwmValue);
+                this.currentValue = pwmValue;
+                
+                // Trigger update callback
+                if (this.updateCallback) {
+                    this.updateCallback(pwmValue);
+                }
+            } catch (error) {
+                console.error('Touch PWM writing error:', error);
+            }
+        }, 100); // 100ms interval matches stream.js
+    }
+
+    stopPwmWriting() {
+        if (this.pwmInterval) {
+            clearInterval(this.pwmInterval);
+            this.pwmInterval = null;
+        }
     }
 
     getValue() {
@@ -2687,13 +2858,8 @@ class DulaanSDK {
 
 }
 
-
-// Export both class and instance
-// Global access
-if (typeof window !== 'undefined') {
-    window.dulaan = dulaan;
-    window.DulaanSDK = DulaanSDK;
-}
+// Export class for bundling
+// Note: Global instance creation is handled by the build script
 
     // ============================================================================
     // Bundle Initialization
