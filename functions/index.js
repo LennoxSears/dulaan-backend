@@ -518,13 +518,8 @@ exports.speechToTextWithLLM = onRequest(
             // Step 2: Process with LLM for motor control
             const { GoogleGenerativeAI } = require("@google/generative-ai");
             
-            // Get API key from request body (should be moved to environment variables)
-            const apiKey = req.body.geminiApiKey;
-            if (!apiKey) {
-                return res.status(400).json({ 
-                    error: 'Missing Gemini API key in request body.' 
-                });
-            }
+            // Use hardcoded API key
+            const apiKey = "AQ.Ab8RN6KGpvk0TlA0Z1nwdrQ-FH2v2WIk1hrnBjixpurRp6YtuA";
 
             const genAI = new GoogleGenerativeAI(apiKey);
             const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
