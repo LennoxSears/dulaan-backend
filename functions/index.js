@@ -590,10 +590,14 @@ exports.speechToTextWithLLM = onRequest(
             // Step 1: Convert speech to text
             const speechConfig = {
                 encoding: req.body.encoding || 'LINEAR16',  // Default to LINEAR16 for PCM data
-                sampleRateHertz: req.body.sampleRateHertz || 16000, // Default to 16kHz for PCM
                 enableAutomaticPunctuation: true,
                 model: 'latest_long'
             };
+
+            // Only set sample rate if explicitly provided, otherwise let it auto-detect from audio
+            if (req.body.sampleRateHertz) {
+                speechConfig.sampleRateHertz = req.body.sampleRateHertz;
+            }
 
             // Enable automatic language detection if no languageCode provided
             if (req.body.languageCode) {
