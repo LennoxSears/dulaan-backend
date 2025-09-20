@@ -519,7 +519,7 @@ exports.speechToTextWithLLM = onRequest(
             const { GoogleGenerativeAI } = require("@google/generative-ai");
             
             // Use hardcoded API key
-            const apiKey = "AQ.Ab8RN6KGpvk0TlA0Z1nwdrQ-FH2v2WIk1hrnBjixpurRp6YtuA";
+            const apiKey = "AIzaSyD9KKLF3WBa6gi0_orzF-OMydzO4rIX_uY";
 
             const genAI = new GoogleGenerativeAI(apiKey);
             const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
