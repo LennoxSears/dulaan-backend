@@ -47,6 +47,9 @@ class DulaanSDK {
                 sampleRate: 16000,
                 maxEnergy: 0.075
             },
+            api: {
+                geminiApiKey: null // Add API key configuration
+            },
             remote: {
                 autoHeartbeat: true,
                 heartbeatInterval: 30000
@@ -220,9 +223,21 @@ class DulaanSDK {
             this.audio.setMaxEnergy(newConfig.audio.maxEnergy);
         }
         
+        if (newConfig.api?.geminiApiKey) {
+            this.api.setApiKey(newConfig.api.geminiApiKey);
+        }
+        
         if (newConfig.remote) {
             this.remote.updatePeerConfig(newConfig.remote);
         }
+    }
+
+    /**
+     * Set Gemini API key for AI voice processing
+     */
+    setApiKey(apiKey) {
+        this.config.api.geminiApiKey = apiKey;
+        this.api.setApiKey(apiKey);
     }
 
     getConfig() {

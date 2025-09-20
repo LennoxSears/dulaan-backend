@@ -467,8 +467,8 @@ exports.speechToTextWithLLM = onRequest(
 
             // Step 1: Convert speech to text
             const speechConfig = {
-                encoding: req.body.encoding || 'WEBM_OPUS',
-                sampleRateHertz: req.body.sampleRateHertz || 48000,
+                encoding: req.body.encoding || 'LINEAR16',  // Default to LINEAR16 for PCM data
+                sampleRateHertz: req.body.sampleRateHertz || 16000, // Default to 16kHz for PCM
                 enableAutomaticPunctuation: true,
                 model: 'latest_long'
             };
@@ -529,10 +529,13 @@ exports.speechToTextWithLLM = onRequest(
             const genAI = new GoogleGenerativeAI(apiKey);
             const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-            // Prepare conversation history for context
-            const conversationHistory = msgHis.map(msg => 
-                `User: ${msg.user}\nAssistant: ${msg.assistant}`
-            ).join('\n\n');
+            // Prepare conversation history for context (handle different formats safely)
+            const conversationHistory = msgHis.map(msg => {
+                // Handle different message formats
+                const user = msg.user || msg.transcript || 'Unknown';
+                const assistant = msg.assistant || msg.response || 'Unknown';
+                return `User: ${user}\nAssistant: ${assistant}`;
+            }).join('\n\n');
 
             const prompt = `You are controlling a motor device with PWM values (0-255). Current PWM: ${currentPwm}
 

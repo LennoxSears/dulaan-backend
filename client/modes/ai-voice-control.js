@@ -121,9 +121,23 @@ export class AIVoiceControl {
                 
                 // Trigger event for UI updates
                 this.onAIResponse(result);
+            } else {
+                console.warn('AI processing failed:', result.error || 'Unknown error');
             }
         } catch (error) {
             console.error('Speech processing error:', error);
+            
+            // Handle specific error types
+            if (error.message.includes('500')) {
+                console.warn('API server error - speech processing temporarily unavailable');
+            } else if (error.message.includes('timeout')) {
+                console.warn('API timeout - speech processing took too long');
+            } else if (error.message.includes('network')) {
+                console.warn('Network error - check internet connection');
+            }
+            
+            // Continue operation despite API errors (don't break voice control)
+            console.log('Voice control continues despite API error');
         }
     }
 
