@@ -702,7 +702,9 @@ Examples:
             
             if (intentDetected) {
                 // Only change PWM if intent was detected
-                newPwmValue = Math.max(0, Math.min(255, parseInt(llmResponse.pwm) || currentPwm));
+                // Fix: Use nullish coalescing (??) instead of logical OR (||) to handle PWM = 0 correctly
+                const parsedPwm = parseInt(llmResponse.pwm);
+                newPwmValue = Math.max(0, Math.min(255, isNaN(parsedPwm) ? currentPwm : parsedPwm));
             } else {
                 // No motor control intent detected, keep current PWM
                 newPwmValue = currentPwm;
