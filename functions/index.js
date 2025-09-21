@@ -443,12 +443,12 @@ exports.speechToTextWithLLM = onRequest(
             }
 
             // Validate required fields
-            const { msgHis, audioContent, audioUri, currentPwm } = req.body;
+            const { msgHis, audioBuffer, audioUri, currentPwm } = req.body;
 
             // Check if audio data is provided
-            if (!audioContent && !audioUri) {
+            if (!audioBuffer && !audioUri) {
                 return res.status(400).json({ 
-                    error: 'Missing audio data. Provide either audioContent (base64) or audioUri.' 
+                    error: 'Missing audio data. Provide either audioBuffer (Int16Array) or audioUri.' 
                 });
             }
 
@@ -466,85 +466,115 @@ exports.speechToTextWithLLM = onRequest(
                 });
             }
 
-            // Step 1: Convert speech to text
-            const speechConfig = {
-                encoding: req.body.encoding || 'LINEAR16',  // Default to LINEAR16 for PCM data
-                enableAutomaticPunctuation: true,
-                enableWordTimeOffsets: false,
-                enableWordConfidence: true,
-                model: 'latest_short',  // Use latest_short for better real-time performance
-                useEnhanced: true,      // Use enhanced model for better accuracy
-                profanityFilter: false,
-                maxAlternatives: 1,
-                audioChannelCount: 1    // Mono audio
-            };
-
-            // Set sample rate - required for raw PCM data (LINEAR16)
-            // Client sends raw PCM at 16000 Hz, not WAV files with headers
-            if (req.body.sampleRateHertz) {
-                speechConfig.sampleRateHertz = req.body.sampleRateHertz;
-            } else {
-                // Default to 16000 Hz for raw PCM data from client
-                speechConfig.sampleRateHertz = 16000;
-            }
-
-            // Enable automatic language detection if no languageCode provided
-            if (req.body.languageCode) {
-                speechConfig.languageCode = req.body.languageCode;
-            } else {
-                speechConfig.languageCode = 'en-US';
-                speechConfig.alternativeLanguageCodes = [
-                    'en-GB', 'es-ES', 'fr-FR', 'de-DE', 'it-IT', 'pt-PT', 
-                    'ru-RU', 'ja-JP', 'ko-KR', 'zh-CN', 'zh-TW', 'ar-SA', 
-                    'hi-IN', 'nl-NL', 'sv-SE', 'da-DK', 'no-NO', 'fi-FI', 
-                    'pl-PL', 'cs-CZ', 'hu-HU', 'tr-TR', 'he-IL', 'th-TH',
-                    'vi-VN', 'id-ID', 'ms-MY', 'tl-PH', 'uk-UA', 'bg-BG',
-                    'hr-HR', 'sk-SK', 'sl-SI', 'et-EE', 'lv-LV', 'lt-LT'
-                ];
-            }
-
-            const speechRequest = { config: speechConfig };
-
-            // Add audio content
-            if (audioContent) {
-                speechRequest.audio = { content: audioContent };
-            } else if (audioUri) {
-                speechRequest.audio = { uri: audioUri };
-            }
-
-            // Log audio info for debugging
-            logger.log('Processing audio for speech recognition', {
-                encoding: speechConfig.encoding,
-                sampleRateHertz: speechConfig.sampleRateHertz,
-                audioContentLength: audioContent ? audioContent.length : 0,
-                hasAudioUri: !!audioUri,
-                model: speechConfig.model
-            });
-
-            // Perform speech recognition
-            const [speechResponse] = await speechClient.recognize(speechRequest);
-            
-            // Extract transcription with confidence filtering
+            // Step 1: Convert speech to text using Google Cloud Speech-to-Text
             let transcript = '';
             let confidence = 0;
             let detectedLanguage = null;
-            
-            if (speechResponse.results && speechResponse.results.length > 0) {
-                const bestResult = speechResponse.results[0];
-                if (bestResult.alternatives && bestResult.alternatives.length > 0) {
-                    const bestAlternative = bestResult.alternatives[0];
-                    transcript = bestAlternative.transcript || '';
-                    confidence = bestAlternative.confidence || 0;
-                    detectedLanguage = bestResult.languageCode || null;
-                    
-                    // Filter out low-confidence results (below 0.3)
-                    if (confidence < 0.3 && transcript.trim().length > 0) {
-                        logger.log('Low confidence transcription filtered out', { 
-                            transcript, 
-                            confidence,
-                            threshold: 0.3 
-                        });
-                        transcript = '';
+
+            if (audioBuffer) {
+                // Convert audioBuffer array to Int16Array buffer (from stream.js approach)
+                const int16Data = new Int16Array(audioBuffer);
+                
+                const speechConfig = {
+                    encoding: 'LINEAR16',  // Int16Array is LINEAR16 PCM data
+                    enableAutomaticPunctuation: true,
+                    enableWordTimeOffsets: false,
+                    enableWordConfidence: true,
+                    model: 'latest_short',  // Use latest_short for better real-time performance
+                    useEnhanced: true,      // Use enhanced model for better accuracy
+                    profanityFilter: false,
+                    maxAlternatives: 1,
+                    audioChannelCount: 1,   // Mono audio
+                    sampleRateHertz: req.body.sampleRateHertz || 16000
+                };
+
+                // Enable automatic language detection if no languageCode provided
+                if (req.body.languageCode) {
+                    speechConfig.languageCode = req.body.languageCode;
+                } else {
+                    speechConfig.languageCode = 'en-US';
+                    speechConfig.alternativeLanguageCodes = [
+                        'en-GB', 'es-ES', 'fr-FR', 'de-DE', 'it-IT', 'pt-PT', 
+                        'ru-RU', 'ja-JP', 'ko-KR', 'zh-CN', 'zh-TW', 'ar-SA', 
+                        'hi-IN', 'nl-NL', 'sv-SE', 'da-DK', 'no-NO', 'fi-FI', 
+                        'pl-PL', 'cs-CZ', 'hu-HU', 'tr-TR', 'he-IL', 'th-TH',
+                        'vi-VN', 'id-ID', 'ms-MY', 'tl-PH', 'uk-UA', 'bg-BG',
+                        'hr-HR', 'sk-SK', 'sl-SI', 'et-EE', 'lv-LV', 'lt-LT'
+                    ];
+                }
+
+                const speechRequest = { 
+                    config: speechConfig,
+                    audio: { content: Buffer.from(int16Data.buffer).toString('base64') }
+                };
+
+                // Log audio info for debugging
+                logger.log('Processing audio for speech recognition', {
+                    encoding: speechConfig.encoding,
+                    sampleRateHertz: speechConfig.sampleRateHertz,
+                    audioBufferLength: int16Data.length,
+                    audioBufferBytes: int16Data.buffer.byteLength,
+                    model: speechConfig.model
+                });
+
+                // Perform speech recognition
+                const [speechResponse] = await speechClient.recognize(speechRequest);
+                
+                // Extract transcription with confidence filtering
+                if (speechResponse.results && speechResponse.results.length > 0) {
+                    const bestResult = speechResponse.results[0];
+                    if (bestResult.alternatives && bestResult.alternatives.length > 0) {
+                        const bestAlternative = bestResult.alternatives[0];
+                        transcript = bestAlternative.transcript || '';
+                        confidence = bestAlternative.confidence || 0;
+                        detectedLanguage = bestResult.languageCode || null;
+                        
+                        // Filter out low-confidence results (below 0.3)
+                        if (confidence < 0.3 && transcript.trim().length > 0) {
+                            logger.log('Low confidence transcription filtered out', { 
+                                transcript, 
+                                confidence,
+                                threshold: 0.3 
+                            });
+                            transcript = '';
+                        }
+                    }
+                }
+            } else if (audioUri) {
+                // Handle URI-based audio (existing logic)
+                const speechConfig = {
+                    encoding: req.body.encoding || 'LINEAR16',
+                    enableAutomaticPunctuation: true,
+                    enableWordTimeOffsets: false,
+                    enableWordConfidence: true,
+                    model: 'latest_short',
+                    useEnhanced: true,
+                    profanityFilter: false,
+                    maxAlternatives: 1,
+                    audioChannelCount: 1,
+                    sampleRateHertz: req.body.sampleRateHertz || 16000
+                };
+
+                if (req.body.languageCode) {
+                    speechConfig.languageCode = req.body.languageCode;
+                } else {
+                    speechConfig.languageCode = 'en-US';
+                }
+
+                const speechRequest = { 
+                    config: speechConfig,
+                    audio: { uri: audioUri }
+                };
+
+                const [speechResponse] = await speechClient.recognize(speechRequest);
+                
+                if (speechResponse.results && speechResponse.results.length > 0) {
+                    const bestResult = speechResponse.results[0];
+                    if (bestResult.alternatives && bestResult.alternatives.length > 0) {
+                        const bestAlternative = bestResult.alternatives[0];
+                        transcript = bestAlternative.transcript || '';
+                        confidence = bestAlternative.confidence || 0;
+                        detectedLanguage = bestResult.languageCode || null;
                     }
                 }
             }

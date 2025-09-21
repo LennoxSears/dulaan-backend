@@ -312,16 +312,8 @@ class AudioProcessor {
             this.audioState.isSpeaking = false;
             this.audioState.silenceCounter = 0;
 
-            // Convert to base64 for transmission using chunked approach to avoid stack overflow
-            const chunkSize = 8192; // Process in smaller chunks
-            let base64Audio = '';
-            
-            for (let i = 0; i < int16Data.buffer.byteLength; i += chunkSize) {
-                const chunk = new Uint8Array(int16Data.buffer, i, Math.min(chunkSize, int16Data.buffer.byteLength - i));
-                base64Audio += btoa(String.fromCharCode.apply(null, chunk));
-            }
-            
-            return base64Audio;
+            // Return Int16Array directly instead of base64 (more efficient like stream.js)
+            return Array.from(int16Data); // Convert to regular array for JSON transmission
         } catch (error) {
             console.error("Speech packaging failed:", error);
             // Reset state on error to prevent stuck state

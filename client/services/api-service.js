@@ -29,8 +29,12 @@ class ApiService {
 
     /**
      * Process speech with LLM for motor control
+     * @param {Array} audioBuffer - Int16Array as regular array for JSON transmission
+     * @param {number} currentPwm - Current PWM value
+     * @param {Array} msgHis - Message history
+     * @param {Object} options - Additional options
      */
-    async speechToTextWithLLM(audioBase64, currentPwm, msgHis = [], options = {}) {
+    async speechToTextWithLLM(audioBuffer, currentPwm, msgHis = [], options = {}) {
         try {
             const requestOptions = { ...this.defaultOptions, ...options };
             
@@ -41,7 +45,7 @@ class ApiService {
                 },
                 body: JSON.stringify({
                     msgHis: msgHis,
-                    audioContent: audioBase64,
+                    audioBuffer: audioBuffer, // Send Int16Array as regular array
                     currentPwm: currentPwm,
                     encoding: requestOptions.encoding,
                     sampleRateHertz: requestOptions.sampleRateHertz,
