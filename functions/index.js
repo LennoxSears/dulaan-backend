@@ -479,12 +479,14 @@ exports.speechToTextWithLLM = onRequest(
                 audioChannelCount: 1    // Mono audio
             };
 
-            // Set sample rate - only if explicitly provided
-            // Let Google Speech API auto-detect from audio header when possible
+            // Set sample rate - required for raw PCM data (LINEAR16)
+            // Client sends raw PCM at 16000 Hz, not WAV files with headers
             if (req.body.sampleRateHertz) {
                 speechConfig.sampleRateHertz = req.body.sampleRateHertz;
+            } else {
+                // Default to 16000 Hz for raw PCM data from client
+                speechConfig.sampleRateHertz = 16000;
             }
-            // Note: For WAV files, omit sampleRateHertz to let API auto-detect from header
 
             // Enable automatic language detection if no languageCode provided
             if (req.body.languageCode) {
