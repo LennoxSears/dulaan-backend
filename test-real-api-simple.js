@@ -98,7 +98,7 @@ async function testWithCurl(testCase, currentPwm, messageHistory) {
     
     console.log(`\n📡 Curl command to test ${testCase.language}:`);
     console.log('─'.repeat(80));
-    console.log(curlCommand);
+    //console.log(curlCommand);
     console.log('─'.repeat(80));
     
     return {
@@ -160,7 +160,7 @@ async function runTests() {
     console.log(`\n🔧 Option 2: Use Curl Commands (copy and run each):`);
     testCommands.forEach((cmd, index) => {
         console.log(`\n   Test ${index + 1} (${cmd.testCase.language}):`);
-        console.log(`   ${cmd.curlCommand.replace(/\n/g, ' ')}`);
+        //console.log(`   ${cmd.curlCommand.replace(/\n/g, ' ')}`);
     });
     
     console.log(`\n🔧 Option 3: Use the browser test runner for interactive testing`);
