@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Speech-to-Text Accuracy Test</title>
+    <title>Speech-to-Text Streaming Test</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -378,11 +378,23 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎤 Speech-to-Text Accuracy Test</h1>
+        <h1>🎙️ Speech-to-Text Streaming Test</h1>
+        
+        <!-- Instructions -->
+        <div class="status info" style="margin-bottom: 20px;">
+            <h4>📋 How to Use Streaming Mode:</h4>
+            <ol style="text-align: left; margin: 10px 0; padding-left: 20px;">
+                <li><strong>Start Streaming:</strong> Click "Start Streaming" to begin continuous audio monitoring</li>
+                <li><strong>Speak Naturally:</strong> Just talk normally - speech will be detected automatically</li>
+                <li><strong>Auto-Detection:</strong> When you stop speaking, the segment is automatically sent to the API</li>
+                <li><strong>Review Results:</strong> See what audio was sent and the API response below</li>
+                <li><strong>Playback:</strong> Click play buttons to hear exactly what was sent to the API</li>
+            </ol>
+        </div>
         
         <!-- Status Display -->
         <div id="status" class="status info">
-            Initializing speech recognition test interface...
+            Initializing speech streaming interface...
         </div>
         
         <!-- Troubleshooting Section -->
@@ -401,13 +413,13 @@
         <!-- Controls -->
         <div class="controls">
             <div class="control-group">
-                <label>Recording Control</label>
-                <button id="startBtn" class="btn-primary">🎤 Start Recording</button>
+                <label>Streaming Mode</label>
+                <button id="startStreamBtn" class="btn-primary">🎙️ Start Streaming</button>
             </div>
             
             <div class="control-group">
-                <label>Stop Recording</label>
-                <button id="stopBtn" class="btn-danger" disabled>⏹️ Stop Recording</button>
+                <label>Stop Streaming</label>
+                <button id="stopStreamBtn" class="btn-danger" disabled>⏹️ Stop Streaming</button>
             </div>
             
             <div class="control-group">
@@ -454,8 +466,8 @@
         <!-- Audio Information -->
         <div class="audio-info">
             <div class="info-card">
-                <h4>Recording Status</h4>
-                <div id="recordingStatus" class="value">Stopped</div>
+                <h4>Streaming Status</h4>
+                <div id="streamingStatus" class="value">Stopped</div>
             </div>
             
             <div class="info-card">
@@ -469,12 +481,12 @@
             </div>
             
             <div class="info-card">
-                <h4>Recording Duration</h4>
+                <h4>Streaming Duration</h4>
                 <div id="duration" class="value">0.0s</div>
             </div>
             
             <div class="info-card">
-                <h4>Segments Captured</h4>
+                <h4>Speech Segments Sent</h4>
                 <div id="segmentCount" class="value">0</div>
             </div>
             
@@ -486,10 +498,10 @@
         
         <!-- Results Section -->
         <div class="results">
-            <h2>📊 Test Results</h2>
+            <h2>📊 Auto-Detected Speech Segments</h2>
             <div id="resultsContainer">
                 <p style="text-align: center; color: #666; font-style: italic;">
-                    No test results yet. Start recording to see speech recognition results.
+                    No speech segments detected yet. Start streaming to see automatically detected speech and API results.
                 </p>
             </div>
             
@@ -508,22 +520,23 @@
     </div>
 
     <script>
-        // Global variables will be added in next steps
+        // Global variables for streaming mode
         let audioContext = null;
         let mediaStream = null;
         let audioProcessor = null;
-        let isRecording = false;
-        let recordingStartTime = null;
-        let audioSegments = [];
+        let isStreaming = false;
+        let streamingStartTime = null;
+        let sentAudioSegments = []; // Audio segments that were sent to API
         let testResults = [];
         let segmentCounter = 0;
         let apiCallCounter = 0;
         
-        // Audio processing variables
-        let ringBuffer = null;
+        // Audio processing variables for speech detection
+        let speechBuffer = []; // Buffer for current speech segment
         let silenceCounter = 0;
         let isSpeaking = false;
         let lastAudioLevel = 0;
+        let speechStartTime = null;
         
         // Configuration
         const config = {
@@ -599,20 +612,35 @@
         }
         
         function updateUI() {
-            // Update recording duration
-            if (isRecording && recordingStartTime) {
-                const duration = (Date.now() - recordingStartTime) / 1000;
+            // Update streaming duration
+            if (isStreaming && streamingStartTime) {
+                const duration = (Date.now() - streamingStartTime) / 1000;
                 document.getElementById('duration').textContent = duration.toFixed(1) + 's';
             }
             
             // Update audio level
             document.getElementById('audioLevel').textContent = lastAudioLevel.toFixed(3);
             
-            // Update speech status
-            document.getElementById('speechStatus').textContent = isSpeaking ? 'Yes' : 'No';
+            // Update speech status with more detail
+            const speechStatusEl = document.getElementById('speechStatus');
+            if (isSpeaking) {
+                const speechDuration = speechBuffer.length / config.sampleRate;
+                speechStatusEl.textContent = `Yes (${speechDuration.toFixed(1)}s)`;
+                speechStatusEl.style.color = '#28a745';
+            } else {
+                speechStatusEl.textContent = 'No';
+                speechStatusEl.style.color = '#666';
+            }
             
-            // Update recording status
-            document.getElementById('recordingStatus').textContent = isRecording ? 'Recording' : 'Stopped';
+            // Update streaming status
+            const streamingStatusEl = document.getElementById('streamingStatus');
+            if (isStreaming) {
+                streamingStatusEl.textContent = 'Active';
+                streamingStatusEl.style.color = '#28a745';
+            } else {
+                streamingStatusEl.textContent = 'Stopped';
+                streamingStatusEl.style.color = '#666';
+            }
             
             // Update counters
             document.getElementById('segmentCount').textContent = segmentCounter;
@@ -664,11 +692,11 @@
             }
         }
 
-        // Audio recording functions
-        async function startRecording() {
+        // Audio streaming functions
+        async function startStreaming() {
             try {
-                log('Requesting microphone access...');
-                updateStatus('Requesting microphone access...', 'info');
+                log('🎙️ Starting speech streaming mode...');
+                showInfo('Starting speech streaming mode...');
                 
                 // Check if devices are available
                 if (availableDevices.length === 0) {
@@ -717,10 +745,12 @@
                     throw new Error(`Audio processor creation failed: ${processorError.message}`);
                 }
                 
-                // Initialize ring buffer (30 seconds at 16kHz)
-                ringBuffer = new RingBuffer(480000);
+                // Initialize speech buffer for current segment
+                speechBuffer = [];
+                silenceCounter = 0;
+                isSpeaking = false;
                 
-                // Audio processing callback
+                // Audio processing callback for streaming speech detection
                 let processCallCount = 0;
                 audioProcessor.onaudioprocess = function(event) {
                     const inputBuffer = event.inputBuffer;
@@ -732,8 +762,8 @@
                         log(`Audio process call ${processCallCount}: ${inputData.length} samples, max level: ${Math.max(...inputData).toFixed(4)}`);
                     }
                     
-                    // Process audio chunk
-                    processAudioChunk(inputData);
+                    // Process audio for speech detection and auto-sending
+                    processStreamingAudio(inputData);
                     
                     // Update visualizer
                     updateVisualizer(inputData);
@@ -744,28 +774,36 @@
                 audioProcessor.connect(audioContext.destination);
                 
                 // Update state
-                isRecording = true;
-                recordingStartTime = Date.now();
+                isStreaming = true;
+                streamingStartTime = Date.now();
                 silenceCounter = 0;
                 isSpeaking = false;
+                speechStartTime = null;
                 
                 // Update UI
-                document.getElementById('startBtn').disabled = true;
-                document.getElementById('stopBtn').disabled = false;
-                updateStatus('Recording... Speak into your microphone', 'success');
+                document.getElementById('startStreamBtn').disabled = true;
+                document.getElementById('stopStreamBtn').disabled = false;
+                showSuccess('🎙️ Streaming active - speak naturally, speech will be detected automatically');
                 
-                log('Recording started successfully');
+                log('✅ Speech streaming started successfully');
                 
             } catch (error) {
-                log('Error starting recording: ' + error.message);
-                updateStatus('Error: ' + error.message, 'error');
-                console.error('Recording error:', error);
+                reportDetailedError(error, 'during streaming start');
+                showError('Error starting streaming: ' + error.message);
             }
         }
         
-        async function stopRecording() {
+        async function stopStreaming() {
             try {
-                log('Stopping recording...');
+                log('🛑 Stopping speech streaming...');
+                showInfo('Stopping speech streaming...');
+                
+                // Process any current speech segment
+                if (speechBuffer.length > 0) {
+                    log(`📤 Processing final speech segment: ${speechBuffer.length} samples`);
+                    processSpeechSegment([...speechBuffer]); // Process final segment
+                    speechBuffer = [];
+                }
                 
                 // Stop media stream
                 if (mediaStream) {
@@ -785,55 +823,63 @@
                     audioContext = null;
                 }
                 
-                // Process any remaining audio
-                if (ringBuffer && ringBuffer.count > 0) {
-                    log('Processing remaining audio buffer...');
-                    await packageAndSendSpeech();
-                }
-                
                 // Update state
-                isRecording = false;
-                recordingStartTime = null;
+                isStreaming = false;
+                streamingStartTime = null;
+                isSpeaking = false;
+                speechBuffer = [];
                 
                 // Update UI
-                document.getElementById('startBtn').disabled = false;
-                document.getElementById('stopBtn').disabled = true;
-                updateStatus('Recording stopped', 'info');
+                document.getElementById('startStreamBtn').disabled = false;
+                document.getElementById('stopStreamBtn').disabled = true;
+                showInfo('🛑 Speech streaming stopped');
                 
-                log('Recording stopped successfully');
+                log('✅ Speech streaming stopped successfully');
                 
             } catch (error) {
-                log('Error stopping recording: ' + error.message);
-                updateStatus('Error stopping recording: ' + error.message, 'error');
-                console.error('Stop recording error:', error);
+                reportDetailedError(error, 'during streaming stop');
+                showError('Error stopping streaming: ' + error.message);
             }
         }
         
         function clearResults() {
-            log('Clearing all results...');
+            log('🗑️ Clearing all results...');
+            
+            // Clean up audio URLs to prevent memory leaks
+            sentAudioSegments.forEach(segment => {
+                if (segment && segment.audioUrl) {
+                    URL.revokeObjectURL(segment.audioUrl);
+                }
+            });
+            
+            testResults.forEach(result => {
+                if (result.audioSegment && result.audioSegment.audioUrl) {
+                    URL.revokeObjectURL(result.audioSegment.audioUrl);
+                }
+            });
             
             // Clear results
             testResults = [];
-            audioSegments = [];
+            sentAudioSegments = [];
             segmentCounter = 0;
             apiCallCounter = 0;
             
             // Clear UI
             document.getElementById('resultsContainer').innerHTML = `
                 <p style="text-align: center; color: #666; font-style: italic;">
-                    No test results yet. Start recording to see speech recognition results.
+                    No test results yet. Start streaming to see automatically detected speech segments.
                 </p>
             `;
             
             // Reset PWM
             document.getElementById('currentPwm').value = '150';
             
-            updateStatus('Results cleared', 'info');
-            log('All results cleared');
+            showInfo('🗑️ All results cleared');
+            log('✅ All results and audio segments cleared');
         }
         
-        // Audio processing functions (matches client algorithm)
-        function processAudioChunk(audioData) {
+        // Streaming audio processing with automatic speech detection
+        function processStreamingAudio(audioData) {
             try {
                 // Calculate audio level for UI
                 lastAudioLevel = calculateRMS(audioData);
@@ -841,41 +887,131 @@
                 // Detect silence (matches client algorithm)
                 const isSilent = detectSilence(audioData);
                 
-                log(`Audio chunk: ${audioData.length} samples, RMS: ${lastAudioLevel.toFixed(4)}, Silent: ${isSilent}`);
-                
-                // Speech activity detection (matches client logic)
+                // Speech activity detection for streaming mode
                 if (!isSilent) {
+                    // Speech detected
+                    if (!isSpeaking) {
+                        // Start of speech
+                        isSpeaking = true;
+                        speechStartTime = Date.now();
+                        speechBuffer = []; // Start new speech segment
+                        log(`🗣️ Speech started at ${new Date().toLocaleTimeString()}`);
+                    }
+                    
+                    // Add audio data to current speech segment
+                    speechBuffer.push(...audioData);
+                    silenceCounter = 0;
                     silenceCounter = 0;
                     if (!isSpeaking) {
                         isSpeaking = true;
                         log('🎤 Speech started - detected speech activity');
                     }
                     
-                    // Add to ring buffer
-                    ringBuffer.push(audioData);
                 } else {
+                    // Silence detected
                     if (isSpeaking) {
                         silenceCounter++;
-                        log(`🔇 Silence counter: ${silenceCounter}/${config.silenceTimeout}`);
                         
-                        // Continue adding to buffer during silence (for context)
-                        ringBuffer.push(audioData);
+                        // Continue adding silence to speech segment (for natural endings)
+                        speechBuffer.push(...audioData);
                         
                         // Check if silence timeout reached
                         if (silenceCounter >= config.silenceTimeout) {
+                            // End of speech detected
+                            const speechDuration = speechBuffer.length / config.sampleRate;
+                            log(`🔇 Speech ended after ${speechDuration.toFixed(2)}s of audio (${speechBuffer.length} samples)`);
+                            
+                            // Check minimum speech duration
+                            if (speechBuffer.length >= config.minSpeechDuration * config.chunkSize) {
+                                log(`📤 Sending speech segment to API...`);
+                                processSpeechSegment([...speechBuffer]); // Copy the buffer (don't await in audio callback)
+                            } else {
+                                log(`⚠️ Speech too short (${speechDuration.toFixed(2)}s), skipping`);
+                            }
+                            
+                            // Reset for next speech segment
                             isSpeaking = false;
                             silenceCounter = 0;
-                            
-                            log('📦 Silence timeout reached - packaging speech segment');
-                            // Package and send speech segment
-                            packageAndSendSpeech();
+                            speechBuffer = [];
                         }
+                    } else {
+                        // Not speaking, just reset silence counter
+                        silenceCounter = 0;
                     }
                 }
                 
             } catch (error) {
-                log('Error processing audio chunk: ' + error.message);
-                console.error('Audio processing error:', error);
+                log('❌ Error processing streaming audio: ' + error.message);
+                console.error('Streaming audio processing error:', error);
+            }
+        }
+        
+        // Process detected speech segment and send to API
+        async function processSpeechSegment(speechData) {
+            try {
+                segmentCounter++;
+                const segmentId = segmentCounter;
+                
+                log(`📦 Processing speech segment ${segmentId}: ${speechData.length} samples (${(speechData.length / config.sampleRate).toFixed(2)}s)`);
+                
+                // Convert to Int16 (matches client conversion)
+                const int16Data = new Int16Array(speechData.length);
+                for (let i = 0; i < speechData.length; i++) {
+                    const scaled = Math.max(-1, Math.min(1, speechData[i])) * 32767;
+                    int16Data[i] = Math.max(-32768, Math.min(32767, scaled));
+                }
+                
+                // Save audio segment for playback (what was actually sent)
+                const audioSegment = saveAudioSegment(int16Data, segmentId);
+                sentAudioSegments.push(audioSegment);
+                
+                // Convert to base64 for API
+                const uint8Array = new Uint8Array(int16Data.buffer);
+                const audioBase64 = arrayToBase64(uint8Array);
+                
+                log(`   Base64 conversion: ${uint8Array.length} bytes → ${audioBase64.length} base64 chars`);
+                log(`🚀 Sending speech segment ${segmentId} to API...`);
+                
+                // Call API
+                const result = await callSpeechAPI(audioBase64, audioSegment, segmentId);
+                
+                return result;
+                
+            } catch (error) {
+                log(`❌ Error processing speech segment: ${error.message}`);
+                console.error('Speech segment processing error:', error);
+                return { success: false, error: error.message };
+            }
+        }
+        
+        // Helper function for base64 conversion (avoid stack overflow)
+        function arrayToBase64(uint8Array) {
+            try {
+                // Method 1: Chunked String.fromCharCode (most compatible)
+                let binaryString = '';
+                const chunkSize = 8192; // Process 8KB chunks to avoid stack overflow
+                
+                for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                    const chunk = uint8Array.slice(i, i + chunkSize);
+                    binaryString += String.fromCharCode.apply(null, chunk);
+                }
+                
+                return btoa(binaryString);
+                
+            } catch (error) {
+                log(`⚠️ Chunked conversion failed: ${error.message}, trying fallback...`);
+                
+                try {
+                    // Method 2: Fallback using reduce (slower but safer)
+                    const binaryString = Array.from(uint8Array)
+                        .map(byte => String.fromCharCode(byte))
+                        .join('');
+                    return btoa(binaryString);
+                    
+                } catch (fallbackError) {
+                    log(`❌ All base64 conversion methods failed: ${fallbackError.message}`);
+                    throw new Error(`Base64 conversion failed: ${fallbackError.message}`);
+                }
             }
         }
         
@@ -1062,11 +1198,22 @@
                 }
 
                 // Limit audio segment size (max 30 seconds at 16kHz)
-                const MAX_SAMPLES = 480000;
+                const MAX_SAMPLES = 480000; // 30 seconds * 16000 Hz
                 const limitedData = pcmData.length > MAX_SAMPLES ? 
                     pcmData.slice(0, MAX_SAMPLES) : pcmData;
+                
+                // Additional safety check for reasonable size
+                if (limitedData.length > MAX_SAMPLES) {
+                    log(`⚠️ Audio segment too large: ${limitedData.length} samples, truncating to ${MAX_SAMPLES}`);
+                }
+                
+                // Check for minimum size
+                if (limitedData.length < 1600) { // Less than 0.1 seconds
+                    log(`⚠️ Audio segment very small: ${limitedData.length} samples (${(limitedData.length / config.sampleRate).toFixed(3)}s)`);
+                }
 
                 log(`📦 Packaging PCM segment: ${limitedData.length} samples (${(limitedData.length / config.sampleRate).toFixed(2)}s)`);
+                log(`   Converting to Int16: ${limitedData.length} float32 → ${limitedData.length * 2} bytes`);
 
                 // Convert to Int16 (matches client conversion)
                 const int16Data = new Int16Array(limitedData.length);
@@ -1078,10 +1225,43 @@
                 // Save audio segment for playback
                 const audioSegment = saveAudioSegment(int16Data, segmentCounter);
 
-                // Convert to base64 (matches client)
+                // Convert to base64 (matches client) - avoid stack overflow for large arrays
                 const uint8Array = new Uint8Array(int16Data.buffer);
-                const audioBase64 = btoa(String.fromCharCode.apply(null, uint8Array));
+                
+                // Use chunked approach to avoid call stack issues
+                function arrayToBase64(uint8Array) {
+                    try {
+                        // Method 1: Chunked String.fromCharCode (most compatible)
+                        let binaryString = '';
+                        const chunkSize = 8192; // Process 8KB chunks to avoid stack overflow
+                        
+                        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                            const chunk = uint8Array.slice(i, i + chunkSize);
+                            binaryString += String.fromCharCode.apply(null, chunk);
+                        }
+                        
+                        return btoa(binaryString);
+                        
+                    } catch (error) {
+                        log(`⚠️ Chunked conversion failed: ${error.message}, trying fallback...`);
+                        
+                        try {
+                            // Method 2: Fallback using reduce (slower but safer)
+                            const binaryString = Array.from(uint8Array)
+                                .map(byte => String.fromCharCode(byte))
+                                .join('');
+                            return btoa(binaryString);
+                            
+                        } catch (fallbackError) {
+                            log(`❌ All base64 conversion methods failed: ${fallbackError.message}`);
+                            throw new Error(`Base64 conversion failed: ${fallbackError.message}`);
+                        }
+                    }
+                }
+                
+                const audioBase64 = arrayToBase64(uint8Array);
 
+                log(`   Base64 conversion: ${uint8Array.length} bytes → ${audioBase64.length} base64 chars`);
                 log(`🚀 Sending ${audioBase64.length} base64 chars to speechToTextWithLLM API`);
 
                 // Call API (will be implemented in next step)
@@ -1098,8 +1278,8 @@
             }
         }
         
-        // API integration function
-        async function callSpeechAPI(audioBase64, audioSegment) {
+        // API integration function for streaming mode
+        async function callSpeechAPI(audioBase64, audioSegment, segmentId) {
             try {
                 apiCallCounter++;
                 
@@ -1115,7 +1295,7 @@
                     languageCode: language
                 };
                 
-                log(`📡 API Call ${apiCallCounter}: Sending to speechToTextWithLLM`);
+                log(`📡 API Call ${apiCallCounter} (Segment ${segmentId}): Sending to speechToTextWithLLM`);
                 log(`   PWM: ${currentPwm}, Language: ${language}, Audio: ${audioBase64.length} chars`);
                 
                 updateStatus(`Making API call ${apiCallCounter}...`, 'info');
@@ -1166,13 +1346,14 @@
                 
                 // Store result with audio segment
                 const testResult = {
-                    segmentNumber: segmentCounter,
+                    segmentNumber: segmentId,
                     audioSegment: audioSegment,
                     apiResult: result,
                     timestamp: new Date().toISOString(),
                     apiCallNumber: apiCallCounter,
                     requestPwm: currentPwm,
-                    language: language
+                    language: language,
+                    detectionTime: speechStartTime ? new Date(speechStartTime).toLocaleTimeString() : 'Unknown'
                 };
                 
                 testResults.push(testResult);
@@ -1180,7 +1361,7 @@
                 // Update results display
                 displayResult(testResult);
                 
-                updateStatus(`API call ${apiCallCounter} completed`, 'success');
+                showSuccess(`✅ Speech segment ${segmentId} processed - API call ${apiCallCounter} completed`);
                 
                 return result;
                 
@@ -1204,6 +1385,37 @@
                 displayResult(errorResult);
                 
                 return { success: false, error: error.message };
+            }
+        }
+        
+        // Helper function for base64 conversion (avoid stack overflow)
+        function arrayToBase64(uint8Array) {
+            try {
+                // Method 1: Chunked String.fromCharCode (most compatible)
+                let binaryString = '';
+                const chunkSize = 8192; // Process 8KB chunks to avoid stack overflow
+                
+                for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                    const chunk = uint8Array.slice(i, i + chunkSize);
+                    binaryString += String.fromCharCode.apply(null, chunk);
+                }
+                
+                return btoa(binaryString);
+                
+            } catch (error) {
+                log(`⚠️ Chunked conversion failed: ${error.message}, trying fallback...`);
+                
+                try {
+                    // Method 2: Fallback using reduce (slower but safer)
+                    const binaryString = Array.from(uint8Array)
+                        .map(byte => String.fromCharCode(byte))
+                        .join('');
+                    return btoa(binaryString);
+                    
+                } catch (fallbackError) {
+                    log(`❌ All base64 conversion methods failed: ${fallbackError.message}`);
+                    throw new Error(`Base64 conversion failed: ${fallbackError.message}`);
+                }
             }
         }
         
@@ -1235,11 +1447,11 @@
             
             const titleSpan = document.createElement('span');
             titleSpan.className = 'result-title';
-            titleSpan.textContent = `API Call #${apiCallNumber} - Segment ${testResult.segmentNumber}`;
+            titleSpan.textContent = `🎙️ Auto-detected Speech #${testResult.segmentNumber} (API Call #${apiCallNumber})`;
             
             const timestampSpan = document.createElement('span');
             timestampSpan.className = 'result-timestamp';
-            timestampSpan.textContent = new Date(timestamp).toLocaleTimeString();
+            timestampSpan.textContent = `Detected: ${testResult.detectionTime || new Date(timestamp).toLocaleTimeString()}`;
             
             headerDiv.appendChild(titleSpan);
             headerDiv.appendChild(timestampSpan);
@@ -1248,11 +1460,12 @@
             const detailsDiv = document.createElement('div');
             detailsDiv.className = 'result-details';
             
-            // Audio info
-            const audioInfo = createDetailGroup('Audio Info', [
+            // Audio info (what was actually sent to API)
+            const audioInfo = createDetailGroup('Sent Audio Info', [
                 { label: 'Duration', value: `${audioSegment.duration.toFixed(2)}s` },
                 { label: 'Samples', value: audioSegment.sampleCount.toLocaleString() },
-                { label: 'Size', value: `${(audioSegment.audioBlob.size / 1024).toFixed(1)} KB` }
+                { label: 'Size', value: `${(audioSegment.audioBlob.size / 1024).toFixed(1)} KB` },
+                { label: 'Detection Method', value: 'Auto (Silence Detection)' }
             ]);
             
             // Request info
@@ -1420,26 +1633,12 @@
         
         function clearAllResults() {
             if (testResults.length === 0) {
-                alert('No test results to clear');
+                alert('No speech segments to clear');
                 return;
             }
             
-            if (confirm(`Clear all ${testResults.length} test results? This cannot be undone.`)) {
-                // Clean up audio URLs to prevent memory leaks
-                testResults.forEach(result => {
-                    if (result.audioSegment && result.audioSegment.audioUrl) {
-                        URL.revokeObjectURL(result.audioSegment.audioUrl);
-                    }
-                });
-                
-                testResults = [];
-                segmentCounter = 0;
-                apiCallCounter = 0;
-                
-                const resultsContainer = document.getElementById('resultsContainer');
-                resultsContainer.innerHTML = '<p style="text-align: center; color: #666; font-style: italic;">No test results yet. Start recording to see speech recognition results.</p>';
-                
-                log('🗑️ Cleared all test results');
+            if (confirm(`Clear all ${testResults.length} speech segments? This cannot be undone.`)) {
+                clearResults(); // Use the main clear function
             }
         }
         
@@ -1955,8 +2154,8 @@
             log(`Configuration: ${JSON.stringify(config, null, 2)}`);
             
             // Set up event listeners
-            document.getElementById('startBtn').addEventListener('click', startRecording);
-            document.getElementById('stopBtn').addEventListener('click', stopRecording);
+            document.getElementById('startStreamBtn').addEventListener('click', startStreaming);
+            document.getElementById('stopStreamBtn').addEventListener('click', stopStreaming);
             document.getElementById('testMicBtn').addEventListener('click', testMicrophone);
             document.getElementById('refreshDevicesBtn').addEventListener('click', refreshDeviceList);
             document.getElementById('troubleshootBtn').addEventListener('click', showTroubleshooting);
