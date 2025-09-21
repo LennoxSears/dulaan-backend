@@ -479,11 +479,12 @@ exports.speechToTextWithLLM = onRequest(
                 audioChannelCount: 1    // Mono audio
             };
 
-            // Set sample rate - prefer explicit rate, fallback to 16000 for raw PCM
+            // Set sample rate - required for raw PCM data (LINEAR16)
+            // Client sends raw PCM at 16000 Hz, not WAV files with headers
             if (req.body.sampleRateHertz) {
                 speechConfig.sampleRateHertz = req.body.sampleRateHertz;
-            } else if (req.body.encoding === 'LINEAR16') {
-                // For raw PCM data, we need to specify sample rate
+            } else {
+                // Default to 16000 Hz for raw PCM data from client
                 speechConfig.sampleRateHertz = 16000;
             }
 
