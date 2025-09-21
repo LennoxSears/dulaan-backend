@@ -183,14 +183,13 @@ class AudioProcessor {
                 this.audioState.ZERO_CROSSING
             );
 
-            // Speech activity detection (matches stream.js exactly)
+            // Speech activity detection (matches stream.js logic)
             if (!isSilent) {
                 this.audioState.silenceCounter = 0;
                 if (!this.audioState.isSpeaking) {
                     console.log(
-                        `变了=====================================`,
-                        `能量: ${this.audioState.lastRMS.toFixed(4)}`,
-                        `过零: ${this.audioState.lastZeroCrossings}`
+                        `[Speech Detected] Energy: ${this.audioState.lastRMS.toFixed(4)}, ` +
+                        `Zero crossings: ${this.audioState.lastZeroCrossings}`
                     );
                 }
                 this.audioState.isSpeaking = true;
@@ -198,10 +197,10 @@ class AudioProcessor {
                 this.audioState.silenceCounter++;
             }
 
-            // Write to ring buffer (matches stream.js exactly)
+            // Write to ring buffer (matches stream.js logic)
             const written = this.audioState.ringBuffer.push(pcmData);
             if (written < pcmData.length) {
-                console.warn("[警告] 缓冲区溢出，丢弃", pcmData.length - written, "采样点");
+                console.warn("Buffer overflow, discarding", pcmData.length - written, "samples");
                 this.audioState.ringBuffer.reset();
             }
 
@@ -236,10 +235,10 @@ class AudioProcessor {
             // Update chunk size
             this.audioState.lastChunkSize = pcmData.length;
             
-            // Write to ambient buffer (matches stream.js exactly)
+            // Write to ambient buffer (matches stream.js logic)
             const written = this.audioState.abiBuffer.push(pcmData);
             if (written < pcmData.length) {
-                console.warn("[警告] 缓冲区溢出，丢弃", pcmData.length - written, "采样点");
+                console.warn("ABI buffer overflow, discarding", pcmData.length - written, "samples");
                 this.audioState.abiBuffer.reset();
             }
         } catch (error) {
@@ -283,7 +282,7 @@ class AudioProcessor {
                 int16Data[i] = Math.max(-32768, Math.min(32767, scaled));
             }
 
-            console.log("[传输] PCM分段:", int16Data.length, "采样点"); // Match stream.js logging
+            console.log("[Speech Packaging] PCM segment:", int16Data.length, "samples");
 
             // Reset state (matches stream.js exactly)
             this.audioState.ringBuffer.reset();
@@ -338,10 +337,10 @@ class AudioProcessor {
         
         this.monitoringInterval = setInterval(() => {
             console.log(
-                `[监控] 缓冲区: ${this.audioState.ringBuffer.count}/${this.audioState.ringBuffer.size}`,
-                `静音计数: ${this.audioState.silenceCounter}`,
-                `能量: ${this.audioState.lastRMS.toFixed(4)}`,
-                `过零: ${this.audioState.lastZeroCrossings}`
+                `[Audio Monitor] Buffer: ${this.audioState.ringBuffer.count}/${this.audioState.ringBuffer.size}`,
+                `Silence: ${this.audioState.silenceCounter}`,
+                `Energy: ${this.audioState.lastRMS.toFixed(4)}`,
+                `Zero crossings: ${this.audioState.lastZeroCrossings}`
             );
         }, intervalMs);
     }
