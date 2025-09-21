@@ -10,18 +10,7 @@ export class AIVoiceControl {
 
         this.messageHistory = [];
         
-        // Audio state for streaming (using existing audio processor)
-        this.audioState = {
-            isSpeaking: false,
-            silenceCounter: 0,
-            SILENCE_THRESHOLD: 0.05,
-            ZERO_CROSSING: 0.1,
-            SILENCE_TIMEOUT: 25,
-            MIN_SPEECH_DURATION: 10,
-            lastChunkSize: 0,
-            lastRMS: 0,
-            lastZeroCrossings: 0
-        };
+        // No duplicate audio state - use sdk.audio.getAudioState() instead
     }
 
     async start() {
@@ -51,6 +40,9 @@ export class AIVoiceControl {
             this.isActive = true;
             this.setupSpeechProcessing();
             
+            // Start audio monitoring for debugging
+            this.sdk.audio.startMonitoring();
+            
             console.log('AI Voice Control started with streaming');
             return true;
         } catch (error) {
@@ -70,6 +62,10 @@ export class AIVoiceControl {
             await window.Capacitor.Plugins.VoiceRecorder.stopStreaming();
             
             this.cleanupSpeechProcessing();
+            
+            // Stop audio monitoring
+            this.sdk.audio.stopMonitoring();
+            
             this.isActive = false;
             
             console.log('AI Voice Control stopped');
@@ -165,6 +161,23 @@ export class AIVoiceControl {
 
     isRunning() {
         return this.isActive;
+    }
+    
+    getAudioState() {
+        return this.sdk.audio.getAudioState();
+    }
+    
+    getCurrentStats() {
+        const audioState = this.getAudioState();
+        return {
+            isActive: this.isActive,
+            isSpeaking: audioState.isSpeaking,
+            silenceCounter: audioState.silenceCounter,
+            bufferCount: audioState.ringBuffer.count,
+            bufferSize: audioState.ringBuffer.size,
+            lastRMS: audioState.lastRMS,
+            messageHistoryLength: this.messageHistory.length
+        };
     }
 }
 
