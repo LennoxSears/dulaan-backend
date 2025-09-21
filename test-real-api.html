@@ -89,6 +89,7 @@
         <button class="button" onclick="testSingleLanguage('english')" id="testEnBtn">🇺🇸 Test English</button>
         <button class="button" onclick="testSingleLanguage('spanish')" id="testEsBtn">🇪🇸 Test Spanish</button>
         <button class="button" onclick="testSingleLanguage('chinese')" id="testZhBtn">🇨🇳 Test Chinese</button>
+        <button class="button" onclick="testApiConnectivity()" id="testConnBtn">🔧 Test API Connectivity</button>
         <button class="button" onclick="clearOutput()">🗑️ Clear Output</button>
         
         <div id="test-output" class="test-output">
@@ -121,56 +122,131 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
         }
         
         function setButtonsEnabled(enabled) {
-            const buttons = ['runAllBtn', 'testEnBtn', 'testEsBtn', 'testZhBtn'];
+            const buttons = ['runAllBtn', 'testEnBtn', 'testEsBtn', 'testZhBtn', 'testConnBtn'];
             buttons.forEach(id => {
                 document.getElementById(id).disabled = !enabled;
             });
         }
         
-        // Generate realistic test audio data
+        // Test API connectivity with minimal request
+        async function testApiConnectivity() {
+            setButtonsEnabled(false);
+            
+            log(`\n🔧 Testing API Connectivity...`);
+            log(`📡 Endpoint: ${API_URL}`);
+            
+            try {
+                // Test with minimal valid request
+                const testRequest = {
+                    msgHis: [],
+                    audioBuffer: [0, 100, 0, -100, 0], // Minimal test audio
+                    currentPwm: 100,
+                    encoding: 'LINEAR16',
+                    sampleRateHertz: 16000,
+                    languageCode: 'en-US'
+                };
+                
+                log(`📦 Sending minimal test request...`);
+                
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testRequest)
+                });
+                
+                log(`📊 Response Status: ${response.status} ${response.statusText}`);
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    log(`✅ API is responding!`, 'success');
+                    log(`📄 Response structure: ${JSON.stringify(Object.keys(result))}`);
+                    log(`🔍 Success field: ${result.success}`);
+                    log(`🔍 Error field: ${result.error || 'none'}`);
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ API error: ${errorText}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Connection failed: ${error.message}`, 'error');
+            } finally {
+                setButtonsEnabled(true);
+            }
+        }
+        
+        // Generate test audio data - simplified for better speech recognition
         function generateTestAudio(duration, language) {
             const sampleRate = 16000;
             const samples = Math.floor(duration * sampleRate);
             const audioData = new Array(samples);
             
-            let baseFreq = 150;
-            let amplitude = 0.7;
+            // Use more speech-like frequencies and patterns
+            let baseFreq = 200; // Higher base frequency for better recognition
+            let amplitude = 0.5; // Lower amplitude to avoid clipping
             
             switch (language) {
                 case 'english':
-                    baseFreq = 160;
+                    baseFreq = 220; // A3 note
                     break;
                 case 'spanish':
-                    baseFreq = 155;
+                    baseFreq = 196; // G3 note
                     break;
                 case 'chinese':
-                    baseFreq = 170;
+                    baseFreq = 247; // B3 note
                     break;
             }
             
             for (let i = 0; i < samples; i++) {
                 const t = i / sampleRate;
                 
-                // Create speech-like waveform with harmonics
+                // Create more realistic speech pattern with vowel-like formants
                 let signal = 0;
+                
+                // Fundamental frequency
                 signal += Math.sin(2 * Math.PI * baseFreq * t) * amplitude;
-                signal += Math.sin(2 * Math.PI * baseFreq * 2 * t) * amplitude * 0.4;
-                signal += Math.sin(2 * Math.PI * baseFreq * 3 * t) * amplitude * 0.2;
                 
-                // Add formant-like resonances
-                signal += Math.sin(2 * Math.PI * (baseFreq + 200) * t) * amplitude * 0.3;
-                signal += Math.sin(2 * Math.PI * (baseFreq + 400) * t) * amplitude * 0.2;
+                // First formant (around 500-700 Hz for vowels)
+                signal += Math.sin(2 * Math.PI * (baseFreq * 2.5) * t) * amplitude * 0.6;
                 
-                // Natural envelope
-                const envelope = Math.sin(Math.PI * t / duration) * 0.8 + 0.2;
+                // Second formant (around 1000-1500 Hz for vowels)
+                signal += Math.sin(2 * Math.PI * (baseFreq * 5) * t) * amplitude * 0.4;
+                
+                // Third formant (around 2000-3000 Hz)
+                signal += Math.sin(2 * Math.PI * (baseFreq * 10) * t) * amplitude * 0.2;
+                
+                // Add speech-like modulation
+                const modulation = 1 + 0.1 * Math.sin(2 * Math.PI * 5 * t); // 5 Hz modulation
+                signal *= modulation;
+                
+                // Natural envelope with attack and decay
+                let envelope = 1;
+                const attackTime = 0.1; // 100ms attack
+                const decayTime = 0.1;  // 100ms decay
+                
+                if (t < attackTime) {
+                    envelope = t / attackTime;
+                } else if (t > duration - decayTime) {
+                    envelope = (duration - t) / decayTime;
+                }
+                
                 signal *= envelope;
                 
-                // Add realistic noise
-                signal += (Math.random() - 0.5) * 0.1;
+                // Add minimal noise for realism
+                signal += (Math.random() - 0.5) * 0.05;
                 
-                // Convert to Int16 range
-                audioData[i] = Math.max(-32768, Math.min(32767, Math.round(signal * 16000)));
+                // Convert to Int16 range with proper scaling
+                audioData[i] = Math.max(-32768, Math.min(32767, Math.round(signal * 20000)));
             }
+            
+            // Validate audio data
+            const minVal = Math.min(...audioData);
+            const maxVal = Math.max(...audioData);
+            const avgVal = audioData.reduce((a, b) => a + b, 0) / audioData.length;
+            const rms = Math.sqrt(audioData.reduce((sum, val) => sum + val * val, 0) / audioData.length);
+            
+            console.log(`Generated ${language} audio: ${samples} samples, range: ${minVal} to ${maxVal}, avg: ${avgVal.toFixed(2)}, RMS: ${rms.toFixed(2)}`);
             
             return audioData;
         }
@@ -224,6 +300,7 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
                 };
                 
                 log(`   📦 Request payload size: ${JSON.stringify(requestBody).length} bytes`);
+                log(`   🔍 Request structure: msgHis=${requestBody.msgHis.length}, audioBuffer=${requestBody.audioBuffer.length}, currentPwm=${requestBody.currentPwm}, encoding=${requestBody.encoding}, sampleRate=${requestBody.sampleRateHertz}, lang=${requestBody.languageCode}`);
                 
                 const response = await fetch(API_URL, {
                     method: 'POST',
@@ -243,6 +320,7 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
                 const result = await response.json();
                 
                 log(`   ✅ API call successful`, 'success');
+                log(`   📄 Full response: ${JSON.stringify(result, null, 2)}`);
                 log(`   🎤 Transcription: "${result.transcription || 'N/A'}"`);
                 log(`   🤖 Response: "${result.response || 'N/A'}"`);
                 log(`   ⚡ PWM: ${result.previousPwm || currentPwm} → ${result.newPwmValue || currentPwm}`);
