@@ -196,7 +196,11 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
                 });
                 
                 log(`✅ Microphone access granted`, 'success');
-                log(`🎙️ Please say "turn it up" clearly and wait...`);
+                log(`🎙️ Please say a motor control command in any language:`, 'info');
+                log(`   🇺🇸 English: "turn it up" / "make it stronger"`);
+                log(`   🇪🇸 Spanish: "más fuerte" / "aumenta la potencia"`);
+                log(`   🇨🇳 Chinese: "加强" / "增加功率"`);
+                log(`   🌍 Or any motor control command in your language...`);
                 
                 // Create audio context and recorder
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
@@ -220,7 +224,19 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
                 source.connect(processor);
                 processor.connect(audioContext.destination);
                 
-                // Record for 3 seconds
+                // Countdown for user
+                let countdown = 3;
+                const countdownInterval = setInterval(() => {
+                    if (countdown > 0) {
+                        log(`🎙️ Recording in ${countdown}...`);
+                        countdown--;
+                    } else {
+                        log(`🔴 Recording now! Speak your command...`, 'success');
+                        clearInterval(countdownInterval);
+                    }
+                }, 1000);
+                
+                // Record for 4 seconds (1 second countdown + 3 seconds recording)
                 setTimeout(async () => {
                     recording = false;
                     stream.getTracks().forEach(track => track.stop());
@@ -229,27 +245,53 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
                     
                     log(`🎵 Recorded ${audioData.length} samples (${(audioData.length / 16000).toFixed(2)}s)`);
                     
-                    // Test with recorded audio
+                    // Test with recorded audio using auto language detection
                     try {
                         const result = await callRealApi(
                             audioData,
                             100,
                             [],
-                            'en-US',
-                            { language: 'English', command: 'Real microphone input' }
+                            'auto', // Use auto-detection instead of hardcoded language
+                            { language: 'Auto-detected', command: 'Real microphone input' }
                         );
                         
                         log(`\n📋 Real Microphone Test Results:`);
                         log(`   - Success: ${result.success ? '✅' : '❌'}`);
                         log(`   - Transcription: "${result.transcription || 'None'}"`);
+                        log(`   - Detected Language: ${result.detectedLanguage || 'Unknown'}`);
                         log(`   - Confidence: ${result.confidence ? (result.confidence * 100).toFixed(1) + '%' : 'N/A'}`);
+                        log(`   - Intent Detected: ${result.intentDetected ? '✅' : '❌'}`);
+                        log(`   - PWM Change: ${result.previousPwm || 100} → ${result.newPwmValue || 100}`);
+                        log(`   - Response: "${result.response || 'None'}"`);
+                        
+                        // Validate results
+                        const hasTranscription = result.transcription && result.transcription.length > 0;
+                        const hasLanguageDetection = result.detectedLanguage && result.detectedLanguage.length > 0;
+                        const intentDetected = result.intentDetected;
+                        const pwmChanged = result.newPwmValue !== (result.previousPwm || 100);
+                        const overallSuccess = result.success && hasTranscription && intentDetected;
+                        
+                        log(`\n📊 Microphone Test Validation:`);
+                        log(`   - Has transcription: ${hasTranscription ? '✅' : '❌'}`);
+                        log(`   - Language detected: ${hasLanguageDetection ? '✅' : '❌'}`);
+                        log(`   - Intent recognized: ${intentDetected ? '✅' : '❌'}`);
+                        log(`   - PWM changed: ${pwmChanged ? '✅' : '❌'}`);
+                        log(`   - Overall result: ${overallSuccess ? '✅ SUCCESS' : '❌ FAILED'}`, 
+                            overallSuccess ? 'success' : 'error');
+                        
+                        if (!overallSuccess && hasTranscription) {
+                            log(`\n💡 Tip: Try saying clearer motor control commands like:`, 'warning');
+                            log(`   🇺🇸 "turn it up", "make it stronger", "increase power"`);
+                            log(`   🇪🇸 "más fuerte", "aumenta la potencia"`);
+                            log(`   🇨🇳 "加强", "增加功率", "开大一点"`);
+                        }
                         
                     } catch (error) {
                         log(`❌ Real microphone test failed: ${error.message}`, 'error');
                     }
                     
                     setButtonsEnabled(true);
-                }, 3000);
+                }, 4000); // 1 second countdown + 3 seconds recording
                 
             } catch (error) {
                 log(`❌ Microphone access failed: ${error.message}`, 'error');
@@ -564,7 +606,11 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
                 });
                 
                 log(`✅ Microphone access granted`, 'success');
-                log(`🎙️ Please say "turn it up" clearly and wait...`);
+                log(`🎙️ Please say a motor control command in any language:`, 'info');
+                log(`   🇺🇸 English: "turn it up" / "make it stronger"`);
+                log(`   🇪🇸 Spanish: "más fuerte" / "aumenta la potencia"`);
+                log(`   🇨🇳 Chinese: "加强" / "增加功率"`);
+                log(`   🌍 Or any motor control command in your language...`);
                 
                 // Create audio context and recorder
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
@@ -588,7 +634,19 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
                 source.connect(processor);
                 processor.connect(audioContext.destination);
                 
-                // Record for 3 seconds
+                // Countdown for user
+                let countdown = 3;
+                const countdownInterval = setInterval(() => {
+                    if (countdown > 0) {
+                        log(`🎙️ Recording in ${countdown}...`);
+                        countdown--;
+                    } else {
+                        log(`🔴 Recording now! Speak your command...`, 'success');
+                        clearInterval(countdownInterval);
+                    }
+                }, 1000);
+                
+                // Record for 4 seconds (1 second countdown + 3 seconds recording)
                 setTimeout(async () => {
                     recording = false;
                     stream.getTracks().forEach(track => track.stop());
@@ -597,27 +655,53 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
                     
                     log(`🎵 Recorded ${audioData.length} samples (${(audioData.length / 16000).toFixed(2)}s)`);
                     
-                    // Test with recorded audio
+                    // Test with recorded audio using auto language detection
                     try {
                         const result = await callRealApi(
                             audioData,
                             100,
                             [],
-                            'en-US',
-                            { language: 'English', command: 'Real microphone input' }
+                            'auto', // Use auto-detection instead of hardcoded language
+                            { language: 'Auto-detected', command: 'Real microphone input' }
                         );
                         
                         log(`\n📋 Real Microphone Test Results:`);
                         log(`   - Success: ${result.success ? '✅' : '❌'}`);
                         log(`   - Transcription: "${result.transcription || 'None'}"`);
+                        log(`   - Detected Language: ${result.detectedLanguage || 'Unknown'}`);
                         log(`   - Confidence: ${result.confidence ? (result.confidence * 100).toFixed(1) + '%' : 'N/A'}`);
+                        log(`   - Intent Detected: ${result.intentDetected ? '✅' : '❌'}`);
+                        log(`   - PWM Change: ${result.previousPwm || 100} → ${result.newPwmValue || 100}`);
+                        log(`   - Response: "${result.response || 'None'}"`);
+                        
+                        // Validate results
+                        const hasTranscription = result.transcription && result.transcription.length > 0;
+                        const hasLanguageDetection = result.detectedLanguage && result.detectedLanguage.length > 0;
+                        const intentDetected = result.intentDetected;
+                        const pwmChanged = result.newPwmValue !== (result.previousPwm || 100);
+                        const overallSuccess = result.success && hasTranscription && intentDetected;
+                        
+                        log(`\n📊 Microphone Test Validation:`);
+                        log(`   - Has transcription: ${hasTranscription ? '✅' : '❌'}`);
+                        log(`   - Language detected: ${hasLanguageDetection ? '✅' : '❌'}`);
+                        log(`   - Intent recognized: ${intentDetected ? '✅' : '❌'}`);
+                        log(`   - PWM changed: ${pwmChanged ? '✅' : '❌'}`);
+                        log(`   - Overall result: ${overallSuccess ? '✅ SUCCESS' : '❌ FAILED'}`, 
+                            overallSuccess ? 'success' : 'error');
+                        
+                        if (!overallSuccess && hasTranscription) {
+                            log(`\n💡 Tip: Try saying clearer motor control commands like:`, 'warning');
+                            log(`   🇺🇸 "turn it up", "make it stronger", "increase power"`);
+                            log(`   🇪🇸 "más fuerte", "aumenta la potencia"`);
+                            log(`   🇨🇳 "加强", "增加功率", "开大一点"`);
+                        }
                         
                     } catch (error) {
                         log(`❌ Real microphone test failed: ${error.message}`, 'error');
                     }
                     
                     setButtonsEnabled(true);
-                }, 3000);
+                }, 4000); // 1 second countdown + 3 seconds recording
                 
             } catch (error) {
                 log(`❌ Microphone access failed: ${error.message}`, 'error');

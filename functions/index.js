@@ -499,19 +499,35 @@ exports.speechToTextWithLLM = onRequest(
                     sampleRateHertz: req.body.sampleRateHertz || 16000
                 };
 
-                // Enable automatic language detection if no languageCode provided
-                if (req.body.languageCode) {
+                // Enable automatic language detection
+                if (req.body.languageCode && req.body.languageCode !== 'auto') {
+                    // Use specific language if provided
                     speechConfig.languageCode = req.body.languageCode;
                 } else {
-                    speechConfig.languageCode = 'en-US';
+                    // Enable automatic language detection with comprehensive language list
+                    speechConfig.languageCode = 'en-US'; // Primary language
                     speechConfig.alternativeLanguageCodes = [
-                        'en-GB', 'es-ES', 'fr-FR', 'de-DE', 'it-IT', 'pt-PT', 
-                        'ru-RU', 'ja-JP', 'ko-KR', 'zh-CN', 'zh-TW', 'ar-SA', 
-                        'hi-IN', 'nl-NL', 'sv-SE', 'da-DK', 'no-NO', 'fi-FI', 
-                        'pl-PL', 'cs-CZ', 'hu-HU', 'tr-TR', 'he-IL', 'th-TH',
-                        'vi-VN', 'id-ID', 'ms-MY', 'tl-PH', 'uk-UA', 'bg-BG',
-                        'hr-HR', 'sk-SK', 'sl-SI', 'et-EE', 'lv-LV', 'lt-LT'
+                        // Major languages for motor control commands
+                        'zh-CN', 'zh-TW', 'zh-HK', // Chinese variants
+                        'es-ES', 'es-MX', 'es-AR', // Spanish variants
+                        'en-GB', 'en-AU', 'en-CA', // English variants
+                        'fr-FR', 'fr-CA', // French
+                        'de-DE', 'de-AT', // German
+                        'it-IT', 'pt-PT', 'pt-BR', // Italian, Portuguese
+                        'ru-RU', 'ja-JP', 'ko-KR', // Russian, Japanese, Korean
+                        'ar-SA', 'ar-EG', // Arabic
+                        'hi-IN', 'th-TH', 'vi-VN', // Hindi, Thai, Vietnamese
+                        'nl-NL', 'sv-SE', 'da-DK', 'no-NO', 'fi-FI', // Nordic
+                        'pl-PL', 'cs-CZ', 'hu-HU', 'tr-TR', // Eastern European
+                        'he-IL', 'id-ID', 'ms-MY', 'tl-PH', // Other languages
+                        'uk-UA', 'bg-BG', 'hr-HR', 'sk-SK', 'sl-SI',
+                        'et-EE', 'lv-LV', 'lt-LT'
                     ];
+                    
+                    logger.log('Using automatic language detection with comprehensive language list', {
+                        primaryLanguage: speechConfig.languageCode,
+                        alternativeLanguagesCount: speechConfig.alternativeLanguageCodes.length
+                    });
                 }
 
                 const speechRequest = { 
