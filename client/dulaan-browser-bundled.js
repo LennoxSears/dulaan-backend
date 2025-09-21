@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-21T05:32:52.678Z
+ * Generated on: 2025-09-21T05:48:01.563Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -2094,6 +2094,7 @@ class AIVoiceControl {
             );
             
             if (result.success) {
+                console.log(result)
                 // Update motor based on AI response
                 await this.sdk.motor.write(result.newPwmValue);
                 
