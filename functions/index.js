@@ -443,10 +443,10 @@ exports.speechToTextWithLLM = onRequest(
             }
 
             // Validate required fields
-            const { msgHis, audioBuffer, audioUri, currentPwm } = req.body;
+            const { msgHis, audioBuffer, audioUri, currentPwm, testMode, testTranscript } = req.body;
 
-            // Check if audio data is provided
-            if (!audioBuffer && !audioUri) {
+            // Check if audio data is provided (unless in test mode)
+            if (!testMode && !audioBuffer && !audioUri) {
                 return res.status(400).json({ 
                     error: 'Missing audio data. Provide either audioBuffer (Int16Array) or audioUri.' 
                 });
@@ -471,7 +471,18 @@ exports.speechToTextWithLLM = onRequest(
             let confidence = 0;
             let detectedLanguage = null;
 
-            if (audioBuffer) {
+            // Test mode: skip speech recognition and use provided transcript
+            if (testMode && testTranscript) {
+                transcript = testTranscript;
+                confidence = 0.95; // High confidence for test
+                detectedLanguage = req.body.languageCode || 'en-US';
+                
+                logger.log('Test mode: using provided transcript', {
+                    testTranscript: transcript,
+                    confidence: confidence,
+                    detectedLanguage: detectedLanguage
+                });
+            } else if (audioBuffer) {
                 // Convert audioBuffer array to Int16Array buffer (from stream.js approach)
                 const int16Data = new Int16Array(audioBuffer);
                 
