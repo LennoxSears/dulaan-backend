@@ -648,16 +648,53 @@ New user speech: "${transcript}"
 IMPORTANT RULES:
 1. ONLY change PWM if the user clearly requests a motor control action
 2. If the user's speech is unclear, unrelated, or not about motor control, keep PWM at current value
-3. Motor control keywords: up, down, increase, decrease, faster, slower, stop, start, on, off, more, less, stronger, weaker
-4. If no clear motor control intent is detected, return current PWM value unchanged
+3. Always detect motor control intent when user mentions intensity modifiers
 
-Respond with a JSON object containing:
-- "response": Your natural language response to the user
-- "pwm": New PWM value (0-255) - ONLY change if clear motor control intent detected, otherwise use current value ${currentPwm}
-- "reasoning": Brief explanation of why you chose this PWM value
-- "intentDetected": true/false - whether clear motor control intent was detected
+MOTOR CONTROL KEYWORDS:
+- Direction: up, down, increase, decrease, faster, slower, more, less, stronger, weaker
+- State: stop, start, on, off, turn on, turn off
+- Intensity Modifiers: a little, little bit, slightly, much, way more, huge, massive, tiny, small, big
 
-PWM Ranges:
+RELATIVE INTENSITY CHANGES:
+When user says intensity modifiers, apply these PWM changes:
+
+SMALL INCREASES (+):
+- "a little harder/faster/more" → +15-25 PWM
+- "little bit up/stronger" → +15-25 PWM  
+- "slightly more/faster" → +10-20 PWM
+- "just a bit more" → +10-15 PWM
+
+MEDIUM INCREASES (+):
+- "much harder/faster" → +30-50 PWM
+- "way more/stronger" → +40-60 PWM
+- "more power" → +25-40 PWM
+
+LARGE INCREASES (+):
+- "huge increase" → +60-80 PWM
+- "massive/maximum" → +80-100 PWM
+- "full power" → set to 255
+
+SMALL DECREASES (-):
+- "a little slower/less" → -15-25 PWM
+- "little bit down/weaker" → -15-25 PWM
+- "slightly less/slower" → -10-20 PWM
+
+MEDIUM DECREASES (-):
+- "much slower/less" → -30-50 PWM
+- "way less power" → -40-60 PWM
+
+LARGE DECREASES (-):
+- "huge decrease" → -60-80 PWM
+- "way down" → -80-100 PWM
+
+ABSOLUTE COMMANDS:
+- "stop/off" → PWM = 0
+- "start/on" → PWM = 100 (if currently 0)
+- "maximum/full" → PWM = 255
+- "medium" → PWM = 125
+- "low" → PWM = 75
+
+PWM RANGES:
 - 0 = motor off
 - 1-50 = very low intensity
 - 51-100 = low intensity  
@@ -665,12 +702,22 @@ PWM Ranges:
 - 151-200 = high intensity
 - 201-255 = maximum intensity
 
-Examples:
-- "turn it up" → increase PWM
-- "make it slower" → decrease PWM  
-- "stop" → PWM = 0
-- "hello" → keep current PWM (no motor intent)
-- "what time is it" → keep current PWM (no motor intent)`;
+EXAMPLES:
+- "make it a little harder" (current: 100) → PWM = 120 (intentDetected: true)
+- "much faster please" (current: 80) → PWM = 120 (intentDetected: true)
+- "just slightly more" (current: 150) → PWM = 165 (intentDetected: true)
+- "way less power" (current: 200) → PWM = 150 (intentDetected: true)
+- "huge increase" (current: 100) → PWM = 170 (intentDetected: true)
+- "stop it now" → PWM = 0 (intentDetected: true)
+- "hello there" → PWM = ${currentPwm} (intentDetected: false)
+
+Respond with a JSON object containing:
+- "response": Your natural language response to the user
+- "pwm": New PWM value (0-255) - Apply intensity changes as specified above
+- "reasoning": Brief explanation of why you chose this PWM value and what change you applied
+- "intentDetected": true/false - whether clear motor control intent was detected
+
+ALWAYS apply PWM changes when intensity modifiers are detected, even if the base command seems unclear.`;
 
             const result = await model.generateContent(prompt);
             const responseText = result.response.text();
