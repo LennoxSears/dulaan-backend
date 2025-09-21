@@ -1062,11 +1062,22 @@
                 }
 
                 // Limit audio segment size (max 30 seconds at 16kHz)
-                const MAX_SAMPLES = 480000;
+                const MAX_SAMPLES = 480000; // 30 seconds * 16000 Hz
                 const limitedData = pcmData.length > MAX_SAMPLES ? 
                     pcmData.slice(0, MAX_SAMPLES) : pcmData;
+                
+                // Additional safety check for reasonable size
+                if (limitedData.length > MAX_SAMPLES) {
+                    log(`⚠️ Audio segment too large: ${limitedData.length} samples, truncating to ${MAX_SAMPLES}`);
+                }
+                
+                // Check for minimum size
+                if (limitedData.length < 1600) { // Less than 0.1 seconds
+                    log(`⚠️ Audio segment very small: ${limitedData.length} samples (${(limitedData.length / config.sampleRate).toFixed(3)}s)`);
+                }
 
                 log(`📦 Packaging PCM segment: ${limitedData.length} samples (${(limitedData.length / config.sampleRate).toFixed(2)}s)`);
+                log(`   Converting to Int16: ${limitedData.length} float32 → ${limitedData.length * 2} bytes`);
 
                 // Convert to Int16 (matches client conversion)
                 const int16Data = new Int16Array(limitedData.length);
@@ -1078,10 +1089,43 @@
                 // Save audio segment for playback
                 const audioSegment = saveAudioSegment(int16Data, segmentCounter);
 
-                // Convert to base64 (matches client)
+                // Convert to base64 (matches client) - avoid stack overflow for large arrays
                 const uint8Array = new Uint8Array(int16Data.buffer);
-                const audioBase64 = btoa(String.fromCharCode.apply(null, uint8Array));
+                
+                // Use chunked approach to avoid call stack issues
+                function arrayToBase64(uint8Array) {
+                    try {
+                        // Method 1: Chunked String.fromCharCode (most compatible)
+                        let binaryString = '';
+                        const chunkSize = 8192; // Process 8KB chunks to avoid stack overflow
+                        
+                        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                            const chunk = uint8Array.slice(i, i + chunkSize);
+                            binaryString += String.fromCharCode.apply(null, chunk);
+                        }
+                        
+                        return btoa(binaryString);
+                        
+                    } catch (error) {
+                        log(`⚠️ Chunked conversion failed: ${error.message}, trying fallback...`);
+                        
+                        try {
+                            // Method 2: Fallback using reduce (slower but safer)
+                            const binaryString = Array.from(uint8Array)
+                                .map(byte => String.fromCharCode(byte))
+                                .join('');
+                            return btoa(binaryString);
+                            
+                        } catch (fallbackError) {
+                            log(`❌ All base64 conversion methods failed: ${fallbackError.message}`);
+                            throw new Error(`Base64 conversion failed: ${fallbackError.message}`);
+                        }
+                    }
+                }
+                
+                const audioBase64 = arrayToBase64(uint8Array);
 
+                log(`   Base64 conversion: ${uint8Array.length} bytes → ${audioBase64.length} base64 chars`);
                 log(`🚀 Sending ${audioBase64.length} base64 chars to speechToTextWithLLM API`);
 
                 // Call API (will be implemented in next step)
