@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 
 /**
- * Command-line test runner for speech pipeline
- * Simulates the entire audio processing pipeline with three language test cases
+ * Real API Test Runner for Speech Pipeline
+ * Tests the actual Firebase function with three language audio samples
  */
 
-console.log('🚀 Speech Pipeline Test - Multi-language Motor Commands\n');
+// Add fetch polyfill for Node.js if needed
+if (typeof fetch === 'undefined') {
+    global.fetch = require('node-fetch');
+}
+
+console.log('🚀 Real API Speech Pipeline Test - Multi-language Motor Commands\n');
 
 // Test cases with manually generated audio data
 const testCases = [
@@ -71,74 +76,57 @@ function generateTestAudio(samples, language) {
     return audioData;
 }
 
-// Simulate the speechToTextWithLLM API processing
-async function simulateApiProcessing(audioBuffer, currentPwm, msgHis, languageCode, testCase) {
-    console.log(`🔄 Processing ${testCase.language} audio...`);
+// Real API call to speechToTextWithLLM Firebase function
+async function callRealApi(audioBuffer, currentPwm, msgHis, languageCode, testCase) {
+    console.log(`🔄 Calling real API for ${testCase.language} audio...`);
     console.log(`   - Audio buffer: ${audioBuffer.length} samples`);
     console.log(`   - Duration: ${(audioBuffer.length / 16000).toFixed(2)}s`);
     console.log(`   - Current PWM: ${currentPwm}`);
+    console.log(`   - Language code: ${languageCode}`);
     
-    // Simulate server-side Int16Array conversion
-    const int16Data = new Int16Array(audioBuffer);
-    console.log(`   ✅ Server converted to Int16Array: ${int16Data.length} samples`);
-    console.log(`   ✅ Buffer size: ${int16Data.buffer.byteLength} bytes`);
+    const apiUrl = 'https://speechtotextwithllm-qveg3gkwxa-ew.a.run.app';
     
-    // Simulate speech recognition results
-    let transcript = '';
-    let confidence = 0.85;
-    
-    switch (languageCode) {
-        case 'en-US':
-            transcript = 'turn it up';
-            break;
-        case 'es-ES':
-            transcript = 'más fuerte';
-            break;
-        case 'zh-CN':
-            transcript = '加强';
-            break;
+    try {
+        console.log(`   📡 Making API request to: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                msgHis: msgHis,
+                audioBuffer: audioBuffer, // Send Int16Array as regular array
+                currentPwm: currentPwm,
+                encoding: 'LINEAR16',
+                sampleRateHertz: 16000,
+                languageCode: languageCode
+            })
+        });
+        
+        console.log(`   📊 API Response Status: ${response.status} ${response.statusText}`);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`API error ${response.status}: ${errorText}`);
+        }
+        
+        const result = await response.json();
+        
+        console.log(`   ✅ API call successful`);
+        console.log(`   🎤 Transcription: "${result.transcription || 'N/A'}"`);
+        console.log(`   🤖 Response: "${result.response || 'N/A'}"`);
+        console.log(`   ⚡ PWM: ${result.previousPwm || currentPwm} → ${result.newPwmValue || currentPwm}`);
+        console.log(`   🎯 Intent detected: ${result.intentDetected || false}`);
+        console.log(`   📈 Confidence: ${result.confidence ? (result.confidence * 100).toFixed(1) + '%' : 'N/A'}`);
+        console.log(`   🌍 Detected language: ${result.detectedLanguage || 'N/A'}`);
+        
+        return result;
+        
+    } catch (error) {
+        console.error(`   ❌ API call failed: ${error.message}`);
+        throw error;
     }
-    
-    console.log(`   🎤 Speech-to-Text: "${transcript}" (${(confidence * 100).toFixed(1)}% confidence)`);
-    
-    // Simulate LLM processing
-    const intentDetected = confidence > 0.3;
-    const newPwmValue = intentDetected ? Math.min(255, currentPwm + 50) : currentPwm;
-    
-    let response = '';
-    switch (languageCode) {
-        case 'en-US':
-            response = 'Increasing motor power as requested.';
-            break;
-        case 'es-ES':
-            response = 'Aumentando la potencia del motor como solicitaste.';
-            break;
-        case 'zh-CN':
-            response = '正在按要求增加电机功率。';
-            break;
-    }
-    
-    console.log(`   🤖 LLM Response: "${response}"`);
-    console.log(`   ⚡ PWM Control: ${currentPwm} → ${newPwmValue} (${intentDetected ? 'Intent detected' : 'No intent'})`);
-    
-    return {
-        success: true,
-        transcription: transcript,
-        response: response,
-        reasoning: intentDetected ? 'Clear motor control command detected' : 'No clear intent detected',
-        newPwmValue: newPwmValue,
-        previousPwm: currentPwm,
-        intentDetected: intentDetected,
-        msgHis: [...msgHis, {
-            user: transcript,
-            assistant: response,
-            pwm: newPwmValue,
-            intentDetected: intentDetected,
-            timestamp: new Date().toISOString()
-        }],
-        detectedLanguage: languageCode,
-        confidence: confidence
-    };
 }
 
 // Main test runner
@@ -170,8 +158,8 @@ async function runTests() {
             const audioData = generateTestAudio(testCase.audioSamples, testCase.language);
             console.log(`📡 Generated ${testCase.language} audio: ${audioData.length} samples`);
             
-            // Process through pipeline
-            const result = await simulateApiProcessing(
+            // Process through real API
+            const result = await callRealApi(
                 audioData,
                 currentPwm,
                 messageHistory,
@@ -180,12 +168,19 @@ async function runTests() {
             );
             
             // Validate results
+            const hasTranscription = result.transcription && result.transcription.length > 0;
+            const hasResponse = result.response && result.response.length > 0;
             const pwmIncreased = result.newPwmValue > result.previousPwm;
             const intentMatches = result.intentDetected === testCase.expectedIntent;
             const pwmChangeMatches = (testCase.expectedPwmChange === 'increase') === pwmIncreased;
-            const overallSuccess = intentMatches && pwmChangeMatches;
+            const hasConfidence = result.confidence !== undefined && result.confidence > 0;
+            const overallSuccess = result.success && hasTranscription && intentMatches && pwmChangeMatches;
             
             console.log(`\n📋 Validation Results:`);
+            console.log(`   - API success: ${result.success ? '✅ PASS' : '❌ FAIL'}`);
+            console.log(`   - Has transcription: ${hasTranscription ? '✅ PASS' : '❌ FAIL'}`);
+            console.log(`   - Has response: ${hasResponse ? '✅ PASS' : '❌ FAIL'}`);
+            console.log(`   - Has confidence: ${hasConfidence ? '✅ PASS' : '❌ FAIL'}`);
             console.log(`   - Intent detection: ${intentMatches ? '✅ PASS' : '❌ FAIL'}`);
             console.log(`   - PWM change direction: ${pwmChangeMatches ? '✅ PASS' : '❌ FAIL'}`);
             console.log(`   - Overall result: ${overallSuccess ? '✅ SUCCESS' : '❌ FAILED'}`);
@@ -230,16 +225,16 @@ async function runTests() {
         console.log(`   ${status} Test ${index + 1} (${result.testCase.language}): "${result.testCase.command}"`);
     });
     
-    console.log(`\n🔧 Pipeline Verification:`);
+    console.log(`\n🔧 Real API Pipeline Verification:`);
     console.log(`   ✅ Audio data generation: Working`);
-    console.log(`   ✅ Int16Array conversion: Working`);
-    console.log(`   ✅ Speech recognition simulation: Working`);
-    console.log(`   ✅ LLM processing simulation: Working`);
+    console.log(`   ✅ Int16Array transmission: Working`);
+    console.log(`   ✅ Real Google Speech-to-Text API: ${passedTests > 0 ? 'Working' : 'Check API'}`);
+    console.log(`   ✅ Real Google Gemini LLM API: ${passedTests > 0 ? 'Working' : 'Check API'}`);
     console.log(`   ✅ PWM control logic: Working`);
-    console.log(`   ✅ Multi-language support: Working`);
+    console.log(`   ✅ Multi-language support: ${passedTests === totalTests ? 'Working' : 'Partial'}`);
     
-    console.log(`\n🏁 Test completed successfully!`);
-    console.log(`\n💡 The pipeline is ready for real audio data testing.`);
+    console.log(`\n🏁 Real API test completed!`);
+    console.log(`\n💡 ${passedTests === totalTests ? 'All systems operational!' : 'Some issues detected - check logs above.'}`);
     
     return testResults;
 }
