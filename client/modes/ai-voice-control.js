@@ -110,6 +110,7 @@ export class AIVoiceControl {
             );
             
             if (result.success) {
+                console.log(result)
                 // Update motor based on AI response
                 await this.sdk.motor.write(result.newPwmValue);
                 

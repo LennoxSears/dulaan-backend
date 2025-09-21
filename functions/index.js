@@ -511,7 +511,7 @@ exports.speechToTextWithLLM = onRequest(
                 .join('\n');
 
             if (!transcript) {
-                return res.status(400).json({
+                return res.status(200).json({
                     success: false,
                     error: 'No speech detected in audio',
                     transcription: '',
