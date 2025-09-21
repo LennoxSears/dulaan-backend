@@ -1,0 +1,1974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech-to-Text Accuracy Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        label {
+            font-weight: bold;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        input, select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .audio-visualizer {
+            width: 100%;
+            height: 100px;
+            background-color: #000;
+            border-radius: 6px;
+            margin: 20px 0;
+            position: relative;
+        }
+        
+        .audio-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .info-card {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .result-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #28a745;
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .result-title {
+            font-weight: bold;
+            color: #333;
+            font-size: 16px;
+        }
+        
+        .result-timestamp {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .result-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .detail-group {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 4px;
+            border-left: 3px solid #007bff;
+        }
+        
+        .detail-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        
+        .detail-value {
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .detail-value.transcription {
+            font-style: italic;
+            background: #fff;
+            padding: 8px;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+            margin-top: 4px;
+        }
+        
+        .confidence-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #dc3545 0%, #ffc107 50%, #28a745 100%);
+            transition: width 0.3s ease;
+        }
+        
+        .info-card h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .info-card .value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .results {
+            margin-top: 30px;
+        }
+        
+        .result-item {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .result-title {
+            font-weight: bold;
+            color: #333;
+            font-size: 16px;
+        }
+        
+        .result-timestamp {
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .result-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        
+        .detail-group {
+            background-color: white;
+            padding: 12px;
+            border-radius: 4px;
+            border-left: 3px solid #28a745;
+        }
+        
+        .detail-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .detail-value {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .transcription {
+            font-style: italic;
+            color: #007bff;
+        }
+        
+        .audio-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 10px;
+        }
+        
+        .audio-player {
+            flex: 1;
+        }
+        
+        .confidence-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #dc3545 0%, #ffc107 50%, #28a745 100%);
+            transition: width 0.3s ease;
+        }
+        
+        .log {
+            background-color: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .control-group {
+                width: 100%;
+            }
+            
+            .audio-info {
+                grid-template-columns: 1fr;
+            }
+            
+            .result-details {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Speech-to-Text Accuracy Test</h1>
+        
+        <!-- Status Display -->
+        <div id="status" class="status info">
+            Initializing speech recognition test interface...
+        </div>
+        
+        <!-- Troubleshooting Section -->
+        <div id="troubleshooting" class="status warning" style="display: none;">
+            <h4>🔧 Microphone Troubleshooting</h4>
+            <ul style="text-align: left; margin: 10px 0;">
+                <li><strong>Chrome/Edge:</strong> Click the 🔒 lock icon in address bar → Allow microphone</li>
+                <li><strong>Firefox:</strong> Click the 🎤 microphone icon in address bar → Allow</li>
+                <li><strong>Safari:</strong> Safari menu → Settings → Websites → Microphone → Allow</li>
+                <li><strong>No microphone found:</strong> Check if microphone is connected and working</li>
+                <li><strong>Still not working:</strong> Try refreshing the page or restarting your browser</li>
+            </ul>
+            <button onclick="hideTroubleshooting()" class="btn btn-secondary" style="margin-top: 10px;">Hide Troubleshooting</button>
+        </div>
+        
+        <!-- Controls -->
+        <div class="controls">
+            <div class="control-group">
+                <label>Recording Control</label>
+                <button id="startBtn" class="btn-primary">🎤 Start Recording</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Stop Recording</label>
+                <button id="stopBtn" class="btn-danger" disabled>⏹️ Stop Recording</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Clear Results</label>
+                <button id="clearBtn" class="btn-secondary">🗑️ Clear All</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Current PWM</label>
+                <input type="number" id="currentPwm" value="150" min="0" max="255">
+            </div>
+            
+            <div class="control-group">
+                <label>Language</label>
+                <select id="language">
+                    <option value="en-US">English (US)</option>
+                    <option value="en-GB">English (UK)</option>
+                    <option value="es-ES">Spanish</option>
+                    <option value="fr-FR">French</option>
+                    <option value="de-DE">German</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Microphone</label>
+                <select id="deviceSelect">
+                    <option value="">Detecting devices...</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Audio Test</label>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button id="testMicBtn" class="btn btn-secondary">🎤 Test Microphone</button>
+                    <button id="refreshDevicesBtn" class="btn btn-secondary">🔄 Refresh Devices</button>
+                    <button id="troubleshootBtn" class="btn btn-secondary">🔧 Troubleshoot</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Audio Visualizer -->
+        <canvas id="visualizer" class="audio-visualizer"></canvas>
+        
+        <!-- Audio Information -->
+        <div class="audio-info">
+            <div class="info-card">
+                <h4>Recording Status</h4>
+                <div id="recordingStatus" class="value">Stopped</div>
+            </div>
+            
+            <div class="info-card">
+                <h4>Audio Level</h4>
+                <div id="audioLevel" class="value">0.000</div>
+            </div>
+            
+            <div class="info-card">
+                <h4>Speech Detected</h4>
+                <div id="speechStatus" class="value">No</div>
+            </div>
+            
+            <div class="info-card">
+                <h4>Recording Duration</h4>
+                <div id="duration" class="value">0.0s</div>
+            </div>
+            
+            <div class="info-card">
+                <h4>Segments Captured</h4>
+                <div id="segmentCount" class="value">0</div>
+            </div>
+            
+            <div class="info-card">
+                <h4>API Calls Made</h4>
+                <div id="apiCallCount" class="value">0</div>
+            </div>
+        </div>
+        
+        <!-- Results Section -->
+        <div class="results">
+            <h2>📊 Test Results</h2>
+            <div id="resultsContainer">
+                <p style="text-align: center; color: #666; font-style: italic;">
+                    No test results yet. Start recording to see speech recognition results.
+                </p>
+            </div>
+            
+            <div style="margin-top: 30px; text-align: center;">
+                <button onclick="downloadAllResults()" class="btn btn-secondary" style="margin-right: 10px;">
+                    📥 Download All Results (JSON)
+                </button>
+                <button onclick="clearAllResults()" class="btn btn-secondary">
+                    🗑️ Clear All Results
+                </button>
+            </div>
+        </div>
+        
+        <!-- Debug Log -->
+        <div class="log" id="debugLog"></div>
+    </div>
+
+    <script>
+        // Global variables will be added in next steps
+        let audioContext = null;
+        let mediaStream = null;
+        let audioProcessor = null;
+        let isRecording = false;
+        let recordingStartTime = null;
+        let audioSegments = [];
+        let testResults = [];
+        let segmentCounter = 0;
+        let apiCallCounter = 0;
+        
+        // Audio processing variables
+        let ringBuffer = null;
+        let silenceCounter = 0;
+        let isSpeaking = false;
+        let lastAudioLevel = 0;
+        
+        // Configuration
+        const config = {
+            sampleRate: 16000,
+            chunkSize: 1600, // 0.1 seconds
+            silenceThreshold: 0.05,
+            zeroCrossingThreshold: 0.1,
+            silenceTimeout: 25, // chunks
+            minSpeechDuration: 10 // chunks
+        };
+        
+        // Fake message history for testing
+        const msgHis = [
+            {
+                user: "turn it up",
+                assistant: "I'll increase the speed for you.",
+                pwm: 150,
+                timestamp: new Date(Date.now() - 60000).toISOString()
+            },
+            {
+                user: "that's good",
+                assistant: "Great! The motor is running at medium intensity.",
+                pwm: 150,
+                timestamp: new Date(Date.now() - 30000).toISOString()
+            }
+        ];
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeUI();
+            log('Speech-to-Text Accuracy Test initialized');
+            log('Configuration: ' + JSON.stringify(config, null, 2));
+        });
+        
+        function initializeUI() {
+            // Event listeners will be added in next steps
+            document.getElementById('startBtn').addEventListener('click', startRecording);
+            document.getElementById('stopBtn').addEventListener('click', stopRecording);
+            document.getElementById('clearBtn').addEventListener('click', clearResults);
+            
+            // Initialize visualizer
+            initializeVisualizer();
+        }
+        
+        function initializeVisualizer() {
+            const canvas = document.getElementById('visualizer');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            // Draw initial state
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#333';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Audio Visualizer - Start recording to see waveform', canvas.width / 2, canvas.height / 2);
+        }
+        
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('debugLog');
+            logElement.innerHTML += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+        }
+        
+        function updateUI() {
+            // Update recording duration
+            if (isRecording && recordingStartTime) {
+                const duration = (Date.now() - recordingStartTime) / 1000;
+                document.getElementById('duration').textContent = duration.toFixed(1) + 's';
+            }
+            
+            // Update audio level
+            document.getElementById('audioLevel').textContent = lastAudioLevel.toFixed(3);
+            
+            // Update speech status
+            document.getElementById('speechStatus').textContent = isSpeaking ? 'Yes' : 'No';
+            
+            // Update recording status
+            document.getElementById('recordingStatus').textContent = isRecording ? 'Recording' : 'Stopped';
+            
+            // Update counters
+            document.getElementById('segmentCount').textContent = segmentCounter;
+            document.getElementById('apiCallCount').textContent = apiCallCounter;
+        }
+        
+        // Ring Buffer implementation (matches client)
+        class RingBuffer {
+            constructor(size) {
+                this.buffer = new Float32Array(size);
+                this.size = size;
+                this.head = 0;
+                this.tail = 0;
+                this.count = 0;
+            }
+
+            push(data) {
+                const available = this.size - this.count;
+                const toWrite = Math.min(data.length, available);
+
+                const firstPart = Math.min(toWrite, this.size - this.tail);
+                this.buffer.set(data.subarray(0, firstPart), this.tail);
+
+                const secondPart = toWrite - firstPart;
+                if (secondPart > 0) {
+                    this.buffer.set(data.subarray(firstPart, firstPart + secondPart), 0);
+                }
+
+                this.tail = (this.tail + toWrite) % this.size;
+                this.count += toWrite;
+                return toWrite;
+            }
+
+            readAll() {
+                const out = new Float32Array(this.count);
+                const firstPart = Math.min(this.count, this.size - this.head);
+                out.set(this.buffer.subarray(this.head, this.head + firstPart));
+
+                if (this.count > firstPart) {
+                    out.set(this.buffer.subarray(0, this.count - firstPart), firstPart);
+                }
+                return out;
+            }
+
+            reset() {
+                this.head = 0;
+                this.tail = 0;
+                this.count = 0;
+            }
+        }
+
+        // Audio recording functions
+        async function startRecording() {
+            try {
+                log('Requesting microphone access...');
+                updateStatus('Requesting microphone access...', 'info');
+                
+                // Check if devices are available
+                if (availableDevices.length === 0) {
+                    const devicesDetected = await detectAudioDevicesWithFallback();
+                    if (!devicesDetected) {
+                        showError('No microphone available. Please connect a microphone and refresh the device list.');
+                        return;
+                    }
+                }
+                
+                // Request microphone access with specific device
+                const constraints = {
+                    audio: {
+                        deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+                        sampleRate: config.sampleRate,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                };
+                
+                log(`Using device: ${availableDevices.find(d => d.deviceId === selectedDeviceId)?.label || 'Default'}`);
+                mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                log('Microphone access granted');
+                
+                // Create audio context
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: config.sampleRate
+                });
+                
+                log(`Audio context created: ${audioContext.sampleRate} Hz`);
+                
+                // Create audio source
+                const source = audioContext.createMediaStreamSource(mediaStream);
+                
+                // Create script processor for audio processing
+                audioProcessor = audioContext.createScriptProcessor(config.chunkSize, 1, 1);
+                
+                // Initialize ring buffer
+                ringBuffer = new RingBuffer(480000 * 2); // 30 seconds at 16kHz
+                
+                // Audio processing callback
+                audioProcessor.onaudioprocess = function(event) {
+                    const inputBuffer = event.inputBuffer;
+                    const inputData = inputBuffer.getChannelData(0);
+                    
+                    // Process audio chunk
+                    processAudioChunk(inputData);
+                    
+                    // Update visualizer
+                    updateVisualizer(inputData);
+                };
+                
+                // Connect audio nodes
+                source.connect(audioProcessor);
+                audioProcessor.connect(audioContext.destination);
+                
+                // Update state
+                isRecording = true;
+                recordingStartTime = Date.now();
+                silenceCounter = 0;
+                isSpeaking = false;
+                
+                // Update UI
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                updateStatus('Recording... Speak into your microphone', 'success');
+                
+                log('Recording started successfully');
+                
+            } catch (error) {
+                log('Error starting recording: ' + error.message);
+                updateStatus('Error: ' + error.message, 'error');
+                console.error('Recording error:', error);
+            }
+        }
+        
+        async function stopRecording() {
+            try {
+                log('Stopping recording...');
+                
+                // Stop media stream
+                if (mediaStream) {
+                    mediaStream.getTracks().forEach(track => track.stop());
+                    mediaStream = null;
+                }
+                
+                // Disconnect audio processor
+                if (audioProcessor) {
+                    audioProcessor.disconnect();
+                    audioProcessor = null;
+                }
+                
+                // Close audio context
+                if (audioContext) {
+                    await audioContext.close();
+                    audioContext = null;
+                }
+                
+                // Process any remaining audio
+                if (ringBuffer && ringBuffer.count > 0) {
+                    log('Processing remaining audio buffer...');
+                    await packageAndSendSpeech();
+                }
+                
+                // Update state
+                isRecording = false;
+                recordingStartTime = null;
+                
+                // Update UI
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                updateStatus('Recording stopped', 'info');
+                
+                log('Recording stopped successfully');
+                
+            } catch (error) {
+                log('Error stopping recording: ' + error.message);
+                updateStatus('Error stopping recording: ' + error.message, 'error');
+                console.error('Stop recording error:', error);
+            }
+        }
+        
+        function clearResults() {
+            log('Clearing all results...');
+            
+            // Clear results
+            testResults = [];
+            audioSegments = [];
+            segmentCounter = 0;
+            apiCallCounter = 0;
+            
+            // Clear UI
+            document.getElementById('resultsContainer').innerHTML = `
+                <p style="text-align: center; color: #666; font-style: italic;">
+                    No test results yet. Start recording to see speech recognition results.
+                </p>
+            `;
+            
+            // Reset PWM
+            document.getElementById('currentPwm').value = '150';
+            
+            updateStatus('Results cleared', 'info');
+            log('All results cleared');
+        }
+        
+        // Audio processing functions (matches client algorithm)
+        function processAudioChunk(audioData) {
+            try {
+                // Calculate audio level for UI
+                lastAudioLevel = calculateRMS(audioData);
+                
+                // Detect silence (matches client algorithm)
+                const isSilent = detectSilence(audioData);
+                
+                log(`Audio chunk: ${audioData.length} samples, RMS: ${lastAudioLevel.toFixed(4)}, Silent: ${isSilent}`);
+                
+                // Speech activity detection (matches client logic)
+                if (!isSilent) {
+                    silenceCounter = 0;
+                    if (!isSpeaking) {
+                        isSpeaking = true;
+                        log('🎤 Speech started - detected speech activity');
+                    }
+                    
+                    // Add to ring buffer
+                    ringBuffer.push(audioData);
+                } else {
+                    if (isSpeaking) {
+                        silenceCounter++;
+                        log(`🔇 Silence counter: ${silenceCounter}/${config.silenceTimeout}`);
+                        
+                        // Continue adding to buffer during silence (for context)
+                        ringBuffer.push(audioData);
+                        
+                        // Check if silence timeout reached
+                        if (silenceCounter >= config.silenceTimeout) {
+                            isSpeaking = false;
+                            silenceCounter = 0;
+                            
+                            log('📦 Silence timeout reached - packaging speech segment');
+                            // Package and send speech segment
+                            packageAndSendSpeech();
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                log('Error processing audio chunk: ' + error.message);
+                console.error('Audio processing error:', error);
+            }
+        }
+        
+        function detectSilence(audioData) {
+            const rms = calculateRMS(audioData);
+            const zeroCrossings = calculateZeroCrossings(audioData);
+            
+            return rms < config.silenceThreshold && 
+                   zeroCrossings < config.zeroCrossingThreshold;
+        }
+        
+        function calculateRMS(audioData) {
+            let sum = 0;
+            for (let i = 0; i < audioData.length; i++) {
+                sum += audioData[i] * audioData[i];
+            }
+            return Math.sqrt(sum / audioData.length);
+        }
+        
+        function calculateZeroCrossings(audioData) {
+            let crossings = 0;
+            for (let i = 1; i < audioData.length; i++) {
+                if ((audioData[i] >= 0) !== (audioData[i - 1] >= 0)) {
+                    crossings++;
+                }
+            }
+            return crossings / audioData.length;
+        }
+        
+        function updateVisualizer(audioData) {
+            const canvas = document.getElementById('visualizer');
+            const ctx = canvas.getContext('2d');
+            
+            // Clear canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw waveform
+            ctx.strokeStyle = isSpeaking ? '#00ff00' : '#666';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            const sliceWidth = canvas.width / audioData.length;
+            let x = 0;
+            
+            for (let i = 0; i < audioData.length; i++) {
+                const v = audioData[i] * 0.5; // Scale down
+                const y = (v + 1) * canvas.height / 2; // Convert to canvas coordinates
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+                
+                x += sliceWidth;
+            }
+            
+            ctx.stroke();
+            
+            // Draw RMS level indicator
+            const rmsHeight = lastAudioLevel * canvas.height * 10; // Scale up for visibility
+            ctx.fillStyle = isSpeaking ? '#00ff0080' : '#66666680';
+            ctx.fillRect(canvas.width - 20, canvas.height - rmsHeight, 15, rmsHeight);
+            
+            // Draw silence threshold line
+            const thresholdY = canvas.height - (config.silenceThreshold * canvas.height * 10);
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width - 25, thresholdY);
+            ctx.lineTo(canvas.width, thresholdY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        // Audio saving and playback functions
+        function createAudioBlob(int16Data) {
+            // Create WAV file from Int16 data
+            const buffer = new ArrayBuffer(44 + int16Data.length * 2);
+            const view = new DataView(buffer);
+            
+            // WAV header
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+            
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + int16Data.length * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, config.sampleRate, true);
+            view.setUint32(28, config.sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, int16Data.length * 2, true);
+            
+            // Audio data
+            let offset = 44;
+            for (let i = 0; i < int16Data.length; i++) {
+                view.setInt16(offset, int16Data[i], true);
+                offset += 2;
+            }
+            
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+        
+        function saveAudioSegment(int16Data, segmentNumber) {
+            try {
+                // Create WAV blob
+                const audioBlob = createAudioBlob(int16Data);
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                // Store audio segment
+                const audioSegment = {
+                    segmentNumber: segmentNumber,
+                    audioBlob: audioBlob,
+                    audioUrl: audioUrl,
+                    duration: int16Data.length / config.sampleRate,
+                    timestamp: new Date().toISOString(),
+                    sampleCount: int16Data.length
+                };
+                
+                audioSegments.push(audioSegment);
+                
+                log(`💾 Audio segment ${segmentNumber} saved: ${int16Data.length} samples (${audioSegment.duration.toFixed(2)}s)`);
+                
+                return audioSegment;
+                
+            } catch (error) {
+                log('Error saving audio segment: ' + error.message);
+                console.error('Audio save error:', error);
+                return null;
+            }
+        }
+        
+        function createAudioPlayer(audioUrl, segmentNumber) {
+            const playerContainer = document.createElement('div');
+            playerContainer.className = 'audio-controls';
+            
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.src = audioUrl;
+            audio.className = 'audio-player';
+            
+            const downloadBtn = document.createElement('button');
+            downloadBtn.textContent = '💾 Download';
+            downloadBtn.className = 'btn-secondary';
+            downloadBtn.style.padding = '5px 10px';
+            downloadBtn.style.fontSize = '12px';
+            downloadBtn.onclick = () => {
+                const a = document.createElement('a');
+                a.href = audioUrl;
+                a.download = `speech-segment-${segmentNumber}-${Date.now()}.wav`;
+                a.click();
+            };
+            
+            const infoSpan = document.createElement('span');
+            infoSpan.textContent = `Segment ${segmentNumber}`;
+            infoSpan.style.fontSize = '12px';
+            infoSpan.style.color = '#666';
+            
+            playerContainer.appendChild(audio);
+            playerContainer.appendChild(downloadBtn);
+            playerContainer.appendChild(infoSpan);
+            
+            return playerContainer;
+        }
+        
+        // Speech packaging and API call function
+        async function packageAndSendSpeech() {
+            try {
+                const pcmData = ringBuffer.readAll();
+                if (pcmData.length === 0) {
+                    log('⚠️ No audio data to package');
+                    return;
+                }
+
+                // Limit audio segment size (max 30 seconds at 16kHz)
+                const MAX_SAMPLES = 480000;
+                const limitedData = pcmData.length > MAX_SAMPLES ? 
+                    pcmData.slice(0, MAX_SAMPLES) : pcmData;
+
+                log(`📦 Packaging PCM segment: ${limitedData.length} samples (${(limitedData.length / config.sampleRate).toFixed(2)}s)`);
+
+                // Convert to Int16 (matches client conversion)
+                const int16Data = new Int16Array(limitedData.length);
+                for (let i = 0; i < limitedData.length; i++) {
+                    const scaled = Math.max(-1, Math.min(1, limitedData[i])) * 32767;
+                    int16Data[i] = Math.max(-32768, Math.min(32767, scaled));
+                }
+
+                // Save audio segment for playback
+                const audioSegment = saveAudioSegment(int16Data, segmentCounter);
+
+                // Convert to base64 (matches client)
+                const uint8Array = new Uint8Array(int16Data.buffer);
+                const audioBase64 = btoa(String.fromCharCode.apply(null, uint8Array));
+
+                log(`🚀 Sending ${audioBase64.length} base64 chars to speechToTextWithLLM API`);
+
+                // Call API (will be implemented in next step)
+                const result = await callSpeechAPI(audioBase64, audioSegment);
+                
+                segmentCounter++;
+                
+                // Reset ring buffer
+                ringBuffer.reset();
+
+            } catch (error) {
+                log('❌ Error packaging speech: ' + error.message);
+                console.error('Speech packaging error:', error);
+            }
+        }
+        
+        // API integration function
+        async function callSpeechAPI(audioBase64, audioSegment) {
+            try {
+                apiCallCounter++;
+                
+                const currentPwm = parseInt(document.getElementById('currentPwm').value) || 150;
+                const language = document.getElementById('language').value;
+                
+                const payload = {
+                    msgHis: msgHis,
+                    audioContent: audioBase64,
+                    currentPwm: currentPwm,
+                    encoding: 'LINEAR16',
+                    sampleRateHertz: config.sampleRate,
+                    languageCode: language
+                };
+                
+                log(`📡 API Call ${apiCallCounter}: Sending to speechToTextWithLLM`);
+                log(`   PWM: ${currentPwm}, Language: ${language}, Audio: ${audioBase64.length} chars`);
+                
+                updateStatus(`Making API call ${apiCallCounter}...`, 'info');
+                
+                const response = await fetch('https://speechtotextwithllm-qveg3gkwxa-ew.a.run.app', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                log(`📡 API Response: Status ${response.status}`);
+                
+                const result = await response.json();
+                
+                // Log detailed response
+                log('🎯 Speech Recognition Result:');
+                log(`   Transcription: "${result.transcription || 'NO SPEECH DETECTED'}"`);
+                log(`   Confidence: ${result.confidence || 0}`);
+                log(`   Success: ${result.success}`);
+                log(`   Language: ${result.detectedLanguage || 'unknown'}`);
+                
+                if (result.success) {
+                    log(`   AI Response: "${result.response}"`);
+                    log(`   PWM: ${currentPwm} → ${result.newPwmValue}`);
+                    log(`   Intent Detected: ${result.intentDetected}`);
+                    log(`   Reasoning: ${result.reasoning}`);
+                    
+                    // Update PWM in UI
+                    document.getElementById('currentPwm').value = result.newPwmValue;
+                    
+                    // Add to message history
+                    msgHis.push({
+                        user: result.transcription,
+                        assistant: result.response,
+                        pwm: result.newPwmValue,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    // Keep only last 10 messages
+                    if (msgHis.length > 10) {
+                        msgHis.splice(0, msgHis.length - 10);
+                    }
+                } else {
+                    log(`   Error: ${result.error}`);
+                }
+                
+                // Store result with audio segment
+                const testResult = {
+                    segmentNumber: segmentCounter,
+                    audioSegment: audioSegment,
+                    apiResult: result,
+                    timestamp: new Date().toISOString(),
+                    apiCallNumber: apiCallCounter,
+                    requestPwm: currentPwm,
+                    language: language
+                };
+                
+                testResults.push(testResult);
+                
+                // Update results display
+                displayResult(testResult);
+                
+                updateStatus(`API call ${apiCallCounter} completed`, 'success');
+                
+                return result;
+                
+            } catch (error) {
+                log('❌ API call failed: ' + error.message);
+                updateStatus('API call failed: ' + error.message, 'error');
+                console.error('API call error:', error);
+                
+                // Store error result
+                const errorResult = {
+                    segmentNumber: segmentCounter,
+                    audioSegment: audioSegment,
+                    apiResult: { success: false, error: error.message },
+                    timestamp: new Date().toISOString(),
+                    apiCallNumber: apiCallCounter,
+                    requestPwm: parseInt(document.getElementById('currentPwm').value) || 150,
+                    language: document.getElementById('language').value
+                };
+                
+                testResults.push(errorResult);
+                displayResult(errorResult);
+                
+                return { success: false, error: error.message };
+            }
+        }
+        
+        // Results display functions
+        function displayResult(testResult) {
+            const resultsContainer = document.getElementById('resultsContainer');
+            
+            // Clear "no results" message if this is the first result
+            if (testResults.length === 1) {
+                resultsContainer.innerHTML = '';
+            }
+            
+            const resultElement = createResultElement(testResult);
+            resultsContainer.appendChild(resultElement);
+            
+            // Scroll to new result
+            resultElement.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function createResultElement(testResult) {
+            const { audioSegment, apiResult, timestamp, apiCallNumber, requestPwm, language } = testResult;
+            
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result-item';
+            
+            // Result header
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'result-header';
+            
+            const titleSpan = document.createElement('span');
+            titleSpan.className = 'result-title';
+            titleSpan.textContent = `API Call #${apiCallNumber} - Segment ${testResult.segmentNumber}`;
+            
+            const timestampSpan = document.createElement('span');
+            timestampSpan.className = 'result-timestamp';
+            timestampSpan.textContent = new Date(timestamp).toLocaleTimeString();
+            
+            headerDiv.appendChild(titleSpan);
+            headerDiv.appendChild(timestampSpan);
+            
+            // Result details
+            const detailsDiv = document.createElement('div');
+            detailsDiv.className = 'result-details';
+            
+            // Audio info
+            const audioInfo = createDetailGroup('Audio Info', [
+                { label: 'Duration', value: `${audioSegment.duration.toFixed(2)}s` },
+                { label: 'Samples', value: audioSegment.sampleCount.toLocaleString() },
+                { label: 'Size', value: `${(audioSegment.audioBlob.size / 1024).toFixed(1)} KB` }
+            ]);
+            
+            // Request info
+            const requestInfo = createDetailGroup('Request Info', [
+                { label: 'PWM Input', value: requestPwm },
+                { label: 'Language', value: language },
+                { label: 'Encoding', value: 'LINEAR16' },
+                { label: 'Sample Rate', value: `${config.sampleRate} Hz` }
+            ]);
+            
+            // Speech recognition results
+            const speechInfo = createDetailGroup('Speech Recognition', [
+                { label: 'Success', value: apiResult.success ? 'Yes' : 'No' },
+                { label: 'Transcription', value: apiResult.transcription || 'None', className: 'transcription' },
+                { label: 'Confidence', value: (apiResult.confidence || 0).toFixed(3) },
+                { label: 'Language Detected', value: apiResult.detectedLanguage || 'Unknown' }
+            ]);
+            
+            // Add confidence bar for transcription
+            if (apiResult.confidence !== undefined) {
+                const confidenceBar = document.createElement('div');
+                confidenceBar.className = 'confidence-bar';
+                const confidenceFill = document.createElement('div');
+                confidenceFill.className = 'confidence-fill';
+                confidenceFill.style.width = `${(apiResult.confidence * 100)}%`;
+                confidenceBar.appendChild(confidenceFill);
+                speechInfo.appendChild(confidenceBar);
+            }
+            
+            // AI response (if successful)
+            let aiInfo = null;
+            if (apiResult.success && apiResult.response) {
+                aiInfo = createDetailGroup('AI Response', [
+                    { label: 'Response', value: apiResult.response, className: 'transcription' },
+                    { label: 'PWM Change', value: `${requestPwm} → ${apiResult.newPwmValue}` },
+                    { label: 'Intent Detected', value: apiResult.intentDetected ? 'Yes' : 'No' },
+                    { label: 'Reasoning', value: apiResult.reasoning || 'None' }
+                ]);
+            }
+            
+            // Error info (if failed)
+            let errorInfo = null;
+            if (!apiResult.success && apiResult.error) {
+                errorInfo = createDetailGroup('Error Info', [
+                    { label: 'Error', value: apiResult.error, className: 'transcription' },
+                    { label: 'PWM Preserved', value: apiResult.newPwmValue || requestPwm }
+                ]);
+                errorInfo.style.borderLeftColor = '#dc3545';
+            }
+            
+            // Add all detail groups
+            detailsDiv.appendChild(audioInfo);
+            detailsDiv.appendChild(requestInfo);
+            detailsDiv.appendChild(speechInfo);
+            if (aiInfo) detailsDiv.appendChild(aiInfo);
+            if (errorInfo) detailsDiv.appendChild(errorInfo);
+            
+            // Audio player
+            const audioPlayer = createAudioPlayer(audioSegment.audioUrl, testResult.segmentNumber);
+            
+            // Assemble result element
+            resultDiv.appendChild(headerDiv);
+            resultDiv.appendChild(detailsDiv);
+            resultDiv.appendChild(audioPlayer);
+            
+            return resultDiv;
+        }
+        
+        function createDetailGroup(title, details) {
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'detail-group';
+            
+            const titleH4 = document.createElement('h4');
+            titleH4.textContent = title;
+            titleH4.style.margin = '0 0 10px 0';
+            titleH4.style.color = '#333';
+            titleH4.style.fontSize = '14px';
+            groupDiv.appendChild(titleH4);
+            
+            details.forEach(detail => {
+                const detailDiv = document.createElement('div');
+                detailDiv.style.marginBottom = '8px';
+                
+                const labelSpan = document.createElement('div');
+                labelSpan.className = 'detail-label';
+                labelSpan.textContent = detail.label;
+                
+                const valueSpan = document.createElement('div');
+                valueSpan.className = `detail-value ${detail.className || ''}`;
+                valueSpan.textContent = detail.value;
+                
+                detailDiv.appendChild(labelSpan);
+                detailDiv.appendChild(valueSpan);
+                groupDiv.appendChild(detailDiv);
+            });
+            
+            return groupDiv;
+        }
+        
+        function generateTestSummary() {
+            if (testResults.length === 0) return;
+            
+            const successful = testResults.filter(r => r.apiResult.success);
+            const withTranscription = testResults.filter(r => r.apiResult.transcription && r.apiResult.transcription.trim());
+            const noSpeech = testResults.filter(r => r.apiResult.error && r.apiResult.error.includes('No speech detected'));
+            const errors = testResults.filter(r => r.apiResult.error && !r.apiResult.error.includes('No speech detected'));
+            
+            const avgConfidence = withTranscription.length > 0 ? 
+                withTranscription.reduce((sum, r) => sum + (r.apiResult.confidence || 0), 0) / withTranscription.length : 0;
+            
+            log('\n📊 TEST SUMMARY:');
+            log(`   Total API calls: ${testResults.length}`);
+            log(`   Successful: ${successful.length}/${testResults.length}`);
+            log(`   With transcription: ${withTranscription.length}/${testResults.length}`);
+            log(`   No speech detected: ${noSpeech.length}/${testResults.length}`);
+            log(`   Errors: ${errors.length}/${testResults.length}`);
+            log(`   Average confidence: ${avgConfidence.toFixed(3)}`);
+            
+            if (withTranscription.length === 0 && testResults.length > 0) {
+                log('\n⚠️ NO TRANSCRIPTIONS DETECTED:');
+                log('   - Check microphone is working');
+                log('   - Speak clearly and loudly');
+                log('   - Check if speech is being detected (green waveform)');
+                log('   - Try adjusting silence threshold');
+            }
+        }
+        
+        // Update UI every 100ms
+        setInterval(updateUI, 100);
+        
+        // Utility functions for results management
+        function downloadAllResults() {
+            if (testResults.length === 0) {
+                alert('No test results to download');
+                return;
+            }
+            
+            const data = {
+                testResults: testResults,
+                configuration: config,
+                timestamp: new Date().toISOString(),
+                totalSegments: segmentCounter,
+                totalApiCalls: apiCallCounter,
+                summary: {
+                    successful: testResults.filter(r => r.apiResult.success).length,
+                    withTranscription: testResults.filter(r => r.apiResult.transcription && r.apiResult.transcription.trim()).length,
+                    noSpeech: testResults.filter(r => r.apiResult.error && r.apiResult.error.includes('No speech detected')).length,
+                    errors: testResults.filter(r => r.apiResult.error && !r.apiResult.error.includes('No speech detected')).length,
+                    avgConfidence: testResults.filter(r => r.apiResult.confidence).reduce((sum, r) => sum + r.apiResult.confidence, 0) / testResults.filter(r => r.apiResult.confidence).length || 0
+                }
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `speech-test-results-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            log(`📥 Downloaded ${testResults.length} test results`);
+        }
+        
+        function clearAllResults() {
+            if (testResults.length === 0) {
+                alert('No test results to clear');
+                return;
+            }
+            
+            if (confirm(`Clear all ${testResults.length} test results? This cannot be undone.`)) {
+                // Clean up audio URLs to prevent memory leaks
+                testResults.forEach(result => {
+                    if (result.audioSegment && result.audioSegment.audioUrl) {
+                        URL.revokeObjectURL(result.audioSegment.audioUrl);
+                    }
+                });
+                
+                testResults = [];
+                segmentCounter = 0;
+                apiCallCounter = 0;
+                
+                const resultsContainer = document.getElementById('resultsContainer');
+                resultsContainer.innerHTML = '<p style="text-align: center; color: #666; font-style: italic;">No test results yet. Start recording to see speech recognition results.</p>';
+                
+                log('🗑️ Cleared all test results');
+            }
+        }
+        
+        // Device detection and management
+        let availableDevices = [];
+        let selectedDeviceId = null;
+        
+        async function detectAudioDevices() {
+            try {
+                log('🎤 Detecting available audio devices...');
+                
+                // Request permission first
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(track => track.stop()); // Stop the stream immediately
+                
+                // Get all devices
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                availableDevices = devices.filter(device => device.kind === 'audioinput');
+                
+                log(`Found ${availableDevices.length} audio input device(s):`);
+                availableDevices.forEach((device, index) => {
+                    log(`  ${index + 1}. ${device.label || `Microphone ${index + 1}`} (${device.deviceId.slice(0, 8)}...)`);
+                });
+                
+                if (availableDevices.length === 0) {
+                    throw new Error('No audio input devices found');
+                }
+                
+                // Use first device as default
+                selectedDeviceId = availableDevices[0].deviceId;
+                updateDeviceSelector();
+                
+                return true;
+                
+            } catch (error) {
+                reportDetailedError(error, 'during device detection');
+                
+                if (error.name === 'NotFoundError') {
+                    showError('No microphone found. Please connect a microphone and refresh the page.');
+                } else if (error.name === 'NotAllowedError') {
+                    showError('Microphone access denied. Please allow microphone access and refresh the page.');
+                } else if (error.name === 'NotSupportedError') {
+                    showError('Your browser does not support microphone access. Please use Chrome, Firefox, or Safari.');
+                } else {
+                    showError(`Microphone error: ${error.message}`);
+                }
+                
+                return false;
+            }
+        }
+        
+        // Troubleshooting UI functions
+        function showTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'block';
+            troubleshootingDiv.scrollIntoView({ behavior: 'smooth' });
+            log('🔧 Showing troubleshooting guide');
+        }
+        
+        function hideTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'none';
+            log('🔧 Hiding troubleshooting guide');
+        }
+        
+        // Enhanced error reporting
+        function reportDetailedError(error, context = '') {
+            log(`❌ Detailed error report ${context}:`);
+            log(`   Name: ${error.name}`);
+            log(`   Message: ${error.message}`);
+            log(`   Stack: ${error.stack?.split('\n')[0] || 'No stack trace'}`);
+            
+            // Browser-specific guidance
+            const userAgent = navigator.userAgent;
+            if (userAgent.includes('Chrome')) {
+                log('   Browser: Chrome - Check site permissions in address bar');
+            } else if (userAgent.includes('Firefox')) {
+                log('   Browser: Firefox - Check microphone icon in address bar');
+            } else if (userAgent.includes('Safari')) {
+                log('   Browser: Safari - Check Safari → Settings → Websites → Microphone');
+            } else {
+                log('   Browser: Unknown - Try Chrome, Firefox, or Safari');
+            }
+            
+            // Show troubleshooting automatically for certain errors
+            if (error.name === 'NotAllowedError' || error.name === 'NotFoundError') {
+                setTimeout(showTroubleshooting, 1000);
+            }
+        }
+        
+        function updateDeviceSelector() {
+            const deviceSelect = document.getElementById('deviceSelect');
+            if (!deviceSelect) return;
+            
+            // Clear existing options
+            deviceSelect.innerHTML = '';
+            
+            if (availableDevices.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No devices found';
+                option.disabled = true;
+                deviceSelect.appendChild(option);
+                return;
+            }
+            
+            // Add device options
+            availableDevices.forEach((device, index) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                
+                // Create descriptive label
+                let label = device.label || `Microphone ${index + 1}`;
+                if (device.deviceId === 'default') {
+                    label = `🎤 ${label} (Default)`;
+                } else {
+                    label = `🎤 ${label}`;
+                }
+                
+                option.textContent = label;
+                
+                if (device.deviceId === selectedDeviceId) {
+                    option.selected = true;
+                }
+                
+                deviceSelect.appendChild(option);
+            });
+            
+            // Add refresh option
+            const refreshOption = document.createElement('option');
+            refreshOption.value = 'refresh';
+            refreshOption.textContent = '🔄 Refresh Device List';
+            refreshOption.style.fontStyle = 'italic';
+            deviceSelect.appendChild(refreshOption);
+            
+            // Remove existing event listeners
+            deviceSelect.replaceWith(deviceSelect.cloneNode(true));
+            const newDeviceSelect = document.getElementById('deviceSelect');
+            
+            // Add event listener for device selection
+            newDeviceSelect.addEventListener('change', async (e) => {
+                const selectedValue = e.target.value;
+                
+                if (selectedValue === 'refresh') {
+                    log('🔄 Refreshing device list...');
+                    showInfo('Refreshing microphone list...');
+                    
+                    const devicesDetected = await detectAudioDevicesWithFallback();
+                    if (devicesDetected) {
+                        // Reset to first device after refresh
+                        e.target.selectedIndex = 0;
+                    }
+                } else {
+                    selectedDeviceId = selectedValue;
+                    const selectedDevice = availableDevices.find(d => d.deviceId === selectedValue);
+                    const deviceName = selectedDevice ? selectedDevice.label || 'Unknown Device' : 'Unknown';
+                    
+                    log(`📱 Switched to device: ${deviceName}`);
+                    showInfo(`Selected microphone: ${deviceName}`);
+                    
+                    // Test the selected device
+                    setTimeout(async () => {
+                        const testResult = await testMicrophone();
+                        if (!testResult) {
+                            log('⚠️ Selected device may not work properly');
+                        }
+                    }, 500);
+                }
+            });
+            
+            // Update status
+            if (availableDevices.length > 0) {
+                const currentDevice = availableDevices.find(d => d.deviceId === selectedDeviceId);
+                const deviceName = currentDevice ? currentDevice.label || 'Default' : 'Unknown';
+                log(`📱 Current device: ${deviceName}`);
+            }
+        }
+        
+        // Enhanced device refresh function
+        async function refreshDeviceList() {
+            log('🔄 Manually refreshing device list...');
+            showInfo('Refreshing microphone list...');
+            
+            try {
+                // Clear current devices
+                availableDevices = [];
+                selectedDeviceId = null;
+                
+                // Re-detect devices
+                const devicesDetected = await detectAudioDevicesWithFallback();
+                
+                if (devicesDetected) {
+                    showSuccess(`Device list refreshed. Found ${availableDevices.length} microphone(s).`);
+                } else {
+                    showError('No working microphones found after refresh.');
+                }
+                
+                return devicesDetected;
+                
+            } catch (error) {
+                log(`❌ Device refresh failed: ${error.message}`);
+                showError(`Device refresh failed: ${error.message}`);
+                return false;
+            }
+        }
+        
+        // Troubleshooting UI functions
+        function showTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'block';
+            troubleshootingDiv.scrollIntoView({ behavior: 'smooth' });
+            log('🔧 Showing troubleshooting guide');
+        }
+        
+        function hideTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'none';
+            log('🔧 Hiding troubleshooting guide');
+        }
+        
+        // Enhanced error reporting
+        function reportDetailedError(error, context = '') {
+            log(`❌ Detailed error report ${context}:`);
+            log(`   Name: ${error.name}`);
+            log(`   Message: ${error.message}`);
+            log(`   Stack: ${error.stack?.split('\n')[0] || 'No stack trace'}`);
+            
+            // Browser-specific guidance
+            const userAgent = navigator.userAgent;
+            if (userAgent.includes('Chrome')) {
+                log('   Browser: Chrome - Check site permissions in address bar');
+            } else if (userAgent.includes('Firefox')) {
+                log('   Browser: Firefox - Check microphone icon in address bar');
+            } else if (userAgent.includes('Safari')) {
+                log('   Browser: Safari - Check Safari → Settings → Websites → Microphone');
+            } else {
+                log('   Browser: Unknown - Try Chrome, Firefox, or Safari');
+            }
+            
+            // Show troubleshooting automatically for certain errors
+            if (error.name === 'NotAllowedError' || error.name === 'NotFoundError') {
+                setTimeout(showTroubleshooting, 1000);
+            }
+        }
+        
+        function showError(message) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status error';
+            statusDiv.textContent = message;
+            
+            // Also show in log
+            log(`❌ ${message}`);
+        }
+        
+        function showSuccess(message) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status success';
+            statusDiv.textContent = message;
+        }
+        
+        function showInfo(message) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status info';
+            statusDiv.textContent = message;
+        }
+        
+        // Microphone testing function
+        async function testMicrophone() {
+            try {
+                log('🧪 Testing microphone...');
+                showInfo('Testing microphone access...');
+                
+                // Try to get microphone access with fallback options
+                let stream = null;
+                let constraints = null;
+                
+                // First try: Use selected device with optimal settings
+                if (selectedDeviceId) {
+                    constraints = {
+                        audio: {
+                            deviceId: { exact: selectedDeviceId },
+                            sampleRate: config.sampleRate,
+                            channelCount: 1,
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        }
+                    };
+                    
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        log('✅ Selected device works with optimal settings');
+                    } catch (error) {
+                        log(`⚠️ Selected device failed with optimal settings: ${error.message}`);
+                    }
+                }
+                
+                // Second try: Use selected device with basic settings
+                if (!stream && selectedDeviceId) {
+                    constraints = {
+                        audio: {
+                            deviceId: { exact: selectedDeviceId }
+                        }
+                    };
+                    
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        log('✅ Selected device works with basic settings');
+                    } catch (error) {
+                        log(`⚠️ Selected device failed with basic settings: ${error.message}`);
+                    }
+                }
+                
+                // Third try: Use any available device with optimal settings
+                if (!stream) {
+                    constraints = {
+                        audio: {
+                            sampleRate: config.sampleRate,
+                            channelCount: 1,
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        }
+                    };
+                    
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        log('✅ Default device works with optimal settings');
+                    } catch (error) {
+                        log(`⚠️ Default device failed with optimal settings: ${error.message}`);
+                    }
+                }
+                
+                // Fourth try: Use any available device with basic settings
+                if (!stream) {
+                    constraints = { audio: true };
+                    
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        log('✅ Default device works with basic settings');
+                    } catch (error) {
+                        log(`❌ All microphone access attempts failed: ${error.message}`);
+                        throw error;
+                    }
+                }
+                
+                // Test the stream
+                if (stream) {
+                    const tracks = stream.getAudioTracks();
+                    if (tracks.length > 0) {
+                        const track = tracks[0];
+                        const settings = track.getSettings();
+                        
+                        log('🎤 Microphone test successful!');
+                        log(`   Device: ${track.label || 'Unknown'}`);
+                        log(`   Sample Rate: ${settings.sampleRate || 'Unknown'} Hz`);
+                        log(`   Channels: ${settings.channelCount || 'Unknown'}`);
+                        log(`   Echo Cancellation: ${settings.echoCancellation}`);
+                        log(`   Noise Suppression: ${settings.noiseSuppression}`);
+                        log(`   Auto Gain Control: ${settings.autoGainControl}`);
+                        
+                        showSuccess(`Microphone test successful! Device: ${track.label || 'Default'}`);
+                        
+                        // Stop the test stream
+                        stream.getTracks().forEach(track => track.stop());
+                        
+                        return true;
+                    } else {
+                        throw new Error('No audio tracks found in stream');
+                    }
+                }
+                
+            } catch (error) {
+                reportDetailedError(error, 'during microphone test');
+                
+                if (error.name === 'NotFoundError') {
+                    showError('No microphone found. Please connect a microphone and try again.');
+                } else if (error.name === 'NotAllowedError') {
+                    showError('Microphone access denied. Please allow microphone access in your browser settings.');
+                } else if (error.name === 'NotSupportedError') {
+                    showError('Your browser does not support microphone access. Please use Chrome, Firefox, or Safari.');
+                } else {
+                    showError(`Microphone test failed: ${error.message}`);
+                }
+                
+                return false;
+            }
+        }
+        
+        // Troubleshooting UI functions
+        function showTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'block';
+            troubleshootingDiv.scrollIntoView({ behavior: 'smooth' });
+            log('🔧 Showing troubleshooting guide');
+        }
+        
+        function hideTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'none';
+            log('🔧 Hiding troubleshooting guide');
+        }
+        
+        // Enhanced error reporting
+        function reportDetailedError(error, context = '') {
+            log(`❌ Detailed error report ${context}:`);
+            log(`   Name: ${error.name}`);
+            log(`   Message: ${error.message}`);
+            log(`   Stack: ${error.stack?.split('\n')[0] || 'No stack trace'}`);
+            
+            // Browser-specific guidance
+            const userAgent = navigator.userAgent;
+            if (userAgent.includes('Chrome')) {
+                log('   Browser: Chrome - Check site permissions in address bar');
+            } else if (userAgent.includes('Firefox')) {
+                log('   Browser: Firefox - Check microphone icon in address bar');
+            } else if (userAgent.includes('Safari')) {
+                log('   Browser: Safari - Check Safari → Settings → Websites → Microphone');
+            } else {
+                log('   Browser: Unknown - Try Chrome, Firefox, or Safari');
+            }
+            
+            // Show troubleshooting automatically for certain errors
+            if (error.name === 'NotAllowedError' || error.name === 'NotFoundError') {
+                setTimeout(showTroubleshooting, 1000);
+            }
+        }
+        
+        // Enhanced device detection with fallback options
+        async function detectAudioDevicesWithFallback() {
+            try {
+                // First try: Request permission and enumerate devices
+                const success = await detectAudioDevices();
+                if (success) return true;
+                
+                // Fallback: Try basic audio access
+                log('🔄 Trying fallback device detection...');
+                
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const tracks = stream.getAudioTracks();
+                    
+                    if (tracks.length > 0) {
+                        log('✅ Found at least one working audio device');
+                        availableDevices = [{
+                            deviceId: 'default',
+                            label: tracks[0].label || 'Default Microphone',
+                            kind: 'audioinput'
+                        }];
+                        selectedDeviceId = 'default';
+                        updateDeviceSelector();
+                        
+                        // Stop the test stream
+                        stream.getTracks().forEach(track => track.stop());
+                        
+                        showSuccess('Found working microphone. Ready to test speech recognition.');
+                        return true;
+                    }
+                } catch (fallbackError) {
+                    log(`❌ Fallback detection failed: ${fallbackError.message}`);
+                }
+                
+                return false;
+                
+            } catch (error) {
+                log(`❌ Device detection with fallback failed: ${error.message}`);
+                return false;
+            }
+        }
+        
+        // Troubleshooting UI functions
+        function showTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'block';
+            troubleshootingDiv.scrollIntoView({ behavior: 'smooth' });
+            log('🔧 Showing troubleshooting guide');
+        }
+        
+        function hideTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'none';
+            log('🔧 Hiding troubleshooting guide');
+        }
+        
+        // Enhanced error reporting
+        function reportDetailedError(error, context = '') {
+            log(`❌ Detailed error report ${context}:`);
+            log(`   Name: ${error.name}`);
+            log(`   Message: ${error.message}`);
+            log(`   Stack: ${error.stack?.split('\n')[0] || 'No stack trace'}`);
+            
+            // Browser-specific guidance
+            const userAgent = navigator.userAgent;
+            if (userAgent.includes('Chrome')) {
+                log('   Browser: Chrome - Check site permissions in address bar');
+            } else if (userAgent.includes('Firefox')) {
+                log('   Browser: Firefox - Check microphone icon in address bar');
+            } else if (userAgent.includes('Safari')) {
+                log('   Browser: Safari - Check Safari → Settings → Websites → Microphone');
+            } else {
+                log('   Browser: Unknown - Try Chrome, Firefox, or Safari');
+            }
+            
+            // Show troubleshooting automatically for certain errors
+            if (error.name === 'NotAllowedError' || error.name === 'NotFoundError') {
+                setTimeout(showTroubleshooting, 1000);
+            }
+        }
+        
+        // Initialize the application
+        async function initializeApp() {
+            log('Speech-to-Text Accuracy Test initialized');
+            log(`Configuration: ${JSON.stringify(config, null, 2)}`);
+            
+            // Set up event listeners
+            document.getElementById('startBtn').addEventListener('click', startRecording);
+            document.getElementById('stopBtn').addEventListener('click', stopRecording);
+            document.getElementById('testMicBtn').addEventListener('click', testMicrophone);
+            document.getElementById('refreshDevicesBtn').addEventListener('click', refreshDeviceList);
+            document.getElementById('troubleshootBtn').addEventListener('click', showTroubleshooting);
+            
+            // Initialize audio context on first user interaction
+            document.addEventListener('click', async () => {
+                if (!audioContext) {
+                    try {
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                            sampleRate: config.sampleRate
+                        });
+                        log(`Audio context initialized: ${audioContext.sampleRate}Hz`);
+                    } catch (error) {
+                        log(`Error initializing audio context: ${error.message}`);
+                    }
+                }
+            }, { once: true });
+            
+            // Detect audio devices with fallback
+            const devicesDetected = await detectAudioDevicesWithFallback();
+            if (!devicesDetected) {
+                showError('No working microphone found. Please check your audio devices and refresh the page.');
+            }
+        }
+        
+        // Generate summary when page unloads
+        window.addEventListener('beforeunload', generateTestSummary);
+    </script>
+</body>
+</html>
