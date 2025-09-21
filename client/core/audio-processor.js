@@ -275,6 +275,7 @@ class AudioProcessor {
         if (this.onSpeechSegmentReady) {
             // Call the registered callback with packaged speech data
             const speechData = this.packageSpeechSegmentSync();
+            console.log(speechData)
             if (speechData) {
                 this.onSpeechSegmentReady(speechData);
             }
