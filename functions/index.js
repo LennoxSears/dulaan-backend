@@ -475,8 +475,6 @@ exports.speechToTextWithLLM = onRequest(
                 model: 'latest_short',  // Use latest_short for better real-time performance
                 useEnhanced: true,      // Use enhanced model for better accuracy
                 profanityFilter: false,
-                enableSpokenPunctuation: false,
-                enableSpokenEmojis: false,
                 maxAlternatives: 1,
                 audioChannelCount: 1    // Mono audio
             };
@@ -696,8 +694,8 @@ Examples:
                     success: false,
                     error: 'Speech recognition failed - audio may be unclear or too noisy',
                     transcription: '',
-                    newPwmValue: currentPwm,  // Keep current PWM on speech errors
-                    msgHis: msgHis,
+                    newPwmValue: req.body.currentPwm || 100,  // Use request body value
+                    msgHis: req.body.msgHis || [],
                     details: error.message
                 });
             }
@@ -705,7 +703,9 @@ Examples:
             res.status(500).json({
                 success: false,
                 error: 'Speech-to-text with LLM processing failed',
-                details: error.message
+                details: error.message,
+                newPwmValue: req.body.currentPwm || 100,  // Preserve PWM on errors
+                msgHis: req.body.msgHis || []
             });
         }
     }
