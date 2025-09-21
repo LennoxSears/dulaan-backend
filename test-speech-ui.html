@@ -528,11 +528,11 @@
         // Configuration
         const config = {
             sampleRate: 16000,
-            chunkSize: 1600, // 0.1 seconds
+            chunkSize: 1024, // Power of 2, ~0.064 seconds at 16kHz
             silenceThreshold: 0.05,
             zeroCrossingThreshold: 0.1,
-            silenceTimeout: 25, // chunks
-            minSpeechDuration: 10 // chunks
+            silenceTimeout: 40, // chunks (adjusted for smaller chunk size)
+            minSpeechDuration: 16 // chunks (adjusted for smaller chunk size)
         };
         
         // Fake message history for testing
@@ -701,21 +701,36 @@
                     sampleRate: config.sampleRate
                 });
                 
-                log(`Audio context created: ${audioContext.sampleRate} Hz`);
-                
                 // Create audio source
                 const source = audioContext.createMediaStreamSource(mediaStream);
                 
-                // Create script processor for audio processing
-                audioProcessor = audioContext.createScriptProcessor(config.chunkSize, 1, 1);
+                // Create script processor for audio processing (buffer size must be power of 2)
+                const bufferSize = 1024; // Valid power of 2 between 256 and 16384
                 
-                // Initialize ring buffer
-                ringBuffer = new RingBuffer(480000 * 2); // 30 seconds at 16kHz
+                log(`Audio context created: ${audioContext.sampleRate} Hz`);
+                log(`Using buffer size: ${bufferSize} samples (~${(bufferSize / audioContext.sampleRate * 1000).toFixed(1)}ms)`);
+                try {
+                    audioProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+                    log(`Audio processor created with buffer size: ${bufferSize}`);
+                } catch (processorError) {
+                    log(`❌ Failed to create audio processor: ${processorError.message}`);
+                    throw new Error(`Audio processor creation failed: ${processorError.message}`);
+                }
+                
+                // Initialize ring buffer (30 seconds at 16kHz)
+                ringBuffer = new RingBuffer(480000);
                 
                 // Audio processing callback
+                let processCallCount = 0;
                 audioProcessor.onaudioprocess = function(event) {
                     const inputBuffer = event.inputBuffer;
                     const inputData = inputBuffer.getChannelData(0);
+                    
+                    // Log first few calls for debugging
+                    processCallCount++;
+                    if (processCallCount <= 3) {
+                        log(`Audio process call ${processCallCount}: ${inputData.length} samples, max level: ${Math.max(...inputData).toFixed(4)}`);
+                    }
                     
                     // Process audio chunk
                     processAudioChunk(inputData);
