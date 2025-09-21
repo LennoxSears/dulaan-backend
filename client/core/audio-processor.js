@@ -39,10 +39,15 @@ class RingBuffer {
             out.set(this.buffer.subarray(0, this.count - firstPart), firstPart);
         }
         
-        // Clear the buffer after reading (fix critical bug)
-        this.head = this.tail;
-        this.count = 0;
+        // DON'T clear here - let the caller decide when to reset
+        // This matches stream.js behavior where reset() is called separately
         
+        return out;
+    }
+    
+    readAllAndClear() {
+        const out = this.readAll();
+        this.reset();
         return out;
     }
 
@@ -138,10 +143,10 @@ class AudioProcessor {
     }
 
     /**
-     * Convert audio energy to PWM value (matches stream.js implementation)
+     * Convert audio energy to PWM value (matches stream.js implementation exactly)
      */
     audio2PWM(maxEnergy) {
-        const pcmData = this.audioState.abiBuffer.readAll();
+        const pcmData = this.audioState.abiBuffer.readAllAndClear();
         if (pcmData.length === 0) {
             return -1;
         }
@@ -178,13 +183,14 @@ class AudioProcessor {
                 this.audioState.ZERO_CROSSING
             );
 
-            // Speech activity detection (matches stream.js)
+            // Speech activity detection (matches stream.js exactly)
             if (!isSilent) {
                 this.audioState.silenceCounter = 0;
                 if (!this.audioState.isSpeaking) {
                     console.log(
-                        `[Speech Detected] Energy: ${this.audioState.lastRMS.toFixed(4)}, ` +
-                        `Zero crossings: ${this.audioState.lastZeroCrossings}`
+                        `变了=====================================`,
+                        `能量: ${this.audioState.lastRMS.toFixed(4)}`,
+                        `过零: ${this.audioState.lastZeroCrossings}`
                     );
                 }
                 this.audioState.isSpeaking = true;
@@ -192,24 +198,11 @@ class AudioProcessor {
                 this.audioState.silenceCounter++;
             }
 
-            // Write to ring buffer
+            // Write to ring buffer (matches stream.js exactly)
             const written = this.audioState.ringBuffer.push(pcmData);
             if (written < pcmData.length) {
-                console.warn("Buffer overflow, discarding", pcmData.length - written, "samples");
+                console.warn("[警告] 缓冲区溢出，丢弃", pcmData.length - written, "采样点");
                 this.audioState.ringBuffer.reset();
-            }
-
-            // Prevent buffer from getting too large (force packaging if buffer is near full)
-            const MAX_BUFFER_SIZE = 400000; // ~25 seconds at 16kHz
-            if (this.audioState.ringBuffer.count > MAX_BUFFER_SIZE) {
-                console.warn("Buffer size limit reached, forcing speech packaging");
-                this.triggerSpeechPackaging();
-                return {
-                    isSpeaking: false,
-                    energy: this.audioState.lastRMS,
-                    pwmValue: this.audio2PWM(this.maxEnergy),
-                    silenceCounter: 0
-                };
             }
 
             // Silence timeout triggers speech packaging (matches stream.js)
@@ -224,7 +217,6 @@ class AudioProcessor {
             return {
                 isSpeaking: this.audioState.isSpeaking,
                 energy: this.audioState.lastRMS,
-                pwmValue: this.audio2PWM(this.maxEnergy),
                 silenceCounter: this.audioState.silenceCounter
             };
         } catch (error) {
@@ -244,10 +236,10 @@ class AudioProcessor {
             // Update chunk size
             this.audioState.lastChunkSize = pcmData.length;
             
-            // Write to ambient buffer (matches stream.js)
+            // Write to ambient buffer (matches stream.js exactly)
             const written = this.audioState.abiBuffer.push(pcmData);
             if (written < pcmData.length) {
-                console.warn("ABI buffer overflow, discarding", pcmData.length - written, "samples");
+                console.warn("[警告] 缓冲区溢出，丢弃", pcmData.length - written, "采样点");
                 this.audioState.abiBuffer.reset();
             }
         } catch (error) {
@@ -277,38 +269,29 @@ class AudioProcessor {
     }
 
     /**
-     * Package speech segment synchronously (matches stream.js logic)
+     * Package speech segment synchronously (matches stream.js logic exactly)
      */
     packageSpeechSegmentSync() {
         try {
             const pcmData = this.audioState.ringBuffer.readAll();
             if (pcmData.length === 0) return null;
 
-            // Limit audio segment size to prevent stack overflow (max 30 seconds at 16kHz)
-            const MAX_SAMPLES = 480000; // 16000Hz * 30 seconds
-            const limitedData = pcmData.length > MAX_SAMPLES ? 
-                pcmData.slice(0, MAX_SAMPLES) : pcmData;
-
-            if (pcmData.length > MAX_SAMPLES) {
-                console.warn(`[Speech Packaging] Audio segment too large (${pcmData.length} samples), truncated to ${MAX_SAMPLES}`);
-            }
-
-            // Convert to Int16 to reduce transmission size (matches stream.js)
-            const int16Data = new Int16Array(limitedData.length);
-            for (let i = 0; i < limitedData.length; i++) {
-                const scaled = Math.max(-1, Math.min(1, limitedData[i])) * 32767;
+            // Convert to Int16 to reduce transmission size (matches stream.js exactly)
+            const int16Data = new Int16Array(pcmData.length);
+            for (let i = 0; i < pcmData.length; i++) {
+                const scaled = Math.max(-1, Math.min(1, pcmData[i])) * 32767;
                 int16Data[i] = Math.max(-32768, Math.min(32767, scaled));
             }
 
-            console.log("[Speech Packaging] PCM segment:", int16Data.length, "samples");
+            console.log("[传输] PCM分段:", int16Data.length, "采样点"); // Match stream.js logging
 
-            // Reset state (matches stream.js)
+            // Reset state (matches stream.js exactly)
             this.audioState.ringBuffer.reset();
             this.audioState.isSpeaking = false;
             this.audioState.silenceCounter = 0;
 
-            // Return Int16Array directly instead of base64 (more efficient like stream.js)
-            return Array.from(int16Data); // Convert to regular array for JSON transmission
+            // Return Int16Array as regular array for JSON transmission
+            return Array.from(int16Data);
         } catch (error) {
             console.error("Speech packaging failed:", error);
             // Reset state on error to prevent stuck state
@@ -355,11 +338,10 @@ class AudioProcessor {
         
         this.monitoringInterval = setInterval(() => {
             console.log(
-                `[Audio Monitor] Buffer: ${this.audioState.ringBuffer.count}/${this.audioState.ringBuffer.size}`,
-                `Silence: ${this.audioState.silenceCounter}`,
-                `Energy: ${this.audioState.lastRMS.toFixed(4)}`,
-                `Zero crossings: ${this.audioState.lastZeroCrossings}`,
-                `Speaking: ${this.audioState.isSpeaking}`
+                `[监控] 缓冲区: ${this.audioState.ringBuffer.count}/${this.audioState.ringBuffer.size}`,
+                `静音计数: ${this.audioState.silenceCounter}`,
+                `能量: ${this.audioState.lastRMS.toFixed(4)}`,
+                `过零: ${this.audioState.lastZeroCrossings}`
             );
         }, intervalMs);
     }
