@@ -470,12 +470,23 @@ exports.speechToTextWithLLM = onRequest(
             const speechConfig = {
                 encoding: req.body.encoding || 'LINEAR16',  // Default to LINEAR16 for PCM data
                 enableAutomaticPunctuation: true,
-                model: 'latest_long'
+                enableWordTimeOffsets: false,
+                enableWordConfidence: true,
+                model: 'latest_short',  // Use latest_short for better real-time performance
+                useEnhanced: true,      // Use enhanced model for better accuracy
+                profanityFilter: false,
+                enableSpokenPunctuation: false,
+                enableSpokenEmojis: false,
+                maxAlternatives: 1,
+                audioChannelCount: 1    // Mono audio
             };
 
-            // Only set sample rate if explicitly provided, otherwise let it auto-detect from audio
+            // Set sample rate - prefer explicit rate, fallback to 16000 for raw PCM
             if (req.body.sampleRateHertz) {
                 speechConfig.sampleRateHertz = req.body.sampleRateHertz;
+            } else if (req.body.encoding === 'LINEAR16') {
+                // For raw PCM data, we need to specify sample rate
+                speechConfig.sampleRateHertz = 16000;
             }
 
             // Enable automatic language detection if no languageCode provided
@@ -502,21 +513,55 @@ exports.speechToTextWithLLM = onRequest(
                 speechRequest.audio = { uri: audioUri };
             }
 
+            // Log audio info for debugging
+            logger.log('Processing audio for speech recognition', {
+                encoding: speechConfig.encoding,
+                sampleRateHertz: speechConfig.sampleRateHertz,
+                audioContentLength: audioContent ? audioContent.length : 0,
+                hasAudioUri: !!audioUri,
+                model: speechConfig.model
+            });
+
             // Perform speech recognition
             const [speechResponse] = await speechClient.recognize(speechRequest);
             
-            // Extract transcription
-            const transcript = speechResponse.results
-                .map(result => result.alternatives[0].transcript)
-                .join('\n');
+            // Extract transcription with confidence filtering
+            let transcript = '';
+            let confidence = 0;
+            let detectedLanguage = null;
+            
+            if (speechResponse.results && speechResponse.results.length > 0) {
+                const bestResult = speechResponse.results[0];
+                if (bestResult.alternatives && bestResult.alternatives.length > 0) {
+                    const bestAlternative = bestResult.alternatives[0];
+                    transcript = bestAlternative.transcript || '';
+                    confidence = bestAlternative.confidence || 0;
+                    detectedLanguage = bestResult.languageCode || null;
+                    
+                    // Filter out low-confidence results (below 0.3)
+                    if (confidence < 0.3 && transcript.trim().length > 0) {
+                        logger.log('Low confidence transcription filtered out', { 
+                            transcript, 
+                            confidence,
+                            threshold: 0.3 
+                        });
+                        transcript = '';
+                    }
+                }
+            }
 
-            if (!transcript) {
+            // Clean up transcript
+            transcript = transcript.trim();
+
+            if (!transcript || transcript.length === 0) {
                 return res.status(200).json({
                     success: false,
                     error: 'No speech detected in audio',
                     transcription: '',
-                    newPwmValue: currentPwm,
-                    msgHis: msgHis
+                    newPwmValue: currentPwm,  // Return current PWM unchanged
+                    msgHis: msgHis,
+                    confidence: confidence,
+                    detectedLanguage: detectedLanguage
                 });
             }
 
@@ -544,12 +589,19 @@ ${conversationHistory}
 
 New user speech: "${transcript}"
 
+IMPORTANT RULES:
+1. ONLY change PWM if the user clearly requests a motor control action
+2. If the user's speech is unclear, unrelated, or not about motor control, keep PWM at current value
+3. Motor control keywords: up, down, increase, decrease, faster, slower, stop, start, on, off, more, less, stronger, weaker
+4. If no clear motor control intent is detected, return current PWM value unchanged
+
 Respond with a JSON object containing:
 - "response": Your natural language response to the user
-- "pwm": New PWM value (0-255) based on the user's request
+- "pwm": New PWM value (0-255) - ONLY change if clear motor control intent detected, otherwise use current value ${currentPwm}
 - "reasoning": Brief explanation of why you chose this PWM value
+- "intentDetected": true/false - whether clear motor control intent was detected
 
-Consider:
+PWM Ranges:
 - 0 = motor off
 - 1-50 = very low intensity
 - 51-100 = low intensity  
@@ -557,7 +609,12 @@ Consider:
 - 151-200 = high intensity
 - 201-255 = maximum intensity
 
-Be conversational and helpful. If the user asks to increase/decrease, adjust relative to current value.`;
+Examples:
+- "turn it up" → increase PWM
+- "make it slower" → decrease PWM  
+- "stop" → PWM = 0
+- "hello" → keep current PWM (no motor intent)
+- "what time is it" → keep current PWM (no motor intent)`;
 
             const result = await model.generateContent(prompt);
             const responseText = result.response.text();
@@ -583,14 +640,24 @@ Be conversational and helpful. If the user asks to increase/decrease, adjust rel
                 });
             }
 
-            // Validate PWM value
-            const newPwmValue = Math.max(0, Math.min(255, parseInt(llmResponse.pwm) || currentPwm));
+            // Validate PWM value and intent detection
+            const intentDetected = llmResponse.intentDetected === true || llmResponse.intentDetected === 'true';
+            let newPwmValue;
+            
+            if (intentDetected) {
+                // Only change PWM if intent was detected
+                newPwmValue = Math.max(0, Math.min(255, parseInt(llmResponse.pwm) || currentPwm));
+            } else {
+                // No motor control intent detected, keep current PWM
+                newPwmValue = currentPwm;
+            }
             
             // Update message history
             const updatedMsgHis = [...msgHis, {
                 user: transcript,
                 assistant: llmResponse.response,
                 pwm: newPwmValue,
+                intentDetected: intentDetected,
                 timestamp: new Date().toISOString()
             }];
 
@@ -599,8 +666,11 @@ Be conversational and helpful. If the user asks to increase/decrease, adjust rel
 
             logger.log('Speech-to-text with LLM completed', {
                 transcriptionLength: transcript.length,
+                transcription: transcript,
                 currentPwm: currentPwm,
                 newPwmValue: newPwmValue,
+                intentDetected: intentDetected,
+                confidence: confidence,
                 messageHistoryLength: trimmedMsgHis.length
             });
 
@@ -611,13 +681,27 @@ Be conversational and helpful. If the user asks to increase/decrease, adjust rel
                 reasoning: llmResponse.reasoning,
                 newPwmValue: newPwmValue,
                 previousPwm: currentPwm,
+                intentDetected: intentDetected,
                 msgHis: trimmedMsgHis,
-                detectedLanguage: speechResponse.results[0]?.languageCode || null,
-                confidence: speechResponse.results[0]?.alternatives[0]?.confidence || 0
+                detectedLanguage: detectedLanguage,
+                confidence: confidence
             });
 
         } catch (error) {
             logger.error('Speech-to-text with LLM error:', error);
+            
+            // Check if it's a speech recognition error specifically
+            if (error.message && error.message.includes('speech')) {
+                return res.status(200).json({
+                    success: false,
+                    error: 'Speech recognition failed - audio may be unclear or too noisy',
+                    transcription: '',
+                    newPwmValue: currentPwm,  // Keep current PWM on speech errors
+                    msgHis: msgHis,
+                    details: error.message
+                });
+            }
+            
             res.status(500).json({
                 success: false,
                 error: 'Speech-to-text with LLM processing failed',
