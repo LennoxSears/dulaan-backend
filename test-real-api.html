@@ -90,6 +90,8 @@
         <button class="button" onclick="testSingleLanguage('spanish')" id="testEsBtn">🇪🇸 Test Spanish</button>
         <button class="button" onclick="testSingleLanguage('chinese')" id="testZhBtn">🇨🇳 Test Chinese</button>
         <button class="button" onclick="testApiConnectivity()" id="testConnBtn">🔧 Test API Connectivity</button>
+        <button class="button" onclick="testWithMicrophone()" id="testMicBtn">🎤 Test with Real Microphone</button>
+        <button class="button" onclick="testLLMOnly()" id="testLLMBtn">🤖 Test LLM Only</button>
         <button class="button" onclick="clearOutput()">🗑️ Clear Output</button>
         
         <div id="test-output" class="test-output">
@@ -122,7 +124,7 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
         }
         
         function setButtonsEnabled(enabled) {
-            const buttons = ['runAllBtn', 'testEnBtn', 'testEsBtn', 'testZhBtn', 'testConnBtn'];
+            const buttons = ['runAllBtn', 'testEnBtn', 'testEsBtn', 'testZhBtn', 'testConnBtn', 'testMicBtn', 'testLLMBtn'];
             buttons.forEach(id => {
                 document.getElementById(id).disabled = !enabled;
             });
@@ -176,7 +178,164 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
             }
         }
         
-        // Generate test audio data - simplified for better speech recognition
+        // Test with real microphone input
+        async function testWithMicrophone() {
+            setButtonsEnabled(false);
+            
+            log(`\n🎤 Testing with Real Microphone...`);
+            
+            try {
+                // Request microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        sampleRate: 16000,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    }
+                });
+                
+                log(`✅ Microphone access granted`, 'success');
+                log(`🎙️ Please say "turn it up" clearly and wait...`);
+                
+                // Create audio context and recorder
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+                const source = audioContext.createMediaStreamSource(stream);
+                const processor = audioContext.createScriptProcessor(4096, 1, 1);
+                
+                const audioData = [];
+                let recording = true;
+                
+                processor.onaudioprocess = function(e) {
+                    if (recording) {
+                        const inputData = e.inputBuffer.getChannelData(0);
+                        // Convert to Int16Array
+                        for (let i = 0; i < inputData.length; i++) {
+                            const sample = Math.max(-1, Math.min(1, inputData[i]));
+                            audioData.push(Math.round(sample * 32767));
+                        }
+                    }
+                };
+                
+                source.connect(processor);
+                processor.connect(audioContext.destination);
+                
+                // Record for 3 seconds
+                setTimeout(async () => {
+                    recording = false;
+                    stream.getTracks().forEach(track => track.stop());
+                    processor.disconnect();
+                    source.disconnect();
+                    
+                    log(`🎵 Recorded ${audioData.length} samples (${(audioData.length / 16000).toFixed(2)}s)`);
+                    
+                    // Test with recorded audio
+                    try {
+                        const result = await callRealApi(
+                            audioData,
+                            100,
+                            [],
+                            'en-US',
+                            { language: 'English', command: 'Real microphone input' }
+                        );
+                        
+                        log(`\n📋 Real Microphone Test Results:`);
+                        log(`   - Success: ${result.success ? '✅' : '❌'}`);
+                        log(`   - Transcription: "${result.transcription || 'None'}"`);
+                        log(`   - Confidence: ${result.confidence ? (result.confidence * 100).toFixed(1) + '%' : 'N/A'}`);
+                        
+                    } catch (error) {
+                        log(`❌ Real microphone test failed: ${error.message}`, 'error');
+                    }
+                    
+                    setButtonsEnabled(true);
+                }, 3000);
+                
+            } catch (error) {
+                log(`❌ Microphone access failed: ${error.message}`, 'error');
+                setButtonsEnabled(true);
+            }
+        }
+        
+        // Test LLM processing only (bypass speech recognition)
+        async function testLLMOnly() {
+            setButtonsEnabled(false);
+            
+            log(`\n🤖 Testing LLM Processing Only...`);
+            log(`This bypasses speech recognition and tests the motor control logic directly.`);
+            
+            const testCases = [
+                { transcript: 'turn it up', language: 'English', expected: 'increase' },
+                { transcript: 'más fuerte', language: 'Spanish', expected: 'increase' },
+                { transcript: '加强', language: 'Chinese', expected: 'increase' }
+            ];
+            
+            for (const testCase of testCases) {
+                try {
+                    log(`\n🧪 Testing "${testCase.transcript}" (${testCase.language})`);
+                    
+                    const testRequest = {
+                        msgHis: [],
+                        testMode: true, // Enable test mode
+                        testTranscript: testCase.transcript, // Provide transcript directly
+                        currentPwm: 100,
+                        encoding: 'LINEAR16',
+                        sampleRateHertz: 16000,
+                        languageCode: testCase.language === 'English' ? 'en-US' : 
+                                     testCase.language === 'Spanish' ? 'es-ES' : 'zh-CN'
+                    };
+                    
+                    log(`📡 Sending test request with transcript: "${testCase.transcript}"`);
+                    
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(testRequest)
+                    });
+                    
+                    log(`📊 Response Status: ${response.status} ${response.statusText}`);
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        log(`✅ LLM test successful!`, 'success');
+                        log(`🎤 Transcript: "${result.transcription}"`);
+                        log(`🤖 Response: "${result.response}"`);
+                        log(`⚡ PWM: ${result.previousPwm} → ${result.newPwmValue}`);
+                        log(`🎯 Intent detected: ${result.intentDetected}`);
+                        log(`📈 Confidence: ${(result.confidence * 100).toFixed(1)}%`);
+                        
+                        // Validate results
+                        const pwmIncreased = result.newPwmValue > result.previousPwm;
+                        const intentDetected = result.intentDetected;
+                        const hasResponse = result.response && result.response.length > 0;
+                        
+                        log(`📋 Validation:`);
+                        log(`   - Intent detected: ${intentDetected ? '✅' : '❌'}`);
+                        log(`   - PWM increased: ${pwmIncreased ? '✅' : '❌'}`);
+                        log(`   - Has response: ${hasResponse ? '✅' : '❌'}`);
+                        log(`   - Overall: ${(intentDetected && pwmIncreased && hasResponse) ? '✅ SUCCESS' : '❌ FAILED'}`, 
+                            (intentDetected && pwmIncreased && hasResponse) ? 'success' : 'error');
+                        
+                    } else {
+                        const errorText = await response.text();
+                        log(`❌ LLM test failed: ${errorText}`, 'error');
+                    }
+                    
+                } catch (error) {
+                    log(`❌ LLM test error: ${error.message}`, 'error');
+                }
+                
+                // Small delay between tests
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            log(`\n🏁 LLM-only testing completed!`, 'success');
+            setButtonsEnabled(true);
+        }
+        
+        // Generate test audio data - using white noise with speech-like characteristics
         function generateTestAudio(duration, language) {
             const sampleRate = 16000;
             const samples = Math.floor(duration * sampleRate);
@@ -385,6 +544,163 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
             } finally {
                 setButtonsEnabled(true);
             }
+        }
+        
+        // Test with real microphone input
+        async function testWithMicrophone() {
+            setButtonsEnabled(false);
+            
+            log(`\n🎤 Testing with Real Microphone...`);
+            
+            try {
+                // Request microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        sampleRate: 16000,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    }
+                });
+                
+                log(`✅ Microphone access granted`, 'success');
+                log(`🎙️ Please say "turn it up" clearly and wait...`);
+                
+                // Create audio context and recorder
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+                const source = audioContext.createMediaStreamSource(stream);
+                const processor = audioContext.createScriptProcessor(4096, 1, 1);
+                
+                const audioData = [];
+                let recording = true;
+                
+                processor.onaudioprocess = function(e) {
+                    if (recording) {
+                        const inputData = e.inputBuffer.getChannelData(0);
+                        // Convert to Int16Array
+                        for (let i = 0; i < inputData.length; i++) {
+                            const sample = Math.max(-1, Math.min(1, inputData[i]));
+                            audioData.push(Math.round(sample * 32767));
+                        }
+                    }
+                };
+                
+                source.connect(processor);
+                processor.connect(audioContext.destination);
+                
+                // Record for 3 seconds
+                setTimeout(async () => {
+                    recording = false;
+                    stream.getTracks().forEach(track => track.stop());
+                    processor.disconnect();
+                    source.disconnect();
+                    
+                    log(`🎵 Recorded ${audioData.length} samples (${(audioData.length / 16000).toFixed(2)}s)`);
+                    
+                    // Test with recorded audio
+                    try {
+                        const result = await callRealApi(
+                            audioData,
+                            100,
+                            [],
+                            'en-US',
+                            { language: 'English', command: 'Real microphone input' }
+                        );
+                        
+                        log(`\n📋 Real Microphone Test Results:`);
+                        log(`   - Success: ${result.success ? '✅' : '❌'}`);
+                        log(`   - Transcription: "${result.transcription || 'None'}"`);
+                        log(`   - Confidence: ${result.confidence ? (result.confidence * 100).toFixed(1) + '%' : 'N/A'}`);
+                        
+                    } catch (error) {
+                        log(`❌ Real microphone test failed: ${error.message}`, 'error');
+                    }
+                    
+                    setButtonsEnabled(true);
+                }, 3000);
+                
+            } catch (error) {
+                log(`❌ Microphone access failed: ${error.message}`, 'error');
+                setButtonsEnabled(true);
+            }
+        }
+        
+        // Test LLM processing only (bypass speech recognition)
+        async function testLLMOnly() {
+            setButtonsEnabled(false);
+            
+            log(`\n🤖 Testing LLM Processing Only...`);
+            log(`This bypasses speech recognition and tests the motor control logic directly.`);
+            
+            const testCases = [
+                { transcript: 'turn it up', language: 'English', expected: 'increase' },
+                { transcript: 'más fuerte', language: 'Spanish', expected: 'increase' },
+                { transcript: '加强', language: 'Chinese', expected: 'increase' }
+            ];
+            
+            for (const testCase of testCases) {
+                try {
+                    log(`\n🧪 Testing "${testCase.transcript}" (${testCase.language})`);
+                    
+                    const testRequest = {
+                        msgHis: [],
+                        testMode: true, // Enable test mode
+                        testTranscript: testCase.transcript, // Provide transcript directly
+                        currentPwm: 100,
+                        encoding: 'LINEAR16',
+                        sampleRateHertz: 16000,
+                        languageCode: testCase.language === 'English' ? 'en-US' : 
+                                     testCase.language === 'Spanish' ? 'es-ES' : 'zh-CN'
+                    };
+                    
+                    log(`📡 Sending test request with transcript: "${testCase.transcript}"`);
+                    
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(testRequest)
+                    });
+                    
+                    log(`📊 Response Status: ${response.status} ${response.statusText}`);
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        log(`✅ LLM test successful!`, 'success');
+                        log(`🎤 Transcript: "${result.transcription}"`);
+                        log(`🤖 Response: "${result.response}"`);
+                        log(`⚡ PWM: ${result.previousPwm} → ${result.newPwmValue}`);
+                        log(`🎯 Intent detected: ${result.intentDetected}`);
+                        log(`📈 Confidence: ${(result.confidence * 100).toFixed(1)}%`);
+                        
+                        // Validate results
+                        const pwmIncreased = result.newPwmValue > result.previousPwm;
+                        const intentDetected = result.intentDetected;
+                        const hasResponse = result.response && result.response.length > 0;
+                        
+                        log(`📋 Validation:`);
+                        log(`   - Intent detected: ${intentDetected ? '✅' : '❌'}`);
+                        log(`   - PWM increased: ${pwmIncreased ? '✅' : '❌'}`);
+                        log(`   - Has response: ${hasResponse ? '✅' : '❌'}`);
+                        log(`   - Overall: ${(intentDetected && pwmIncreased && hasResponse) ? '✅ SUCCESS' : '❌ FAILED'}`, 
+                            (intentDetected && pwmIncreased && hasResponse) ? 'success' : 'error');
+                        
+                    } else {
+                        const errorText = await response.text();
+                        log(`❌ LLM test failed: ${errorText}`, 'error');
+                    }
+                    
+                } catch (error) {
+                    log(`❌ LLM test error: ${error.message}`, 'error');
+                }
+                
+                // Small delay between tests
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            log(`\n🏁 LLM-only testing completed!`, 'success');
+            setButtonsEnabled(true);
         }
         
         // Run all tests
