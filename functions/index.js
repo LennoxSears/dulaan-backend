@@ -510,24 +510,20 @@ exports.speechToTextWithLLM = onRequest(
                     }
                 };
 
-                // Optimized language detection for CHIRP model
+                // Streamlined language detection for maximum performance
                 if (req.body.languageCode && req.body.languageCode !== 'auto') {
                     // Use specific language if provided
                     speechConfig.languageCode = req.body.languageCode;
                 } else {
-                    // CHIRP model has superior automatic language detection
-                    // Use fewer alternatives for better performance
+                    // Simplified to English and Spanish only for optimal performance
                     speechConfig.languageCode = 'en-US'; // Primary language
-                    speechConfig.alternativeLanguageCodes = [
-                        // Top languages for motor control commands (reduced for better performance)
-                        'zh-CN', 'es-ES', 'fr-FR', 'de-DE', 'ja-JP', 'ko-KR',
-                        'it-IT', 'pt-BR', 'ru-RU', 'ar-SA', 'hi-IN'
-                    ];
+                    speechConfig.alternativeLanguageCodes = ['es-ES']; // Spanish only
                     
-                    logger.log('Using CHIRP model with optimized language detection', {
+                    logger.log('Using CHIRP model with streamlined language detection', {
                         primaryLanguage: speechConfig.languageCode,
-                        alternativeLanguagesCount: speechConfig.alternativeLanguageCodes.length,
-                        model: 'chirp'
+                        alternativeLanguages: speechConfig.alternativeLanguageCodes,
+                        model: 'chirp',
+                        optimization: 'English + Spanish only for maximum performance'
                     });
                 }
 
