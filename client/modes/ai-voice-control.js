@@ -101,10 +101,14 @@ export class AIVoiceControl {
 
     async processSpeechSegment(speechData) {
         try {
-            console.log('Processing speech with AI...');
+            console.log('Processing speech with AI...', {
+                dataType: Array.isArray(speechData) ? 'Int16Array' : typeof speechData,
+                dataLength: Array.isArray(speechData) ? speechData.length : 'N/A'
+            });
             
+            // speechData is now an Int16Array (as regular array) instead of base64 string
             const result = await this.sdk.api.speechToTextWithLLM(
-                speechData,
+                speechData, // Int16Array buffer
                 this.sdk.motor.getCurrentPwm(),
                 this.messageHistory
             );
@@ -119,6 +123,8 @@ export class AIVoiceControl {
                 
                 console.log(`AI Response: ${result.response}`);
                 console.log(`PWM updated to: ${result.newPwmValue}`);
+                console.log(`Intent detected: ${result.intentDetected}`);
+                console.log(`Confidence: ${result.confidence}`);
                 
                 // Trigger event for UI updates
                 this.onAIResponse(result);
