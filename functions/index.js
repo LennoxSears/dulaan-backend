@@ -442,13 +442,13 @@ exports.speechToTextWithLLM = onRequest(
                 return res.status(405).json({ error: 'Method not allowed. Use POST.' });
             }
 
-            // Validate required fields
-            const { msgHis, audioBuffer, audioUri, currentPwm } = req.body;
+            // Validate required fields - support both old and new formats
+            const { msgHis, audioBuffer, audioContent, audioUri, currentPwm } = req.body;
 
-            // Check if audio data is provided
-            if (!audioBuffer && !audioUri) {
+            // Check if audio data is provided (support both audioBuffer and legacy audioContent)
+            if (!audioBuffer && !audioContent && !audioUri) {
                 return res.status(400).json({ 
-                    error: 'Missing audio data. Provide either audioBuffer (Int16Array) or audioUri.' 
+                    error: 'Missing audio data. Provide either audioBuffer (Int16Array), audioContent (base64), or audioUri.' 
                 });
             }
 
@@ -474,6 +474,12 @@ exports.speechToTextWithLLM = onRequest(
             if (audioBuffer) {
                 // Convert audioBuffer array to Int16Array buffer (from stream.js approach)
                 const int16Data = new Int16Array(audioBuffer);
+                
+                logger.log('Processing audioBuffer (Int16Array format)', {
+                    audioBufferLength: audioBuffer.length,
+                    int16DataLength: int16Data.length,
+                    bufferBytes: int16Data.buffer.byteLength
+                });
                 
                 const speechConfig = {
                     encoding: 'LINEAR16',  // Int16Array is LINEAR16 PCM data
@@ -530,6 +536,64 @@ exports.speechToTextWithLLM = onRequest(
                         detectedLanguage = bestResult.languageCode || null;
                         
                         // Filter out low-confidence results (below 0.3)
+                        if (confidence < 0.3 && transcript.trim().length > 0) {
+                            logger.log('Low confidence transcription filtered out', { 
+                                transcript, 
+                                confidence,
+                                threshold: 0.3 
+                            });
+                            transcript = '';
+                        }
+                    }
+                }
+            } else if (audioContent) {
+                // Handle legacy base64 audioContent format
+                logger.log('Processing audioContent (legacy base64 format)', {
+                    audioContentLength: audioContent.length
+                });
+                
+                const speechConfig = {
+                    encoding: req.body.encoding || 'LINEAR16',
+                    enableAutomaticPunctuation: true,
+                    enableWordTimeOffsets: false,
+                    enableWordConfidence: true,
+                    model: 'latest_short',
+                    useEnhanced: true,
+                    profanityFilter: false,
+                    maxAlternatives: 1,
+                    audioChannelCount: 1,
+                    sampleRateHertz: req.body.sampleRateHertz || 16000
+                };
+
+                if (req.body.languageCode) {
+                    speechConfig.languageCode = req.body.languageCode;
+                } else {
+                    speechConfig.languageCode = 'en-US';
+                    speechConfig.alternativeLanguageCodes = [
+                        'en-GB', 'es-ES', 'fr-FR', 'de-DE', 'it-IT', 'pt-PT', 
+                        'ru-RU', 'ja-JP', 'ko-KR', 'zh-CN', 'zh-TW', 'ar-SA', 
+                        'hi-IN', 'nl-NL', 'sv-SE', 'da-DK', 'no-NO', 'fi-FI', 
+                        'pl-PL', 'cs-CZ', 'hu-HU', 'tr-TR', 'he-IL', 'th-TH',
+                        'vi-VN', 'id-ID', 'ms-MY', 'tl-PH', 'uk-UA', 'bg-BG',
+                        'hr-HR', 'sk-SK', 'sl-SI', 'et-EE', 'lv-LV', 'lt-LT'
+                    ];
+                }
+
+                const speechRequest = { 
+                    config: speechConfig,
+                    audio: { content: audioContent }
+                };
+
+                const [speechResponse] = await speechClient.recognize(speechRequest);
+                
+                if (speechResponse.results && speechResponse.results.length > 0) {
+                    const bestResult = speechResponse.results[0];
+                    if (bestResult.alternatives && bestResult.alternatives.length > 0) {
+                        const bestAlternative = bestResult.alternatives[0];
+                        transcript = bestAlternative.transcript || '';
+                        confidence = bestAlternative.confidence || 0;
+                        detectedLanguage = bestResult.languageCode || null;
+                        
                         if (confidence < 0.3 && transcript.trim().length > 0) {
                             logger.log('Low confidence transcription filtered out', { 
                                 transcript, 

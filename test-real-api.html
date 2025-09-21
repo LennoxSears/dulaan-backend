@@ -214,25 +214,75 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
             try {
                 log(`   📡 Making API request to: ${API_URL}`);
                 
+                // Try both new and legacy formats for compatibility
+                let requestBody = {
+                    msgHis: msgHis,
+                    audioBuffer: audioBuffer, // New Int16Array format
+                    currentPwm: currentPwm,
+                    encoding: 'LINEAR16',
+                    sampleRateHertz: 16000,
+                    languageCode: languageCode
+                };
+                
+                log(`   📦 Request payload size: ${JSON.stringify(requestBody).length} bytes`);
+                
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        msgHis: msgHis,
-                        audioBuffer: audioBuffer,
-                        currentPwm: currentPwm,
-                        encoding: 'LINEAR16',
-                        sampleRateHertz: 16000,
-                        languageCode: languageCode
-                    })
+                    body: JSON.stringify(requestBody)
                 });
                 
                 log(`   📊 API Response Status: ${response.status} ${response.statusText}`);
                 
                 if (!response.ok) {
                     const errorText = await response.text();
+                    
+                    // If audioBuffer format fails, try legacy audioContent format
+                    if (response.status === 400 && errorText.includes('audioContent')) {
+                        log(`   ⚠️  New format failed, trying legacy base64 format...`, 'warning');
+                        
+                        // Convert Int16Array to base64 for legacy compatibility
+                        const int16Data = new Int16Array(audioBuffer);
+                        const uint8Array = new Uint8Array(int16Data.buffer);
+                        let base64Audio = '';
+                        
+                        // Convert to base64 in chunks to avoid stack overflow
+                        const chunkSize = 8192;
+                        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                            const chunk = uint8Array.slice(i, i + chunkSize);
+                            base64Audio += btoa(String.fromCharCode.apply(null, chunk));
+                        }
+                        
+                        const legacyRequestBody = {
+                            msgHis: msgHis,
+                            audioContent: base64Audio, // Legacy base64 format
+                            currentPwm: currentPwm,
+                            encoding: 'LINEAR16',
+                            sampleRateHertz: 16000,
+                            languageCode: languageCode
+                        };
+                        
+                        log(`   📦 Legacy payload size: ${JSON.stringify(legacyRequestBody).length} bytes`);
+                        
+                        const legacyResponse = await fetch(API_URL, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(legacyRequestBody)
+                        });
+                        
+                        if (!legacyResponse.ok) {
+                            const legacyErrorText = await legacyResponse.text();
+                            throw new Error(`API error ${legacyResponse.status}: ${legacyErrorText}`);
+                        }
+                        
+                        log(`   ✅ Legacy format worked!`, 'success');
+                        return await legacyResponse.json();
+                    }
+                    
                     throw new Error(`API error ${response.status}: ${errorText}`);
                 }
                 
