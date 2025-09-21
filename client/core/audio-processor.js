@@ -38,6 +38,11 @@ class RingBuffer {
         if (this.count > firstPart) {
             out.set(this.buffer.subarray(0, this.count - firstPart), firstPart);
         }
+        
+        // Clear the buffer after reading (fix critical bug)
+        this.head = this.tail;
+        this.count = 0;
+        
         return out;
     }
 
@@ -133,16 +138,27 @@ class AudioProcessor {
     }
 
     /**
-     * Convert audio energy to PWM value
+     * Convert audio energy to PWM value (matches stream.js implementation)
      */
     audio2PWM(maxEnergy) {
-        const energy = this.audioState.lastRMS;
-        if (energy <= 0) return 0;
+        const pcmData = this.audioState.abiBuffer.readAll();
+        if (pcmData.length === 0) {
+            return -1;
+        }
         
-        const normalizedEnergy = Math.min(energy / maxEnergy, 1.0);
-        const pwmValue = Math.round(normalizedEnergy * 255);
+        let energy = 0;
+        for (let i = 0; i < pcmData.length; i++) {
+            if (isNaN(pcmData[i])) {
+                pcmData[i] = 0;
+            }
+            energy += pcmData[i] ** 2;
+        }
         
-        return Math.max(0, Math.min(255, pwmValue));
+        const rms = Math.sqrt(energy / pcmData.length);
+        this.audioState.lastRMS = rms;
+        
+        const pwmValue = Math.round((rms / maxEnergy) * 255);
+        return pwmValue > 255 ? 255 : pwmValue;
     }
 
     /**
@@ -240,32 +256,11 @@ class AudioProcessor {
     }
 
     /**
-     * Calculate ambient PWM value from accumulated buffer data (matches stream.js audio2PWM)
+     * Calculate ambient PWM value from accumulated buffer data (deprecated - use audio2PWM)
      */
     calculateAmbientPWM(maxEnergy) {
-        try {
-            const pcmData = this.audioState.abiBuffer.readAll();
-            if (pcmData.length === 0) {
-                return -1;
-            }
-            
-            let energy = 0;
-            for (let i = 0; i < pcmData.length; i++) {
-                if (isNaN(pcmData[i])) {
-                    pcmData[i] = 0;
-                }
-                energy += pcmData[i] ** 2;
-            }
-            
-            const rms = Math.sqrt(energy / pcmData.length);
-            this.audioState.lastRMS = rms;
-            
-            const pwmValue = Math.round((rms / maxEnergy) * 255);
-            return pwmValue > 255 ? 255 : pwmValue;
-        } catch (error) {
-            console.error("Ambient PWM calculation failed:", error);
-            return -1;
-        }
+        // Redirect to the corrected audio2PWM method
+        return this.audio2PWM(maxEnergy);
     }
 
     /**
@@ -351,10 +346,32 @@ class AudioProcessor {
     }
 
     /**
-     * Legacy method for compatibility (deprecated - use calculateAmbientPWM)
+     * Add monitoring capability like stream.js
      */
-    audio2PWM(maxEnergy) {
-        return this.calculateAmbientPWM(maxEnergy);
+    startMonitoring(intervalMs = 5000) {
+        if (this.monitoringInterval) {
+            clearInterval(this.monitoringInterval);
+        }
+        
+        this.monitoringInterval = setInterval(() => {
+            console.log(
+                `[Audio Monitor] Buffer: ${this.audioState.ringBuffer.count}/${this.audioState.ringBuffer.size}`,
+                `Silence: ${this.audioState.silenceCounter}`,
+                `Energy: ${this.audioState.lastRMS.toFixed(4)}`,
+                `Zero crossings: ${this.audioState.lastZeroCrossings}`,
+                `Speaking: ${this.audioState.isSpeaking}`
+            );
+        }, intervalMs);
+    }
+    
+    /**
+     * Stop monitoring
+     */
+    stopMonitoring() {
+        if (this.monitoringInterval) {
+            clearInterval(this.monitoringInterval);
+            this.monitoringInterval = null;
+        }
     }
 
     /**
