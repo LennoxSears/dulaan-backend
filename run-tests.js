@@ -7,7 +7,11 @@
 
 // Add fetch polyfill for Node.js if needed
 if (typeof fetch === 'undefined') {
-    global.fetch = require('node-fetch');
+    try {
+        global.fetch = require('node-fetch');
+    } catch (e) {
+        console.warn('node-fetch not available, fetch calls may fail in Node.js environment');
+    }
 }
 
 console.log('🚀 Real API Speech Pipeline Test - Multi-language Motor Commands\n');

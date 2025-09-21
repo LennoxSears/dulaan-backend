@@ -72,7 +72,7 @@
         <div class="api-info">
             <strong>🔗 API Endpoint:</strong> https://speechtotextwithllm-qveg3gkwxa-ew.a.run.app<br>
             <strong>🎯 Test Type:</strong> Real Google Speech-to-Text + Gemini LLM<br>
-            <strong>📊 Audio Format:</strong> Int16Array (LINEAR16 PCM, 16kHz)
+            <strong>📊 Audio Format:</strong> Int16Array (LINEAR16 PCM, 16kHz) - New Efficient Format
         </div>
         
         <div class="stats">
@@ -214,19 +214,23 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
             try {
                 log(`   📡 Making API request to: ${API_URL}`);
                 
+                const requestBody = {
+                    msgHis: msgHis,
+                    audioBuffer: audioBuffer, // Int16Array format
+                    currentPwm: currentPwm,
+                    encoding: 'LINEAR16',
+                    sampleRateHertz: 16000,
+                    languageCode: languageCode
+                };
+                
+                log(`   📦 Request payload size: ${JSON.stringify(requestBody).length} bytes`);
+                
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        msgHis: msgHis,
-                        audioBuffer: audioBuffer,
-                        currentPwm: currentPwm,
-                        encoding: 'LINEAR16',
-                        sampleRateHertz: 16000,
-                        languageCode: languageCode
-                    })
+                    body: JSON.stringify(requestBody)
                 });
                 
                 log(`   📊 API Response Status: ${response.status} ${response.statusText}`);
