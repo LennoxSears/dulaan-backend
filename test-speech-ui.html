@@ -382,7 +382,20 @@
         
         <!-- Status Display -->
         <div id="status" class="status info">
-            Ready to test speech recognition. Click "Start Recording" to begin.
+            Initializing speech recognition test interface...
+        </div>
+        
+        <!-- Troubleshooting Section -->
+        <div id="troubleshooting" class="status warning" style="display: none;">
+            <h4>🔧 Microphone Troubleshooting</h4>
+            <ul style="text-align: left; margin: 10px 0;">
+                <li><strong>Chrome/Edge:</strong> Click the 🔒 lock icon in address bar → Allow microphone</li>
+                <li><strong>Firefox:</strong> Click the 🎤 microphone icon in address bar → Allow</li>
+                <li><strong>Safari:</strong> Safari menu → Settings → Websites → Microphone → Allow</li>
+                <li><strong>No microphone found:</strong> Check if microphone is connected and working</li>
+                <li><strong>Still not working:</strong> Try refreshing the page or restarting your browser</li>
+            </ul>
+            <button onclick="hideTroubleshooting()" class="btn btn-secondary" style="margin-top: 10px;">Hide Troubleshooting</button>
         </div>
         
         <!-- Controls -->
@@ -416,6 +429,22 @@
                     <option value="fr-FR">French</option>
                     <option value="de-DE">German</option>
                 </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Microphone</label>
+                <select id="deviceSelect">
+                    <option value="">Detecting devices...</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Audio Test</label>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button id="testMicBtn" class="btn btn-secondary">🎤 Test Microphone</button>
+                    <button id="refreshDevicesBtn" class="btn btn-secondary">🔄 Refresh Devices</button>
+                    <button id="troubleshootBtn" class="btn btn-secondary">🔧 Troubleshoot</button>
+                </div>
             </div>
         </div>
         
@@ -641,16 +670,29 @@
                 log('Requesting microphone access...');
                 updateStatus('Requesting microphone access...', 'info');
                 
-                // Request microphone access
-                mediaStream = await navigator.mediaDevices.getUserMedia({
+                // Check if devices are available
+                if (availableDevices.length === 0) {
+                    const devicesDetected = await detectAudioDevicesWithFallback();
+                    if (!devicesDetected) {
+                        showError('No microphone available. Please connect a microphone and refresh the device list.');
+                        return;
+                    }
+                }
+                
+                // Request microphone access with specific device
+                const constraints = {
                     audio: {
+                        deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
                         sampleRate: config.sampleRate,
                         channelCount: 1,
                         echoCancellation: true,
                         noiseSuppression: true,
                         autoGainControl: true
                     }
-                });
+                };
+                
+                log(`Using device: ${availableDevices.find(d => d.deviceId === selectedDeviceId)?.label || 'Default'}`);
+                mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
                 
                 log('Microphone access granted');
                 
@@ -1383,6 +1425,545 @@
                 resultsContainer.innerHTML = '<p style="text-align: center; color: #666; font-style: italic;">No test results yet. Start recording to see speech recognition results.</p>';
                 
                 log('🗑️ Cleared all test results');
+            }
+        }
+        
+        // Device detection and management
+        let availableDevices = [];
+        let selectedDeviceId = null;
+        
+        async function detectAudioDevices() {
+            try {
+                log('🎤 Detecting available audio devices...');
+                
+                // Request permission first
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(track => track.stop()); // Stop the stream immediately
+                
+                // Get all devices
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                availableDevices = devices.filter(device => device.kind === 'audioinput');
+                
+                log(`Found ${availableDevices.length} audio input device(s):`);
+                availableDevices.forEach((device, index) => {
+                    log(`  ${index + 1}. ${device.label || `Microphone ${index + 1}`} (${device.deviceId.slice(0, 8)}...)`);
+                });
+                
+                if (availableDevices.length === 0) {
+                    throw new Error('No audio input devices found');
+                }
+                
+                // Use first device as default
+                selectedDeviceId = availableDevices[0].deviceId;
+                updateDeviceSelector();
+                
+                return true;
+                
+            } catch (error) {
+                reportDetailedError(error, 'during device detection');
+                
+                if (error.name === 'NotFoundError') {
+                    showError('No microphone found. Please connect a microphone and refresh the page.');
+                } else if (error.name === 'NotAllowedError') {
+                    showError('Microphone access denied. Please allow microphone access and refresh the page.');
+                } else if (error.name === 'NotSupportedError') {
+                    showError('Your browser does not support microphone access. Please use Chrome, Firefox, or Safari.');
+                } else {
+                    showError(`Microphone error: ${error.message}`);
+                }
+                
+                return false;
+            }
+        }
+        
+        // Troubleshooting UI functions
+        function showTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'block';
+            troubleshootingDiv.scrollIntoView({ behavior: 'smooth' });
+            log('🔧 Showing troubleshooting guide');
+        }
+        
+        function hideTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'none';
+            log('🔧 Hiding troubleshooting guide');
+        }
+        
+        // Enhanced error reporting
+        function reportDetailedError(error, context = '') {
+            log(`❌ Detailed error report ${context}:`);
+            log(`   Name: ${error.name}`);
+            log(`   Message: ${error.message}`);
+            log(`   Stack: ${error.stack?.split('\n')[0] || 'No stack trace'}`);
+            
+            // Browser-specific guidance
+            const userAgent = navigator.userAgent;
+            if (userAgent.includes('Chrome')) {
+                log('   Browser: Chrome - Check site permissions in address bar');
+            } else if (userAgent.includes('Firefox')) {
+                log('   Browser: Firefox - Check microphone icon in address bar');
+            } else if (userAgent.includes('Safari')) {
+                log('   Browser: Safari - Check Safari → Settings → Websites → Microphone');
+            } else {
+                log('   Browser: Unknown - Try Chrome, Firefox, or Safari');
+            }
+            
+            // Show troubleshooting automatically for certain errors
+            if (error.name === 'NotAllowedError' || error.name === 'NotFoundError') {
+                setTimeout(showTroubleshooting, 1000);
+            }
+        }
+        
+        function updateDeviceSelector() {
+            const deviceSelect = document.getElementById('deviceSelect');
+            if (!deviceSelect) return;
+            
+            // Clear existing options
+            deviceSelect.innerHTML = '';
+            
+            if (availableDevices.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No devices found';
+                option.disabled = true;
+                deviceSelect.appendChild(option);
+                return;
+            }
+            
+            // Add device options
+            availableDevices.forEach((device, index) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                
+                // Create descriptive label
+                let label = device.label || `Microphone ${index + 1}`;
+                if (device.deviceId === 'default') {
+                    label = `🎤 ${label} (Default)`;
+                } else {
+                    label = `🎤 ${label}`;
+                }
+                
+                option.textContent = label;
+                
+                if (device.deviceId === selectedDeviceId) {
+                    option.selected = true;
+                }
+                
+                deviceSelect.appendChild(option);
+            });
+            
+            // Add refresh option
+            const refreshOption = document.createElement('option');
+            refreshOption.value = 'refresh';
+            refreshOption.textContent = '🔄 Refresh Device List';
+            refreshOption.style.fontStyle = 'italic';
+            deviceSelect.appendChild(refreshOption);
+            
+            // Remove existing event listeners
+            deviceSelect.replaceWith(deviceSelect.cloneNode(true));
+            const newDeviceSelect = document.getElementById('deviceSelect');
+            
+            // Add event listener for device selection
+            newDeviceSelect.addEventListener('change', async (e) => {
+                const selectedValue = e.target.value;
+                
+                if (selectedValue === 'refresh') {
+                    log('🔄 Refreshing device list...');
+                    showInfo('Refreshing microphone list...');
+                    
+                    const devicesDetected = await detectAudioDevicesWithFallback();
+                    if (devicesDetected) {
+                        // Reset to first device after refresh
+                        e.target.selectedIndex = 0;
+                    }
+                } else {
+                    selectedDeviceId = selectedValue;
+                    const selectedDevice = availableDevices.find(d => d.deviceId === selectedValue);
+                    const deviceName = selectedDevice ? selectedDevice.label || 'Unknown Device' : 'Unknown';
+                    
+                    log(`📱 Switched to device: ${deviceName}`);
+                    showInfo(`Selected microphone: ${deviceName}`);
+                    
+                    // Test the selected device
+                    setTimeout(async () => {
+                        const testResult = await testMicrophone();
+                        if (!testResult) {
+                            log('⚠️ Selected device may not work properly');
+                        }
+                    }, 500);
+                }
+            });
+            
+            // Update status
+            if (availableDevices.length > 0) {
+                const currentDevice = availableDevices.find(d => d.deviceId === selectedDeviceId);
+                const deviceName = currentDevice ? currentDevice.label || 'Default' : 'Unknown';
+                log(`📱 Current device: ${deviceName}`);
+            }
+        }
+        
+        // Enhanced device refresh function
+        async function refreshDeviceList() {
+            log('🔄 Manually refreshing device list...');
+            showInfo('Refreshing microphone list...');
+            
+            try {
+                // Clear current devices
+                availableDevices = [];
+                selectedDeviceId = null;
+                
+                // Re-detect devices
+                const devicesDetected = await detectAudioDevicesWithFallback();
+                
+                if (devicesDetected) {
+                    showSuccess(`Device list refreshed. Found ${availableDevices.length} microphone(s).`);
+                } else {
+                    showError('No working microphones found after refresh.');
+                }
+                
+                return devicesDetected;
+                
+            } catch (error) {
+                log(`❌ Device refresh failed: ${error.message}`);
+                showError(`Device refresh failed: ${error.message}`);
+                return false;
+            }
+        }
+        
+        // Troubleshooting UI functions
+        function showTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'block';
+            troubleshootingDiv.scrollIntoView({ behavior: 'smooth' });
+            log('🔧 Showing troubleshooting guide');
+        }
+        
+        function hideTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'none';
+            log('🔧 Hiding troubleshooting guide');
+        }
+        
+        // Enhanced error reporting
+        function reportDetailedError(error, context = '') {
+            log(`❌ Detailed error report ${context}:`);
+            log(`   Name: ${error.name}`);
+            log(`   Message: ${error.message}`);
+            log(`   Stack: ${error.stack?.split('\n')[0] || 'No stack trace'}`);
+            
+            // Browser-specific guidance
+            const userAgent = navigator.userAgent;
+            if (userAgent.includes('Chrome')) {
+                log('   Browser: Chrome - Check site permissions in address bar');
+            } else if (userAgent.includes('Firefox')) {
+                log('   Browser: Firefox - Check microphone icon in address bar');
+            } else if (userAgent.includes('Safari')) {
+                log('   Browser: Safari - Check Safari → Settings → Websites → Microphone');
+            } else {
+                log('   Browser: Unknown - Try Chrome, Firefox, or Safari');
+            }
+            
+            // Show troubleshooting automatically for certain errors
+            if (error.name === 'NotAllowedError' || error.name === 'NotFoundError') {
+                setTimeout(showTroubleshooting, 1000);
+            }
+        }
+        
+        function showError(message) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status error';
+            statusDiv.textContent = message;
+            
+            // Also show in log
+            log(`❌ ${message}`);
+        }
+        
+        function showSuccess(message) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status success';
+            statusDiv.textContent = message;
+        }
+        
+        function showInfo(message) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status info';
+            statusDiv.textContent = message;
+        }
+        
+        // Microphone testing function
+        async function testMicrophone() {
+            try {
+                log('🧪 Testing microphone...');
+                showInfo('Testing microphone access...');
+                
+                // Try to get microphone access with fallback options
+                let stream = null;
+                let constraints = null;
+                
+                // First try: Use selected device with optimal settings
+                if (selectedDeviceId) {
+                    constraints = {
+                        audio: {
+                            deviceId: { exact: selectedDeviceId },
+                            sampleRate: config.sampleRate,
+                            channelCount: 1,
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        }
+                    };
+                    
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        log('✅ Selected device works with optimal settings');
+                    } catch (error) {
+                        log(`⚠️ Selected device failed with optimal settings: ${error.message}`);
+                    }
+                }
+                
+                // Second try: Use selected device with basic settings
+                if (!stream && selectedDeviceId) {
+                    constraints = {
+                        audio: {
+                            deviceId: { exact: selectedDeviceId }
+                        }
+                    };
+                    
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        log('✅ Selected device works with basic settings');
+                    } catch (error) {
+                        log(`⚠️ Selected device failed with basic settings: ${error.message}`);
+                    }
+                }
+                
+                // Third try: Use any available device with optimal settings
+                if (!stream) {
+                    constraints = {
+                        audio: {
+                            sampleRate: config.sampleRate,
+                            channelCount: 1,
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        }
+                    };
+                    
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        log('✅ Default device works with optimal settings');
+                    } catch (error) {
+                        log(`⚠️ Default device failed with optimal settings: ${error.message}`);
+                    }
+                }
+                
+                // Fourth try: Use any available device with basic settings
+                if (!stream) {
+                    constraints = { audio: true };
+                    
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        log('✅ Default device works with basic settings');
+                    } catch (error) {
+                        log(`❌ All microphone access attempts failed: ${error.message}`);
+                        throw error;
+                    }
+                }
+                
+                // Test the stream
+                if (stream) {
+                    const tracks = stream.getAudioTracks();
+                    if (tracks.length > 0) {
+                        const track = tracks[0];
+                        const settings = track.getSettings();
+                        
+                        log('🎤 Microphone test successful!');
+                        log(`   Device: ${track.label || 'Unknown'}`);
+                        log(`   Sample Rate: ${settings.sampleRate || 'Unknown'} Hz`);
+                        log(`   Channels: ${settings.channelCount || 'Unknown'}`);
+                        log(`   Echo Cancellation: ${settings.echoCancellation}`);
+                        log(`   Noise Suppression: ${settings.noiseSuppression}`);
+                        log(`   Auto Gain Control: ${settings.autoGainControl}`);
+                        
+                        showSuccess(`Microphone test successful! Device: ${track.label || 'Default'}`);
+                        
+                        // Stop the test stream
+                        stream.getTracks().forEach(track => track.stop());
+                        
+                        return true;
+                    } else {
+                        throw new Error('No audio tracks found in stream');
+                    }
+                }
+                
+            } catch (error) {
+                reportDetailedError(error, 'during microphone test');
+                
+                if (error.name === 'NotFoundError') {
+                    showError('No microphone found. Please connect a microphone and try again.');
+                } else if (error.name === 'NotAllowedError') {
+                    showError('Microphone access denied. Please allow microphone access in your browser settings.');
+                } else if (error.name === 'NotSupportedError') {
+                    showError('Your browser does not support microphone access. Please use Chrome, Firefox, or Safari.');
+                } else {
+                    showError(`Microphone test failed: ${error.message}`);
+                }
+                
+                return false;
+            }
+        }
+        
+        // Troubleshooting UI functions
+        function showTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'block';
+            troubleshootingDiv.scrollIntoView({ behavior: 'smooth' });
+            log('🔧 Showing troubleshooting guide');
+        }
+        
+        function hideTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'none';
+            log('🔧 Hiding troubleshooting guide');
+        }
+        
+        // Enhanced error reporting
+        function reportDetailedError(error, context = '') {
+            log(`❌ Detailed error report ${context}:`);
+            log(`   Name: ${error.name}`);
+            log(`   Message: ${error.message}`);
+            log(`   Stack: ${error.stack?.split('\n')[0] || 'No stack trace'}`);
+            
+            // Browser-specific guidance
+            const userAgent = navigator.userAgent;
+            if (userAgent.includes('Chrome')) {
+                log('   Browser: Chrome - Check site permissions in address bar');
+            } else if (userAgent.includes('Firefox')) {
+                log('   Browser: Firefox - Check microphone icon in address bar');
+            } else if (userAgent.includes('Safari')) {
+                log('   Browser: Safari - Check Safari → Settings → Websites → Microphone');
+            } else {
+                log('   Browser: Unknown - Try Chrome, Firefox, or Safari');
+            }
+            
+            // Show troubleshooting automatically for certain errors
+            if (error.name === 'NotAllowedError' || error.name === 'NotFoundError') {
+                setTimeout(showTroubleshooting, 1000);
+            }
+        }
+        
+        // Enhanced device detection with fallback options
+        async function detectAudioDevicesWithFallback() {
+            try {
+                // First try: Request permission and enumerate devices
+                const success = await detectAudioDevices();
+                if (success) return true;
+                
+                // Fallback: Try basic audio access
+                log('🔄 Trying fallback device detection...');
+                
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const tracks = stream.getAudioTracks();
+                    
+                    if (tracks.length > 0) {
+                        log('✅ Found at least one working audio device');
+                        availableDevices = [{
+                            deviceId: 'default',
+                            label: tracks[0].label || 'Default Microphone',
+                            kind: 'audioinput'
+                        }];
+                        selectedDeviceId = 'default';
+                        updateDeviceSelector();
+                        
+                        // Stop the test stream
+                        stream.getTracks().forEach(track => track.stop());
+                        
+                        showSuccess('Found working microphone. Ready to test speech recognition.');
+                        return true;
+                    }
+                } catch (fallbackError) {
+                    log(`❌ Fallback detection failed: ${fallbackError.message}`);
+                }
+                
+                return false;
+                
+            } catch (error) {
+                log(`❌ Device detection with fallback failed: ${error.message}`);
+                return false;
+            }
+        }
+        
+        // Troubleshooting UI functions
+        function showTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'block';
+            troubleshootingDiv.scrollIntoView({ behavior: 'smooth' });
+            log('🔧 Showing troubleshooting guide');
+        }
+        
+        function hideTroubleshooting() {
+            const troubleshootingDiv = document.getElementById('troubleshooting');
+            troubleshootingDiv.style.display = 'none';
+            log('🔧 Hiding troubleshooting guide');
+        }
+        
+        // Enhanced error reporting
+        function reportDetailedError(error, context = '') {
+            log(`❌ Detailed error report ${context}:`);
+            log(`   Name: ${error.name}`);
+            log(`   Message: ${error.message}`);
+            log(`   Stack: ${error.stack?.split('\n')[0] || 'No stack trace'}`);
+            
+            // Browser-specific guidance
+            const userAgent = navigator.userAgent;
+            if (userAgent.includes('Chrome')) {
+                log('   Browser: Chrome - Check site permissions in address bar');
+            } else if (userAgent.includes('Firefox')) {
+                log('   Browser: Firefox - Check microphone icon in address bar');
+            } else if (userAgent.includes('Safari')) {
+                log('   Browser: Safari - Check Safari → Settings → Websites → Microphone');
+            } else {
+                log('   Browser: Unknown - Try Chrome, Firefox, or Safari');
+            }
+            
+            // Show troubleshooting automatically for certain errors
+            if (error.name === 'NotAllowedError' || error.name === 'NotFoundError') {
+                setTimeout(showTroubleshooting, 1000);
+            }
+        }
+        
+        // Initialize the application
+        async function initializeApp() {
+            log('Speech-to-Text Accuracy Test initialized');
+            log(`Configuration: ${JSON.stringify(config, null, 2)}`);
+            
+            // Set up event listeners
+            document.getElementById('startBtn').addEventListener('click', startRecording);
+            document.getElementById('stopBtn').addEventListener('click', stopRecording);
+            document.getElementById('testMicBtn').addEventListener('click', testMicrophone);
+            document.getElementById('refreshDevicesBtn').addEventListener('click', refreshDeviceList);
+            document.getElementById('troubleshootBtn').addEventListener('click', showTroubleshooting);
+            
+            // Initialize audio context on first user interaction
+            document.addEventListener('click', async () => {
+                if (!audioContext) {
+                    try {
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                            sampleRate: config.sampleRate
+                        });
+                        log(`Audio context initialized: ${audioContext.sampleRate}Hz`);
+                    } catch (error) {
+                        log(`Error initializing audio context: ${error.message}`);
+                    }
+                }
+            }, { once: true });
+            
+            // Detect audio devices with fallback
+            const devicesDetected = await detectAudioDevicesWithFallback();
+            if (!devicesDetected) {
+                showError('No working microphone found. Please check your audio devices and refresh the page.');
             }
         }
         
