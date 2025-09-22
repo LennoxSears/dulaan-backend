@@ -13,6 +13,7 @@ import * as audioUtils from './utils/audio-utils.js';
 
 // Import control modes
 import { AIVoiceControl } from './modes/ai-voice-control.js';
+import { StreamingAIVoiceControl } from './modes/streaming-ai-voice-control.js';
 import { AmbientControl } from './modes/ambient-control.js';
 import { TouchControl } from './modes/touch-control.js';
 
@@ -29,6 +30,7 @@ class DulaanSDK {
         // Control modes
         this.modes = {
             ai: new AIVoiceControl(this),
+            streamingAI: new StreamingAIVoiceControl(this),
             ambient: new AmbientControl(this),
             touch: new TouchControl(this)
         };

@@ -445,12 +445,36 @@ exports.directAudioToPWM = onRequest(
             }
 
             // Extract request data
-            const { audioData, currentPwm = 100, msgHis = [] } = req.body;
+            const { 
+                audioData, 
+                currentPwm = 100, 
+                msgHis = [],
+                streamingMode = false,
+                isFinal = true,
+                chunkIndex = 0,
+                streamId = null,
+                immediateMode = false
+            } = req.body;
             
-            logger.log('Processing direct audio input', {
+            // Get streaming headers
+            const streamIdHeader = req.get('X-Stream-Id');
+            const chunkIndexHeader = req.get('X-Chunk-Index');
+            const isFinalHeader = req.get('X-Is-Final') === 'true';
+            const immediateHeader = req.get('X-Immediate') === 'true';
+            
+            const isStreaming = streamingMode || streamIdHeader;
+            const isImmediate = immediateMode || immediateHeader;
+            const finalChunk = isFinal || isFinalHeader;
+            
+            logger.log('Processing audio input', {
                 audioDataLength: audioData.length,
                 currentPwm: currentPwm,
                 messageHistoryLength: msgHis.length,
+                streamingMode: isStreaming,
+                isFinal: finalChunk,
+                chunkIndex: chunkIndex || chunkIndexHeader,
+                streamId: streamId || streamIdHeader,
+                immediateMode: isImmediate,
                 region: 'europe-west1'
             });
 
@@ -472,10 +496,42 @@ exports.directAudioToPWM = onRequest(
                 return `User: ${user}\nAssistant: ${assistant}`;
             }).join('\n\n');
 
-            // Create prompt for direct audio processing
-            const prompt = `You are a motor control assistant. Listen to the audio and determine if the user wants to control a motor device.
+            // Create prompt for audio processing (streaming or regular)
+            let prompt;
+            
+            if (isStreaming && !finalChunk) {
+                // Streaming mode - partial audio chunk
+                prompt = `You are a motor control assistant processing streaming audio. This is a partial audio chunk in an ongoing conversation.
 
 Current motor PWM value: ${currentPwm} (0-255 scale, where 0=off, 255=maximum)
+Streaming mode: Chunk ${chunkIndex || chunkIndexHeader || 0}
+
+Previous conversation:
+${conversationHistory || 'No previous conversation'}
+
+Instructions for streaming:
+1. Listen to this audio chunk and provide partial understanding
+2. If you detect clear motor control intent, respond immediately with PWM changes
+3. For partial/unclear audio, provide partial transcription and keep current PWM
+4. Be responsive - users expect real-time feedback
+
+Respond in this exact JSON format:
+{
+  "intentDetected": true/false,
+  "partialTranscription": "what you understood so far",
+  "transcription": "leave empty for partial chunks",
+  "pwm": number (0-255),
+  "response": "brief response for partial chunks",
+  "confidence": number (0-1),
+  "isPartial": true
+}`;
+            } else {
+                // Regular mode or final streaming chunk
+                prompt = `You are a motor control assistant. Listen to the audio and determine if the user wants to control a motor device.
+
+Current motor PWM value: ${currentPwm} (0-255 scale, where 0=off, 255=maximum)
+${isImmediate ? 'IMMEDIATE MODE: Respond quickly for urgent control.' : ''}
+${isStreaming ? 'STREAMING MODE: This is the final chunk of a streaming conversation.' : ''}
 
 Previous conversation:
 ${conversationHistory || 'No previous conversation'}
@@ -485,19 +541,21 @@ Instructions:
 2. Determine if they want to control the motor (turn on/off, increase/decrease intensity, set specific level)
 3. If motor control is intended, calculate the appropriate PWM value (0-255)
 4. If no motor control is intended, keep the current PWM value
+5. ${isImmediate ? 'Prioritize speed and immediate motor control.' : 'Provide natural conversational responses.'}
 
 Respond in this exact JSON format:
 {
   "intentDetected": true/false,
   "transcription": "what the user said",
   "pwm": number (0-255),
-  "response": "your response to the user"
+  "response": "your response to the user",
+  "confidence": number (0-1)
 }
 
 Examples:
 - "turn it on" → {"intentDetected": true, "transcription": "turn it on", "pwm": 150, "response": "Turning the motor on"}
-- "make it stronger" → {"intentDetected": true, "transcription": "make it stronger", "pwm": currentPwm + 50, "response": "Increasing motor intensity"}
-- "what's the weather" → {"intentDetected": false, "transcription": "what's the weather", "pwm": currentPwm, "response": "I'm a motor control assistant. I can help you control the motor device."}`;
+- "make it stronger" → {"intentDetected": true, "transcription": "make it stronger", "pwm": ${currentPwm} + 50, "response": "Increasing motor intensity"}
+- "what's the weather" → {"intentDetected": false, "transcription": "what's the weather", "pwm": ${currentPwm}, "response": "I'm a motor control assistant. I can help you control the motor device."}`;
 
             // Send audio directly to Gemini
             const result = await model.generateContent([
