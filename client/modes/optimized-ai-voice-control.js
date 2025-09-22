@@ -221,6 +221,15 @@ class OptimizedAIVoiceControl {
             // ===== UPDATE INTERACTION TIME AND RESTART CONVERSATION =====
             this.state.lastInteractionTime = Date.now(); // Reset interaction timer
             console.log(`[CONVERSATION] Updated interaction time, restarting conversation for next command`);
+            
+            // CRITICAL FIX: Reset processor state to ensure it can detect next speech
+            console.log(`[RESET] Resetting processor state for next interaction`);
+            this.processor.audioState.isVoiceActive = false;
+            this.processor.audioState.pendingSpeech = false;
+            this.processor.audioState.consecutiveVoiceFrames = 0;
+            this.processor.audioState.consecutiveSilenceFrames = 0;
+            
+            // Ensure conversation stays active for next command
             this.handleConversationUpdate(true);
             
         } catch (error) {
@@ -241,10 +250,15 @@ class OptimizedAIVoiceControl {
         this.state.lastInteractionTime = Date.now();
         
         if (voiceState.isActive) {
+            console.log(`[VOICE STATE] Voice started - listening for speech`);
             this.showNotification("🎙️ Listening...", "info", 1000);
         } else if (voiceState.duration) {
             const durationMs = voiceState.duration;
+            console.log(`[VOICE STATE] Voice ended - speech captured (${(durationMs/1000).toFixed(1)}s)`);
             this.showNotification(`✅ Speech captured (${(durationMs/1000).toFixed(1)}s)`, "success", 1500);
+            
+            // CRITICAL FIX: After speech ends, ensure we're ready for next interaction
+            console.log(`[VOICE STATE] Preparing for next voice interaction`);
         }
         
         this.updateUI();
@@ -262,8 +276,16 @@ class OptimizedAIVoiceControl {
             this.processor.setConversationActive(true);
             this.showNotification("💬 Ready for voice command", "success");
             
-            // Reset any processing flags to ensure we can process next command
+            // CRITICAL FIX: Reset all processing flags and ensure clean state
             this.state.isProcessing = false;
+            this.state.isListening = false;
+            
+            // Ensure processor is in clean state for next interaction
+            if (this.processor.audioState) {
+                this.processor.audioState.isVoiceActive = false;
+                this.processor.audioState.pendingSpeech = false;
+                console.log(`[CONVERSATION] Processor state reset for next interaction`);
+            }
             
         } else {
             console.log(`[CONVERSATION] ⏸️ Pausing conversation`);
