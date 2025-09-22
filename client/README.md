@@ -1,136 +1,123 @@
 # Dulaan Client SDK
 
-🚀 **NEW: Modular Architecture with Automated Bundling!**
+🎤 **Voice-Controlled Motor System with AI Integration**
 
-This directory contains the Dulaan client SDK with a modern modular architecture that provides clean development while maintaining browser compatibility through automated bundling.
-
-## 🏗️ Architecture Overview
-
-### Modular Development Structure
-```
-client/
-├── utils/                  # Utility functions and constants
-├── core/                   # Core functionality (motor, audio)
-├── services/              # External services (API, consent, remote)
-├── modes/                 # Control modes (AI, ambient, touch)
-├── dulaan-sdk.js          # Main SDK entry point
-├── build.js               # Automated build system
-└── dulaan-browser.js      # Generated browser bundle
-```
-
-### Key Benefits
-- ✅ **Clean Development**: ES6 modules with proper imports/exports
-- ✅ **Browser Compatible**: Single bundle file for production
-- ✅ **Automated Building**: Watch mode for continuous development
-- ✅ **6-Character IDs**: Simple remote control sharing
-- ✅ **Professional Structure**: Organized, maintainable codebase
+Complete client SDK for Dulaan motor control with voice commands, ambient audio processing, and remote control capabilities.
 
 ## 🚀 Quick Start
 
-### For Developers
-```bash
-cd client
-npm install
-npm run dev    # Start development with auto-rebuild
+### For Hybrid Apps (Capacitor)
+```javascript
+// Load the bundle
+<script src="dulaan-browser-bundled.js"></script>
+
+// Initialize and start voice control
+setTimeout(async () => {
+    try {
+        // Connect to motor via BLE
+        await window.dulaan.motor.scan();
+        await window.dulaan.motor.connect();
+        
+        // Start AI voice control
+        await window.dulaan.modes.ai.start();
+        
+        console.log('🎤 Ready for voice commands!');
+    } catch (error) {
+        console.error('Setup failed:', error);
+    }
+}, 1000);
 ```
 
-### For Browser Integration
+### For Web Applications
 ```html
-<script src="dulaan-browser.js"></script>
+<script src="dulaan-browser-bundled.js"></script>
 <script>
     // SDK auto-initializes
-    const id = window.dulaan.generateId(); // 6-character ID
-    window.dulaan.startRemoteControl(id);
+    window.dulaan.modes.ai.start().then(() => {
+        console.log('Voice control ready!');
+    });
 </script>
 ```
 
-## 📁 File Structure
+## 🏗️ Architecture
 
-### Core Files (v2.0 - Modular Architecture)
-- **`dulaan-browser.js`** - 📦 Complete browser-compatible SDK bundle (69KB)
-- **`dulaan-sdk.js`** - 🎯 Main SDK entry point (ES6 module)
-- **`build.js`** - 🔨 Automated build system with watch mode
-- **`package.json`** - 📋 npm configuration and build scripts
-- **`BUILD_GUIDE.md`** - 📖 Complete development guide
+### Production Files
+- **`dulaan-browser-bundled.js`** - 📦 Complete production bundle (125KB)
+- **`dulaan-sdk.js`** - 🎯 Main SDK entry point
+- **`build.js`** - 🔨 Bundle generation script
 
-### Modular Source Files
-- **`core/`** - 🔧 Core functionality (motor control, audio processing)
-- **`services/`** - 🌐 External services (API, consent, remote control)
-- **`modes/`** - 🎮 Control modes (AI voice, ambient, touch)
-- **`remote-control.js`** - 🎯 High-level remote control orchestration
-- **`utils/`** - 🛠️ Utilities and constants
-
-### Demo & Testing
-- **`remote-control-demo.html`** - 🎮 Interactive demo for testing all features
-- **`test-bundle.html`** - 🧪 Automated tests for bundle verification
-- **`test-remote-control.html`** - 🎯 Dedicated remote control module testing
-
-
-
-## 🎯 Development Workflow
-
-### 1. Install Dependencies
-```bash
-npm install
+### Core Modules
 ```
-
-### 2. Development Mode
-```bash
-npm run dev    # Auto-rebuild on file changes
+client/
+├── core/
+│   ├── motor-controller.js           # BLE motor communication
+│   └── optimized-streaming-processor.js  # VAD & audio processing
+├── services/
+│   ├── optimized-api-service.js      # Gemini AI integration
+│   ├── consent-service.js            # Privacy management
+│   └── remote-service.js             # Remote control
+├── modes/
+│   ├── optimized-ai-voice-control.js # Primary voice control
+│   ├── ambient-control.js            # Ambient audio → PWM
+│   └── touch-control.js              # Manual control
+└── utils/
+    ├── constants.js                  # Configuration
+    └── audio-utils.js                # Audio utilities
 ```
-
-### 3. Build for Production
-```bash
-npm run build  # Generate dulaan-browser.js
-```
-
-### 4. Test Your Changes
-Open `test-bundle.html` or `remote-control-demo.html` to verify functionality.
-
 ## ✨ Key Features
 
-### 🏗️ Modular Architecture
-- **ES6 Modules**: Clean imports/exports for development
-- **Automated Bundling**: Single browser-compatible file
-- **Watch Mode**: Continuous rebuilding during development
-- **Dependency Management**: Proper file processing order
+### 🎤 Voice Control
+- **Direct Audio Processing**: Audio → Gemini 2.0 → PWM commands
+- **Voice Activity Detection**: Smart buffering with pre/post-speech context
+- **Multi-language Support**: Automatic language detection
+- **Real-time Processing**: Sub-second response times
 
-### 🔄 API Integration
-- **Speech-to-Text**: Integrated with Google Cloud Functions instead of Deepgram
-- **LLM Processing**: Uses the new `speechToTextWithLLM` endpoint
-- **Automatic Language Detection**: Supports 30+ languages
-- **Error Handling**: Comprehensive error handling and fallbacks
+### 🔧 Motor Control
+- **BLE Communication**: Direct Bluetooth Low Energy to motor device
+- **PWM Range**: 0-255 motor control values
+- **Device Discovery**: Auto-scan for "XKL-Q086-BT" devices
+- **Safety Limits**: Validated PWM ranges with error handling
 
-### 🎮 Remote Control System
-- **6-Character IDs**: Simple, memorable sharing codes (e.g., "A1B2C3")
-- **Host Mode**: Device owner shares unique ID for remote access
-- **Remote Mode**: Users connect to host via ID to control device
-- **Multi-user Support**: Multiple remote users can control one device
-- **Real-time Communication**: Uses PeerJS for WebRTC peer-to-peer connections
+### 📱 Capacitor Integration
+- **VoiceRecorder Plugin**: Real-time audio streaming
+- **Bluetooth LE**: Motor device communication
+- **Cross-platform**: Web, iOS, Android support
+- **Hybrid App Ready**: Complete Capacitor plugin integration
 
 ### 🎛️ Control Modes
-All three control modes work both locally and remotely:
 
-1. **AI Voice Control** (`startStreaming`/`remoteStartStreaming`)
-   - Voice commands → Speech-to-Text → LLM → PWM control
-   - Automatic language detection
-   - Message history management
+1. **AI Voice Control** - Primary mode
+   - Natural voice commands → PWM control
+   - Conversation history management
+   - Intent detection for motor vs. chat
 
-2. **Ambient Sound Control** (`startAbi`/`remoteStartAbi`)
-   - Real-time audio energy → PWM control
+2. **Ambient Control** - Environmental audio
+   - Real-time ambient audio → PWM control
    - Configurable energy thresholds
    - Continuous audio processing
 
-3. **Touch Control** (`startTouch`/`remoteStartTouch`)
-   - Touch input → PWM control
-   - Real-time slider control
-   - Percentage to PWM conversion
+3. **Touch Control** - Manual control
+   - Direct PWM value control
+   - Slider/touch interface support
 
-## 🔧 Integration Guide
+## 🔧 Development
 
-### 1. Browser Integration
+### Build System
+```bash
+# Generate production bundle
+node build.js
 
-Add to your HTML:
+# The bundle includes all optimized components:
+# - OptimizedStreamingProcessor (VAD)
+# - OptimizedApiService (Gemini integration)  
+# - OptimizedAIVoiceControl (Primary mode)
+# - MotorController (BLE communication)
+# - All utilities and constants
+```
+
+### Integration Examples
+
+#### Hybrid App (Capacitor)
 ```html
 <!-- PeerJS for remote control -->
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
