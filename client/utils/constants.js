@@ -48,10 +48,10 @@ export const PWM_CONFIG = {
 // API Configuration
 export const API_CONFIG = {
     ENDPOINTS: {
-        SPEECH_TO_TEXT_LLM: 'https://speechtotextwithllm-qveg3gkwxa-ew.a.run.app',
-        STORE_USER_DATA: 'https://storeuserdata-qveg3gkwxa-ew.a.run.app',
-        STORE_USER_CONSENT: 'https://storeuserconsent-qveg3gkwxa-ew.a.run.app',
-        GET_USER_CONSENT: 'https://getuserconsent-qveg3gkwxa-ew.a.run.app'
+        SPEECH_TO_TEXT_LLM: 'https://europe-west4-dulaan-backend.cloudfunctions.net/speechToTextWithLLM',
+        STORE_USER_DATA: 'https://europe-west4-dulaan-backend.cloudfunctions.net/storeUserData',
+        STORE_USER_CONSENT: 'https://europe-west4-dulaan-backend.cloudfunctions.net/storeUserConsent',
+        GET_USER_CONSENT: 'https://europe-west4-dulaan-backend.cloudfunctions.net/getUserConsent'
     },
     
     DEFAULT_OPTIONS: {
