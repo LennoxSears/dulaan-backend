@@ -111,8 +111,14 @@ class OptimizedStreamingProcessor {
      */
     processAudioChunk(base64Chunk) {
         try {
+            console.log(`[PROCESSOR] Received chunk: ${base64Chunk.length} chars`);
             const pcmData = this.base64ToFloat32Array(base64Chunk);
-            if (pcmData.length === 0) return null;
+            console.log(`[PROCESSOR] Converted to PCM: ${pcmData.length} samples`);
+            
+            if (pcmData.length === 0) {
+                console.warn(`[PROCESSOR] Empty PCM data from base64 chunk`);
+                return null;
+            }
 
             this.audioState.totalChunksProcessed++;
 

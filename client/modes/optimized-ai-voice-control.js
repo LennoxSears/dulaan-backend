@@ -607,12 +607,14 @@ class OptimizedAIVoiceControl {
      * Process incoming audio chunk from Capacitor VoiceRecorder
      */
     processAudioChunk(base64Chunk) {
-        if (!this.state.isActive || !this.state.isListening) {
+        // CRITICAL FIX: Only check if active, not isListening (which creates chicken-and-egg problem)
+        if (!this.state.isActive) {
             return;
         }
 
         try {
             // Process audio chunk through optimized processor
+            console.log(`[AUDIO CHUNK] Processing chunk: ${base64Chunk.length} chars`);
             const result = this.processor.processAudioChunk(base64Chunk);
             
             if (result) {
@@ -622,8 +624,16 @@ class OptimizedAIVoiceControl {
                 // Log voice activity for debugging
                 console.log(`[VAD] Voice: ${result.isVoiceActive}, Energy: ${result.energy?.toFixed(4)}, ZCR: ${result.zeroCrossings?.toFixed(4)}`);
                 
+                // Update listening state based on voice activity
+                if (result.isVoiceActive !== this.state.isListening) {
+                    this.state.isListening = result.isVoiceActive;
+                    console.log(`[VAD] Listening state changed: ${this.state.isListening}`);
+                }
+                
                 // Speech packets are handled via onSpeechReady callback
                 // This result only contains VAD status information
+            } else {
+                console.log(`[AUDIO CHUNK] No result from processor`);
             }
             
         } catch (error) {

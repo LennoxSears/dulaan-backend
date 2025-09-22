@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-22T14:16:59.195Z
+ * Generated on: 2025-09-22T14:23:50.459Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -1010,8 +1010,14 @@ class OptimizedStreamingProcessor {
      */
     processAudioChunk(base64Chunk) {
         try {
+            console.log(`[PROCESSOR] Received chunk: ${base64Chunk.length} chars`);
             const pcmData = this.base64ToFloat32Array(base64Chunk);
-            if (pcmData.length === 0) return null;
+            console.log(`[PROCESSOR] Converted to PCM: ${pcmData.length} samples`);
+            
+            if (pcmData.length === 0) {
+                console.warn(`[PROCESSOR] Empty PCM data from base64 chunk`);
+                return null;
+            }
 
             this.audioState.totalChunksProcessed++;
 
@@ -2854,12 +2860,14 @@ class OptimizedAIVoiceControl {
      * Process incoming audio chunk from Capacitor VoiceRecorder
      */
     processAudioChunk(base64Chunk) {
-        if (!this.state.isActive || !this.state.isListening) {
+        // CRITICAL FIX: Only check if active, not isListening (which creates chicken-and-egg problem)
+        if (!this.state.isActive) {
             return;
         }
 
         try {
             // Process audio chunk through optimized processor
+            console.log(`[AUDIO CHUNK] Processing chunk: ${base64Chunk.length} chars`);
             const result = this.processor.processAudioChunk(base64Chunk);
             
             if (result) {
@@ -2869,8 +2877,16 @@ class OptimizedAIVoiceControl {
                 // Log voice activity for debugging
                 console.log(`[VAD] Voice: ${result.isVoiceActive}, Energy: ${result.energy?.toFixed(4)}, ZCR: ${result.zeroCrossings?.toFixed(4)}`);
                 
+                // Update listening state based on voice activity
+                if (result.isVoiceActive !== this.state.isListening) {
+                    this.state.isListening = result.isVoiceActive;
+                    console.log(`[VAD] Listening state changed: ${this.state.isListening}`);
+                }
+                
                 // Speech packets are handled via onSpeechReady callback
                 // This result only contains VAD status information
+            } else {
+                console.log(`[AUDIO CHUNK] No result from processor`);
             }
             
         } catch (error) {
