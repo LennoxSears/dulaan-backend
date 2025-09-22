@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-22T14:23:50.459Z
+ * Generated on: 2025-09-22T14:39:41.082Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -8,11 +8,11 @@
  * - utils/constants.js
  * - utils/audio-utils.js
  * - core/motor-controller.js
- * - core/optimized-streaming-processor.js
- * - services/optimized-api-service.js
+ * - core/streaming-processor.js
+ * - services/api-service.js
  * - services/consent-service.js
  * - services/remote-service.js
- * - modes/optimized-ai-voice-control.js
+ * - modes/ai-voice-control.js
  * - modes/ambient-control.js
  * - modes/touch-control.js
  * - remote-control.js
@@ -896,15 +896,16 @@ if (typeof window !== 'undefined') {
 }
 
     // ============================================================================
-    // core/optimized-streaming-processor.js
+    // core/streaming-processor.js
     // ============================================================================
 
 /**
- * Optimized Streaming Audio Processor
- * Efficient client-side VAD with smart API usage
+ * Streaming Audio Processor
+ * Voice Activity Detection and audio processing for Capacitor audio chunks
+ * Based on working test-real-api.html implementation
  */
 
-class OptimizedStreamingProcessor {
+class StreamingProcessor {
     constructor() {
         // Get RingBuffer class - use global if available (for bundled version)
         const RingBufferClass = (typeof RingBuffer !== 'undefined') ? RingBuffer :
@@ -914,41 +915,39 @@ class OptimizedStreamingProcessor {
         if (!RingBufferClass) {
             throw new Error('RingBuffer class not available. Make sure audio-utils.js is loaded.');
         }
+
+        // Audio state
+        this.isActive = false;
+        this.isListening = false;
+        this.isProcessing = false;
+        this.currentPwm = 100;
         
-        this.audioState = {
-            // Local VAD buffers (optimized for longer speech and better context)
-            vadBuffer: new RingBufferClass(4800), // 300ms for VAD analysis (better context)
-            speechBuffer: new RingBufferClass(16000 * 30), // 30 seconds max speech (much longer)
-            
-            // VAD state
-            isVoiceActive: false,
-            voiceStartTime: 0,
-            voiceEndTime: 0,
-            consecutiveVoiceFrames: 0,
-            consecutiveSilenceFrames: 0,
-            
-            // Optimized VAD thresholds for best accuracy
-            VAD_ENERGY_THRESHOLD: 0.008, // Balanced threshold - not too sensitive to noise
-            VAD_ZCR_THRESHOLD: 0.02, // Lower ZCR threshold for realistic speech
-            VAD_VOICE_FRAMES: 3, // 3 consecutive frames to confirm voice (reduce false positives)
-            VAD_SILENCE_FRAMES: 20, // 20 frames of silence to end speech (1.25 seconds)
-            
-            // Smart buffering
-            MIN_SPEECH_DURATION: 6400, // 400ms minimum (in samples) - shorter for quick commands
-            MAX_SPEECH_DURATION: 20000, // 20 seconds maximum in milliseconds
-            SPEECH_TIMEOUT: 1250, // 1.25 seconds of silence ends speech
-            
-            // Efficiency tracking
-            lastRMS: 0,
-            lastZeroCrossings: 0,
-            totalChunksProcessed: 0,
-            speechChunksSent: 0,
-            
-            // Conversation state
-            conversationActive: false,
-            lastApiCall: 0,
-            pendingSpeech: false
-        };
+        // Ring buffers for efficient memory usage
+        this.vadBuffer = new RingBufferClass(4800); // 300ms for VAD analysis
+        this.speechBuffer = new RingBufferClass(16000 * 30); // 30 seconds max speech
+        
+        // VAD state
+        this.consecutiveVoiceFrames = 0;
+        this.consecutiveSilenceFrames = 0;
+        this.isVoiceActive = false;
+        this.voiceStartTime = 0;
+        
+        // Efficiency tracking
+        this.totalChunks = 0;
+        this.apiCalls = 0;
+        this.lastRMS = 0;
+        this.lastZeroCrossings = 0;
+        
+        // VAD thresholds (from working implementation)
+        this.VAD_ENERGY_THRESHOLD = 0.008; // Balanced threshold
+        this.VAD_ZCR_THRESHOLD = 0.08; // Balanced ZCR threshold
+        this.VAD_VOICE_FRAMES = 3; // 3 consecutive frames to confirm voice
+        this.VAD_SILENCE_FRAMES = 20; // 20 frames of silence to end speech
+        this.MIN_SPEECH_DURATION = 6400; // 400ms minimum (in samples)
+        this.MAX_SPEECH_DURATION = 320000; // 20 seconds maximum
+        
+        // Energy history for adaptive thresholds
+        this.energyHistory = [];
         
         // Callbacks
         this.onSpeechReady = null;
@@ -957,56 +956,7 @@ class OptimizedStreamingProcessor {
     }
 
     /**
-     * Efficient Voice Activity Detection
-     * Runs locally - no API calls
-     */
-    detectVoiceActivity(audioData) {
-        // Calculate RMS energy efficiently
-        let sum = 0;
-        for (let i = 0; i < audioData.length; i++) {
-            sum += audioData[i] * audioData[i];
-        }
-        const rms = Math.sqrt(sum / audioData.length);
-        this.audioState.lastRMS = rms;
-
-        // Calculate zero-crossing rate efficiently
-        let zeroCrossings = 0;
-        for (let i = 1; i < audioData.length; i++) {
-            if ((audioData[i] >= 0) !== (audioData[i - 1] >= 0)) {
-                zeroCrossings++;
-            }
-        }
-        const zcr = zeroCrossings / audioData.length;
-        this.audioState.lastZeroCrossings = zcr;
-
-        // Advanced VAD decision with adaptive thresholds
-        const energyActive = rms > this.audioState.VAD_ENERGY_THRESHOLD;
-        const zcrActive = zcr > this.audioState.VAD_ZCR_THRESHOLD && zcr < 0.5; // ZCR too high = noise
-        
-        // Adaptive threshold based on recent SILENCE energy history (not speech)
-        if (!this.energyHistory) this.energyHistory = [];
-        
-        // Only add to history if it's likely silence (low energy)
-        if (rms <= this.audioState.VAD_ENERGY_THRESHOLD * 2) {
-            this.energyHistory.push(rms);
-            if (this.energyHistory.length > 50) this.energyHistory.shift();
-        }
-        
-        const avgSilenceEnergy = this.energyHistory.length > 0 ? 
-            this.energyHistory.reduce((a, b) => a + b, 0) / this.energyHistory.length : 
-            this.audioState.VAD_ENERGY_THRESHOLD;
-        const adaptiveThreshold = Math.max(this.audioState.VAD_ENERGY_THRESHOLD, avgSilenceEnergy * 4);
-        
-        // Combined decision: energy must be active, ZCR should be reasonable
-        const adaptiveCheck = rms > adaptiveThreshold * 1.5;
-        const voiceDetected = energyActive && (zcrActive || adaptiveCheck);
-        
-        return voiceDetected;
-    }
-
-    /**
-     * Process audio chunk efficiently
-     * Only sends to API when speech is complete
+     * Process audio chunk from Capacitor (base64 format)
      */
     processAudioChunk(base64Chunk) {
         try {
@@ -1019,139 +969,192 @@ class OptimizedStreamingProcessor {
                 return null;
             }
 
-            this.audioState.totalChunksProcessed++;
+            this.totalChunks++;
 
-            // Always buffer audio for pre/post-speech context (smart buffering)
-            this.audioState.vadBuffer.push(pcmData);
+            // Always buffer audio for pre/post-speech context
+            this.vadBuffer.push(pcmData);
             
-            // Local VAD - no API call
+            // Voice Activity Detection
             const isVoiceActive = this.detectVoiceActivity(pcmData);
             
             // Voice activity state machine
             if (isVoiceActive) {
-                this.audioState.consecutiveVoiceFrames++;
-                this.audioState.consecutiveSilenceFrames = 0;
+                this.consecutiveVoiceFrames++;
+                this.consecutiveSilenceFrames = 0;
                 
                 // Voice start detection
-                if (!this.audioState.isVoiceActive && 
-                    this.audioState.consecutiveVoiceFrames >= this.audioState.VAD_VOICE_FRAMES) {
-                    console.log(`[VAD] 🎤 Voice START detected (${this.audioState.consecutiveVoiceFrames} consecutive frames)`);
+                if (!this.isVoiceActive && this.consecutiveVoiceFrames >= this.VAD_VOICE_FRAMES) {
+                    console.log(`[VAD] 🎤 Voice START detected (${this.consecutiveVoiceFrames} consecutive frames)`);
                     this.handleVoiceStart();
                 }
                 
                 // Buffer speech audio during active speech
-                if (this.audioState.isVoiceActive) {
-                    this.audioState.speechBuffer.push(pcmData);
+                if (this.isVoiceActive) {
+                    this.speechBuffer.push(pcmData);
                     this.checkSpeechBufferLimits();
                 }
                 
             } else {
-                this.audioState.consecutiveSilenceFrames++;
-                this.audioState.consecutiveVoiceFrames = 0;
+                this.consecutiveSilenceFrames++;
+                this.consecutiveVoiceFrames = 0;
                 
                 // Voice end detection
-                if (this.audioState.isVoiceActive && 
-                    this.audioState.consecutiveSilenceFrames >= this.audioState.VAD_SILENCE_FRAMES) {
-                    console.log(`[VAD] 🔇 Voice END detected (${this.audioState.consecutiveSilenceFrames} consecutive silence frames)`);
+                if (this.isVoiceActive && this.consecutiveSilenceFrames >= this.VAD_SILENCE_FRAMES) {
+                    console.log(`[VAD] 🔇 Voice END detected (${this.consecutiveSilenceFrames} consecutive silence frames)`);
                     this.handleVoiceEnd();
                 }
             }
 
             return {
-                isVoiceActive: this.audioState.isVoiceActive,
-                energy: this.audioState.lastRMS,
-                zeroCrossings: this.audioState.lastZeroCrossings,
-                speechBufferSize: this.audioState.speechBuffer.count,
-                conversationActive: this.audioState.conversationActive,
+                isVoiceActive: this.isVoiceActive,
+                energy: this.lastRMS,
+                zeroCrossings: this.lastZeroCrossings,
+                speechBufferSize: this.speechBuffer.count,
                 efficiency: {
-                    totalChunks: this.audioState.totalChunksProcessed,
-                    speechChunksSent: this.audioState.speechChunksSent,
-                    apiCallRatio: this.audioState.speechChunksSent / this.audioState.totalChunksProcessed
+                    totalChunks: this.totalChunks,
+                    apiCalls: this.apiCalls,
+                    apiCallRatio: this.apiCalls / this.totalChunks
                 }
             };
 
         } catch (error) {
-            console.error("Optimized audio processing failed:", error);
+            console.error("Audio processing failed:", error);
             return null;
         }
     }
 
     /**
-     * Handle voice start - prepare for speech buffering with pre-speech context
+     * Voice Activity Detection (from working implementation)
      */
-    handleVoiceStart() {
-        this.audioState.isVoiceActive = true;
-        this.audioState.voiceStartTime = Date.now();
+    detectVoiceActivity(audioData) {
+        // Calculate RMS energy
+        const rms = this.calculateRMS(audioData);
+        this.lastRMS = rms;
         
-        // Smart buffering: Include pre-speech context for natural start
-        this.audioState.speechBuffer.reset();
+        // Calculate zero crossing rate
+        const zcr = this.calculateZeroCrossingRate(audioData);
+        this.lastZeroCrossings = zcr;
         
-        // Add recent VAD buffer content as pre-speech context (last 300ms for better quality)
-        const preSpeechSamples = Math.min(4800, this.audioState.vadBuffer.count); // 300ms at 16kHz
-        if (preSpeechSamples > 0) {
-            const preSpeechData = this.audioState.vadBuffer.readLast(preSpeechSamples);
-            this.audioState.speechBuffer.push(preSpeechData);
-            console.log(`[Voice Start] Added ${preSpeechSamples} pre-speech samples (${(preSpeechSamples/16000*1000).toFixed(0)}ms) for context`);
+        // Advanced VAD decision with adaptive thresholds
+        const energyActive = rms > this.VAD_ENERGY_THRESHOLD;
+        const zcrActive = zcr > this.VAD_ZCR_THRESHOLD && zcr < 0.5; // ZCR too high = noise
+        
+        // Adaptive threshold based on recent energy history
+        this.energyHistory.push(rms);
+        if (this.energyHistory.length > 100) this.energyHistory.shift();
+        
+        const avgEnergy = this.energyHistory.reduce((a, b) => a + b, 0) / this.energyHistory.length;
+        const adaptiveThreshold = Math.max(this.VAD_ENERGY_THRESHOLD, avgEnergy * 2);
+        const adaptiveEnergyActive = rms > adaptiveThreshold;
+        
+        // Combined decision: energy must be active, ZCR should be reasonable
+        const voiceDetected = energyActive && (zcrActive || rms > adaptiveThreshold * 1.5);
+        
+        // Debug logging (every 50 chunks to avoid spam)
+        if (this.totalChunks % 50 === 0) {
+            console.log(`[VAD] RMS: ${rms.toFixed(4)} (>${this.VAD_ENERGY_THRESHOLD}=${energyActive}, adaptive>${adaptiveThreshold.toFixed(4)}=${adaptiveEnergyActive}) | ZCR: ${zcr.toFixed(4)} (${this.VAD_ZCR_THRESHOLD}-0.5=${zcrActive}) | Voice: ${voiceDetected}`);
         }
         
-        this.audioState.pendingSpeech = true;
+        return voiceDetected;
+    }
+
+    /**
+     * Calculate RMS energy
+     */
+    calculateRMS(audioData) {
+        let sum = 0;
+        for (let i = 0; i < audioData.length; i++) {
+            sum += audioData[i] * audioData[i];
+        }
+        return Math.sqrt(sum / audioData.length);
+    }
+
+    /**
+     * Calculate zero crossing rate
+     */
+    calculateZeroCrossingRate(audioData) {
+        let crossings = 0;
+        for (let i = 1; i < audioData.length; i++) {
+            if ((audioData[i] >= 0) !== (audioData[i - 1] >= 0)) {
+                crossings++;
+            }
+        }
+        return crossings / audioData.length;
+    }
+
+    /**
+     * Handle voice start
+     */
+    handleVoiceStart() {
+        this.isVoiceActive = true;
+        this.isListening = true;
+        this.voiceStartTime = Date.now();
+        
+        // Smart buffering: Include pre-speech context for natural start
+        this.speechBuffer.reset();
+        
+        // Add recent VAD buffer content as pre-speech context (last 300ms)
+        const preSpeechSamples = Math.min(4800, this.vadBuffer.count); // 300ms at 16kHz
+        if (preSpeechSamples > 0) {
+            const preSpeechData = this.vadBuffer.readLast(preSpeechSamples);
+            this.speechBuffer.push(preSpeechData);
+            console.log(`[Voice Start] Added ${preSpeechSamples} pre-speech samples (${(preSpeechSamples/16000*1000).toFixed(0)}ms)`);
+        }
         
         console.log("[Voice Start] Beginning speech capture with smart buffering");
         
         if (this.onVoiceStateChange) {
             this.onVoiceStateChange({
                 isActive: true,
-                timestamp: this.audioState.voiceStartTime,
-                energy: this.audioState.lastRMS,
+                timestamp: this.voiceStartTime,
+                energy: this.lastRMS,
                 preSpeechSamples: preSpeechSamples
             });
         }
     }
 
     /**
-     * Handle voice end - send complete speech to API with post-speech buffering
+     * Handle voice end
      */
     async handleVoiceEnd() {
         // Add small post-speech buffer for natural ending (100ms)
         const postSpeechDelay = 100;
         
         setTimeout(async () => {
-            this.audioState.isVoiceActive = false;
-            this.audioState.voiceEndTime = Date.now();
-            const speechDuration = this.audioState.voiceEndTime - this.audioState.voiceStartTime;
+            this.isVoiceActive = false;
+            this.isListening = false;
+            const speechDuration = Date.now() - this.voiceStartTime;
             
             // Add recent VAD buffer as post-speech context (200ms for natural ending)
-            const postSpeechSamples = Math.min(3200, this.audioState.vadBuffer.count); // 200ms
+            const postSpeechSamples = Math.min(3200, this.vadBuffer.count); // 200ms
             if (postSpeechSamples > 0) {
-                const postSpeechData = this.audioState.vadBuffer.readLast(postSpeechSamples);
-                this.audioState.speechBuffer.push(postSpeechData);
-                console.log(`[Voice End] Added ${postSpeechSamples} post-speech samples (${(postSpeechSamples/16000*1000).toFixed(0)}ms) for natural ending`);
+                const postSpeechData = this.vadBuffer.readLast(postSpeechSamples);
+                this.speechBuffer.push(postSpeechData);
+                console.log(`[Voice End] Added ${postSpeechSamples} post-speech samples (${(postSpeechSamples/16000*1000).toFixed(0)}ms)`);
             }
             
-            console.log(`[Voice End] Speech duration: ${speechDuration}ms, Buffer: ${this.audioState.speechBuffer.count} samples`);
+            console.log(`[Voice End] Speech duration: ${speechDuration}ms, Buffer: ${this.speechBuffer.count} samples`);
             
-            // Send speech to API if we have enough audio and haven't sent recently
-            if (this.audioState.speechBuffer.count >= this.audioState.MIN_SPEECH_DURATION) {
-                const timeSinceLastSend = Date.now() - this.audioState.lastApiCall;
+            // Send speech to API if we have enough audio
+            if (this.speechBuffer.count >= this.MIN_SPEECH_DURATION) {
+                const timeSinceLastSend = Date.now() - this.lastApiCall;
                 if (timeSinceLastSend > 500) { // Prevent duplicate sends within 500ms
                     await this.sendSpeechToAPI(true); // Mark as final
                 } else {
                     console.log("[Voice End] Speech already sent recently, skipping");
-                    this.audioState.speechBuffer.reset();
+                    this.speechBuffer.reset();
                 }
             } else {
                 console.log("[Voice End] Speech too short, discarding");
-                this.audioState.speechBuffer.reset();
+                this.speechBuffer.reset();
             }
-            
-            this.audioState.pendingSpeech = false;
             
             if (this.onVoiceStateChange) {
                 this.onVoiceStateChange({
                     isActive: false,
-                    timestamp: this.audioState.voiceEndTime,
+                    timestamp: Date.now(),
                     duration: speechDuration,
-                    audioLength: this.audioState.speechBuffer.count,
+                    audioLength: this.speechBuffer.count,
                     postSpeechSamples: postSpeechSamples
                 });
             }
@@ -1162,32 +1165,33 @@ class OptimizedStreamingProcessor {
      * Check if speech buffer needs to be sent (max duration reached)
      */
     async checkSpeechBufferLimits() {
-        const speechDuration = Date.now() - this.audioState.voiceStartTime;
-        const bufferSize = this.audioState.speechBuffer.count;
+        const speechDuration = Date.now() - this.voiceStartTime;
+        const bufferSize = this.speechBuffer.count;
+        const maxDurationMs = this.MAX_SPEECH_DURATION / 16000 * 1000;
         
-        // Send if max duration reached or buffer is full
-        if (speechDuration >= this.audioState.MAX_SPEECH_DURATION || 
-            bufferSize >= this.audioState.speechBuffer.capacity * 0.9) {
+        // Send if max duration reached or buffer is 85% full
+        if (speechDuration >= maxDurationMs || bufferSize >= this.speechBuffer.capacity * 0.85) {
             
-            console.log("[Buffer Limit] Sending speech chunk due to size/duration limit");
-            await this.sendSpeechToAPI(false);
+            console.log(`[Buffer Limit] Sending speech chunk (${(speechDuration/1000).toFixed(1)}s / ${(maxDurationMs/1000).toFixed(1)}s max, ${bufferSize} samples)`);
+            await this.sendSpeechToAPI(false); // Not final
             
-            // Keep some overlap for continuity
-            const overlapSize = Math.min(3200, bufferSize * 0.1); // 200ms overlap
-            const overlapData = this.audioState.speechBuffer.readLast(overlapSize);
-            this.audioState.speechBuffer.reset();
+            // Keep overlap for continuity
+            const overlapSize = Math.min(8000, bufferSize * 0.15); // 500ms overlap
+            const overlapData = this.speechBuffer.readLast(overlapSize);
+            this.speechBuffer.reset();
             if (overlapData.length > 0) {
-                this.audioState.speechBuffer.push(overlapData);
+                this.speechBuffer.push(overlapData);
+                console.log(`[Buffer Limit] Kept ${overlapSize} samples (${(overlapSize/16000*1000).toFixed(0)}ms) for continuity`);
             }
         }
     }
 
     /**
-     * Send complete speech to API - ONLY API call in the system
+     * Send complete speech to API
      */
     async sendSpeechToAPI(isFinal = true) {
         try {
-            const speechData = this.audioState.speechBuffer.readAll();
+            const speechData = this.speechBuffer.readAll();
             if (speechData.length === 0) return null;
 
             // Convert to Int16Array for API
@@ -1200,7 +1204,7 @@ class OptimizedStreamingProcessor {
             const speechPacket = {
                 audioData: Array.from(int16Data),
                 timestamp: Date.now(),
-                duration: Date.now() - this.audioState.voiceStartTime,
+                duration: Date.now() - this.voiceStartTime,
                 isFinal: isFinal,
                 sampleRate: 16000,
                 channels: 1
@@ -1208,16 +1212,16 @@ class OptimizedStreamingProcessor {
 
             console.log(`[API Call] Sending speech: ${speechData.length} samples (${(speechData.length/16000).toFixed(2)}s)`);
             
-            this.audioState.speechChunksSent++;
-            this.audioState.lastApiCall = Date.now();
+            this.apiCalls++;
+            this.lastApiCall = Date.now();
 
             if (this.onSpeechReady) {
                 await this.onSpeechReady(speechPacket);
             }
 
-            // Reset buffer after sending
+            // Reset buffer after sending if final
             if (isFinal) {
-                this.audioState.speechBuffer.reset();
+                this.speechBuffer.reset();
             }
 
             return speechPacket;
@@ -1229,36 +1233,11 @@ class OptimizedStreamingProcessor {
     }
 
     /**
-     * Force send current speech (for immediate commands)
-     */
-    async forceSendSpeech() {
-        if (this.audioState.speechBuffer.count > 0) {
-            console.log("[Force Send] Sending current speech buffer");
-            return await this.sendSpeechToAPI(true);
-        }
-        return null;
-    }
-
-    /**
-     * Set conversation active state
-     */
-    setConversationActive(active) {
-        if (this.audioState.conversationActive !== active) {
-            this.audioState.conversationActive = active;
-            console.log(`[Conversation] ${active ? 'Started' : 'Ended'}`);
-            
-            if (this.onConversationUpdate) {
-                this.onConversationUpdate(active);
-            }
-        }
-    }
-
-    /**
-     * Convert base64 to Float32Array (optimized)
+     * Convert base64 to Float32Array
      */
     base64ToFloat32Array(base64String) {
         try {
-            // Remove MIME header if present (matches legacy audio-processor.js)
+            // Remove MIME header if present
             const pureBase64 = base64String.includes(',') ? base64String.split(',')[1] : base64String;
 
             // Decode Base64
@@ -1268,7 +1247,7 @@ class OptimizedStreamingProcessor {
                 bytes[i] = binary.charCodeAt(i);
             }
 
-            // Convert to Float32Array with little-endian parsing (matches legacy)
+            // Convert to Float32Array with little-endian parsing
             const view = new DataView(bytes.buffer);
             const floats = new Float32Array(bytes.length / 4);
             for (let i = 0; i < floats.length; i++) {
@@ -1291,45 +1270,30 @@ class OptimizedStreamingProcessor {
     }
 
     /**
-     * Get efficiency statistics including smart buffering metrics
+     * Set conversation active state
      */
-    getEfficiencyStats() {
-        const totalChunks = this.audioState.totalChunksProcessed;
-        const apiCalls = this.audioState.speechChunksSent;
-        const efficiency = totalChunks > 0 ? (1 - apiCalls / totalChunks) * 100 : 0;
-        
-        return {
-            totalChunksProcessed: totalChunks,
-            apiCallsMade: apiCalls,
-            efficiencyPercentage: efficiency.toFixed(1),
-            chunksPerApiCall: totalChunks > 0 ? (totalChunks / Math.max(1, apiCalls)).toFixed(1) : 0,
-            lastApiCall: this.audioState.lastApiCall,
-            smartBuffering: {
-                vadBufferSize: this.audioState.vadBuffer.count,
-                speechBufferSize: this.audioState.speechBuffer.count,
-                vadBufferMs: Math.round((this.audioState.vadBuffer.count / 16000) * 1000),
-                speechBufferMs: Math.round((this.audioState.speechBuffer.count / 16000) * 1000),
-                preSpeechContextMs: 200, // 200ms pre-speech buffering
-                postSpeechContextMs: 100, // 100ms post-speech buffering
-                bufferUtilization: {
-                    vadBuffer: Math.round((this.audioState.vadBuffer.count / this.audioState.vadBuffer.capacity) * 100),
-                    speechBuffer: Math.round((this.audioState.speechBuffer.count / this.audioState.speechBuffer.capacity) * 100)
-                }
+    setConversationActive(active) {
+        if (this.conversationActive !== active) {
+            this.conversationActive = active;
+            console.log(`[Conversation] ${active ? 'Started' : 'Ended'}`);
+            
+            if (this.onConversationUpdate) {
+                this.onConversationUpdate(active);
             }
-        };
+        }
     }
 
     /**
      * Reset processor
      */
     reset() {
-        this.audioState.speechBuffer.reset();
-        this.audioState.vadBuffer.reset();
-        this.audioState.isVoiceActive = false;
-        this.audioState.conversationActive = false;
-        this.audioState.pendingSpeech = false;
-        this.audioState.consecutiveVoiceFrames = 0;
-        this.audioState.consecutiveSilenceFrames = 0;
+        this.speechBuffer.reset();
+        this.vadBuffer.reset();
+        this.isVoiceActive = false;
+        this.isListening = false;
+        this.isProcessing = false;
+        this.consecutiveVoiceFrames = 0;
+        this.consecutiveSilenceFrames = 0;
         
         console.log("[Reset] Processor state cleared");
     }
@@ -1339,12 +1303,16 @@ class OptimizedStreamingProcessor {
      */
     getState() {
         return {
-            isVoiceActive: this.audioState.isVoiceActive,
-            conversationActive: this.audioState.conversationActive,
-            pendingSpeech: this.audioState.pendingSpeech,
-            speechBufferSize: this.audioState.speechBuffer.count,
-            energy: this.audioState.lastRMS,
-            efficiency: this.getEfficiencyStats()
+            isVoiceActive: this.isVoiceActive,
+            isListening: this.isListening,
+            isProcessing: this.isProcessing,
+            speechBufferSize: this.speechBuffer.count,
+            energy: this.lastRMS,
+            efficiency: {
+                totalChunks: this.totalChunks,
+                apiCalls: this.apiCalls,
+                efficiency: this.totalChunks > 0 ? ((1 - this.apiCalls / this.totalChunks) * 100).toFixed(1) : 0
+            }
         };
     }
 }
@@ -1352,25 +1320,23 @@ class OptimizedStreamingProcessor {
 
 
     // ============================================================================
-    // services/optimized-api-service.js
+    // services/api-service.js
     // ============================================================================
 
 /**
- * Optimized API Service
- * Efficient speech processing - only sends complete speech segments
+ * API Service
+ * Handles communication with Gemini API for speech processing
+ * Based on working test-real-api.html implementation
  */
 
-class OptimizedApiService {
+class ApiService {
     constructor(config = {}) {
-        this.baseUrls = {
-            processAudioToPWM: 'https://directaudiotopwm-qveg3gkwxa-ew.a.run.app',
-            ...config.endpoints
-        };
+        this.baseUrl = 'https://directaudiotopwm-qveg3gkwxa-ew.a.run.app';
         
         // Conversation state
         this.conversationState = {
             history: [],
-            currentPwm: 0, // Motor starts stopped
+            currentPwm: 100, // Motor starts at 100
             isProcessing: false,
             lastResponse: 0,
             totalApiCalls: 0,
@@ -1384,13 +1350,11 @@ class OptimizedApiService {
     }
 
     /**
-     * Process complete speech segment
-     * This is the ONLY API call method - much more efficient
+     * Process complete speech segment (main API method)
      */
     async processSpeechSegment(speechPacket, options = {}) {
         if (this.conversationState.isProcessing) {
             console.warn("[API] Already processing speech, queuing...");
-            // Could implement queuing here if needed
         }
 
         try {
@@ -1404,36 +1368,45 @@ class OptimizedApiService {
 
             console.log(`[API Call ${this.conversationState.totalApiCalls}] Processing speech segment: ${speechPacket.audioData.length} samples`);
 
-            const response = await fetch(this.baseUrls.processAudioToPWM, {
+            // Prepare request body (matches working implementation)
+            const requestBody = {
+                msgHis: this.conversationState.history,
+                audioData: speechPacket.audioData, // Int16Array format
+                currentPwm: this.conversationState.currentPwm
+            };
+
+            console.log(`[API] Request payload size: ${JSON.stringify(requestBody).length} bytes`);
+            console.log(`[API] Request structure: msgHis=${requestBody.msgHis.length}, audioData=${requestBody.audioData.length}, currentPwm=${requestBody.currentPwm}`);
+
+            const response = await fetch(this.baseUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Processing-Mode': 'optimized',
+                    'X-Processing-Mode': 'standard',
                     'X-Speech-Duration': speechPacket.duration?.toString() || '0'
                 },
-                body: JSON.stringify({
-                    msgHis: this.conversationState.history,
-                    audioData: speechPacket.audioData,
-                    currentPwm: this.conversationState.currentPwm,
-                    optimizedMode: true,
-                    speechMetadata: {
-                        duration: speechPacket.duration,
-                        sampleRate: speechPacket.sampleRate || 16000,
-                        channels: speechPacket.channels || 1,
-                        timestamp: speechPacket.timestamp
-                    }
-                })
+                body: JSON.stringify(requestBody)
             });
 
+            console.log(`[API] Response Status: ${response.status} ${response.statusText}`);
+
             if (!response.ok) {
-                throw new Error(`API error: ${response.status} - ${response.statusText}`);
+                const errorText = await response.text();
+                throw new Error(`API error ${response.status}: ${errorText}`);
             }
 
             const result = await response.json();
             const processingTime = Date.now() - startTime;
             this.conversationState.totalProcessingTime += processingTime;
 
-            console.log(`[API Response] Processed in ${processingTime}ms: "${result.transcription}" → PWM: ${result.newPwmValue}`);
+            console.log(`[API Response] Processed in ${processingTime}ms`);
+            console.log(`[API Response] Full response:`, result);
+            console.log(`[API Response] Transcription: "${result.transcription || 'N/A'}"`);
+            console.log(`[API Response] Assistant Response: "${result.response || 'N/A'}"`);
+            console.log(`[API Response] PWM: ${result.previousPwm || this.conversationState.currentPwm} → ${result.newPwmValue || this.conversationState.currentPwm}`);
+            console.log(`[API Response] Intent detected: ${result.intentDetected || false}`);
+            console.log(`[API Response] Confidence: ${result.confidence ? (result.confidence * 100).toFixed(1) + '%' : 'N/A'}`);
+            console.log(`[API Response] Detected language: ${result.detectedLanguage || 'N/A'}`);
 
             // Update conversation state
             await this.updateConversationState(result);
@@ -1455,8 +1428,8 @@ class OptimizedApiService {
             if (this.onError) {
                 this.onError({
                     error: error,
-                    speechPacket: speechPacket,
-                    apiCallNumber: this.conversationState.totalApiCalls
+                    apiCallNumber: this.conversationState.totalApiCalls,
+                    timestamp: Date.now()
                 });
             }
             
@@ -1464,7 +1437,6 @@ class OptimizedApiService {
             
         } finally {
             this.conversationState.isProcessing = false;
-            this.conversationState.lastResponse = Date.now();
             
             if (this.onProcessingStateChange) {
                 this.onProcessingStateChange(false);
@@ -1476,95 +1448,109 @@ class OptimizedApiService {
      * Update conversation state with API response
      */
     async updateConversationState(result) {
-        // Update PWM
-        if (result.newPwmValue !== undefined) {
-            this.conversationState.currentPwm = result.newPwmValue;
-        }
-
-        // Update conversation history
-        if (result.transcription && result.response) {
-            const conversationEntry = {
-                user: result.transcription,
-                assistant: result.response,
-                timestamp: new Date().toISOString(),
-                pwm: this.conversationState.currentPwm,
-                intentDetected: result.intentDetected || false,
-                confidence: result.confidence || 0,
-                apiCallNumber: this.conversationState.totalApiCalls
-            };
-
-            this.conversationState.history.push(conversationEntry);
-
-            // Keep only last 10 messages for efficiency
-            if (this.conversationState.history.length > 10) {
-                this.conversationState.history = this.conversationState.history.slice(-10);
+        try {
+            // Update PWM if provided
+            if (result.newPwmValue !== undefined) {
+                this.conversationState.currentPwm = result.newPwmValue;
+                console.log(`[Conversation] PWM updated: ${result.previousPwm || 'unknown'} → ${result.newPwmValue}`);
             }
 
-            console.log(`[Conversation] Updated history: ${this.conversationState.history.length} messages`);
+            // Add to conversation history
+            if (result.transcription || result.response) {
+                const historyEntry = {
+                    user: result.transcription || 'No transcription',
+                    assistant: result.response || 'No response',
+                    timestamp: new Date().toISOString(),
+                    pwm: result.newPwmValue || this.conversationState.currentPwm,
+                    intentDetected: result.intentDetected || false,
+                    confidence: result.confidence || 0,
+                    detectedLanguage: result.detectedLanguage || 'unknown'
+                };
+
+                this.conversationState.history.push(historyEntry);
+
+                // Keep only last 10 messages for context
+                if (this.conversationState.history.length > 10) {
+                    this.conversationState.history.splice(0, this.conversationState.history.length - 10);
+                }
+
+                console.log(`[Conversation] History updated: ${this.conversationState.history.length} messages`);
+            }
+
+        } catch (error) {
+            console.error('Failed to update conversation state:', error);
         }
     }
 
     /**
-     * Send immediate command (for urgent motor control)
-     * Uses the same efficient API but with priority flag
+     * Test API connectivity
      */
-    async sendImmediateCommand(speechPacket) {
+    async testConnectivity() {
         try {
-            console.log("[Immediate] Processing urgent command");
+            console.log('[API] Testing connectivity...');
             
-            const response = await fetch(this.baseUrls.processAudioToPWM, {
+            // Simple test with minimal audio data
+            const testAudio = new Array(1600).fill(0); // 100ms of silence
+            
+            const response = await fetch(this.baseUrl, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-Processing-Mode': 'immediate',
-                    'X-Priority': 'high'
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    msgHis: this.conversationState.history,
-                    audioData: speechPacket.audioData,
-                    currentPwm: this.conversationState.currentPwm,
-                    immediateMode: true,
-                    speechMetadata: {
-                        duration: speechPacket.duration,
-                        timestamp: speechPacket.timestamp
-                    }
+                    msgHis: [],
+                    audioData: testAudio,
+                    currentPwm: 100
                 })
             });
 
-            if (!response.ok) {
-                throw new Error(`Immediate command API error: ${response.status}`);
+            if (response.ok) {
+                console.log('[API] ✅ Connectivity test passed');
+                return { success: true, status: response.status };
+            } else {
+                console.log(`[API] ❌ Connectivity test failed: ${response.status}`);
+                return { success: false, status: response.status, error: response.statusText };
             }
-
-            const result = await response.json();
-            
-            // Update PWM immediately
-            if (result.newPwmValue !== undefined) {
-                this.conversationState.currentPwm = result.newPwmValue;
-            }
-
-            console.log(`[Immediate] Command processed: PWM → ${result.newPwmValue}`);
-            
-            return result;
 
         } catch (error) {
-            console.error('Immediate command failed:', error);
-            throw error;
+            console.error('[API] ❌ Connectivity test error:', error);
+            return { success: false, error: error.message };
         }
+    }
+
+    /**
+     * Get current conversation state
+     */
+    getState() {
+        return {
+            ...this.conversationState,
+            averageResponseTime: this.conversationState.totalApiCalls > 0 
+                ? this.conversationState.totalProcessingTime / this.conversationState.totalApiCalls 
+                : 0
+        };
     }
 
     /**
      * Get conversation history
      */
-    getConversationHistory() {
+    getHistory() {
         return [...this.conversationState.history];
     }
 
     /**
      * Clear conversation history
      */
-    clearConversationHistory() {
+    clearHistory() {
         this.conversationState.history = [];
-        console.log("[Conversation] History cleared");
+        console.log('[Conversation] History cleared');
+    }
+
+    /**
+     * Set current PWM value
+     */
+    setCurrentPwm(pwm) {
+        this.conversationState.currentPwm = Math.max(0, Math.min(255, pwm));
+        console.log(`[Conversation] PWM set to: ${this.conversationState.currentPwm}`);
     }
 
     /**
@@ -1575,34 +1561,7 @@ class OptimizedApiService {
     }
 
     /**
-     * Update PWM value
-     */
-    updatePwm(newPwm) {
-        this.conversationState.currentPwm = Math.max(0, Math.min(255, newPwm));
-        console.log(`[PWM] Updated to: ${this.conversationState.currentPwm}`);
-    }
-
-    /**
-     * Get API efficiency statistics
-     */
-    getEfficiencyStats() {
-        const avgProcessingTime = this.conversationState.totalApiCalls > 0 
-            ? this.conversationState.totalProcessingTime / this.conversationState.totalApiCalls 
-            : 0;
-
-        return {
-            totalApiCalls: this.conversationState.totalApiCalls,
-            totalProcessingTime: this.conversationState.totalProcessingTime,
-            averageProcessingTime: Math.round(avgProcessingTime),
-            conversationLength: this.conversationState.history.length,
-            currentPwm: this.conversationState.currentPwm,
-            lastResponse: this.conversationState.lastResponse,
-            isProcessing: this.conversationState.isProcessing
-        };
-    }
-
-    /**
-     * Set callbacks
+     * Set callbacks for events
      */
     setCallbacks(callbacks) {
         this.onResponse = callbacks.onResponse || null;
@@ -1611,28 +1570,32 @@ class OptimizedApiService {
     }
 
     /**
-     * Get current state
-     */
-    getState() {
-        return {
-            isProcessing: this.conversationState.isProcessing,
-            currentPwm: this.conversationState.currentPwm,
-            conversationLength: this.conversationState.history.length,
-            efficiency: this.getEfficiencyStats()
-        };
-    }
-
-    /**
-     * Reset service state
+     * Reset API service state
      */
     reset() {
         this.conversationState.history = [];
-        this.conversationState.currentPwm = 0; // Reset to stopped
+        this.conversationState.currentPwm = 100;
         this.conversationState.isProcessing = false;
         this.conversationState.totalApiCalls = 0;
         this.conversationState.totalProcessingTime = 0;
         
         console.log("[API Service] State reset");
+    }
+
+    /**
+     * Get API statistics
+     */
+    getStats() {
+        return {
+            totalApiCalls: this.conversationState.totalApiCalls,
+            totalProcessingTime: this.conversationState.totalProcessingTime,
+            averageResponseTime: this.conversationState.totalApiCalls > 0 
+                ? (this.conversationState.totalProcessingTime / this.conversationState.totalApiCalls).toFixed(0) + 'ms'
+                : '0ms',
+            conversationLength: this.conversationState.history.length,
+            currentPwm: this.conversationState.currentPwm,
+            isProcessing: this.conversationState.isProcessing
+        };
     }
 }
 
@@ -2251,45 +2214,41 @@ if (typeof window !== 'undefined') {
 }
 
     // ============================================================================
-    // modes/optimized-ai-voice-control.js
+    // modes/ai-voice-control.js
     // ============================================================================
 
 /**
- * Optimized AI Voice Control Mode
- * Natural conversation with minimal API overhead
+ * AI Voice Control Mode
+ * Natural conversation with motor control via voice commands
+ * Based on working test-real-api.html implementation
  */
 
-class OptimizedAIVoiceControl {
+class AIVoiceControl {
     constructor(config = {}) {
         this.config = {
-            // Conversation flow optimization
-            responseTimeout: 3000, // 3 seconds max wait for response
-            conversationTimeout: 300000, // 5 minutes of silence ends conversation (much longer)
-            immediateCommandKeywords: ['stop', 'emergency', 'halt', 'now'],
+            // Response timeout
+            responseTimeout: 3000,
             
             // Motor control optimization
             pwmUpdateThreshold: 5, // Only update if PWM changes by 5+
             motorResponseDelay: 100, // 100ms delay for motor commands
-            
-            // UI optimization
-            updateInterval: 100, // Update UI every 100ms
-            notificationDuration: 2000, // 2 second notifications
             
             ...config
         };
 
         // Core components (use shared instances if provided, fallback to creating new ones)
         this.processor = config.processor || 
-                        (typeof OptimizedStreamingProcessor !== 'undefined' ? new OptimizedStreamingProcessor() : null);
+                        (typeof StreamingProcessor !== 'undefined' ? new StreamingProcessor() : null);
         this.apiService = config.apiService || 
-                         (typeof OptimizedApiService !== 'undefined' ? new OptimizedApiService() : null);
+                         (typeof ApiService !== 'undefined' ? new ApiService() : null);
         
         if (!this.processor) {
-            throw new Error('OptimizedStreamingProcessor not available');
+            throw new Error('StreamingProcessor not available');
         }
         if (!this.apiService) {
-            throw new Error('OptimizedApiService not available');
+            throw new Error('ApiService not available');
         }
+        
         this.motorController = config.motorController || null;
         
         // State management
@@ -2299,34 +2258,14 @@ class OptimizedAIVoiceControl {
             isProcessing: false,
             conversationActive: false,
             currentPwm: 0, // Motor starts stopped
+            lastInteractionTime: 0,
             lastResponse: null,
             lastError: null,
-            
-            // Conversation flow
-            conversationStartTime: 0,
-            lastInteractionTime: 0,
-            responseQueue: [],
-            
-            // Performance tracking
-            totalConversations: 0,
             totalApiCalls: 0,
-            totalProcessingTime: 0,
-            averageResponseTime: 0
+            totalProcessingTime: 0
         };
-
-        // UI elements
-        this.ui = {
-            statusDisplay: null,
-            pwmDisplay: null,
-            conversationDisplay: null,
-            efficiencyDisplay: null,
-            notificationArea: null
-        };
-
-        // Timers
-        this.conversationTimer = null;
-        this.uiUpdateTimer = null;
         
+        // Setup callbacks
         this.setupCallbacks();
     }
 
@@ -2334,16 +2273,18 @@ class OptimizedAIVoiceControl {
      * Setup callbacks for processor and API service
      */
     setupCallbacks() {
-        // Processor callbacks (set directly on processor)
-        this.processor.onSpeechReady = async (speechPacket) => {
-            await this.handleSpeechReady(speechPacket);
-        };
-        this.processor.onVoiceStateChange = (voiceState) => {
-            this.handleVoiceStateChange(voiceState);
-        };
-        this.processor.onConversationUpdate = (active) => {
-            this.handleConversationUpdate(active);
-        };
+        // Processor callbacks
+        this.processor.setCallbacks({
+            onSpeechReady: (speechPacket) => {
+                this.handleSpeechReady(speechPacket);
+            },
+            onVoiceStateChange: (voiceState) => {
+                this.handleVoiceStateChange(voiceState);
+            },
+            onConversationUpdate: (active) => {
+                this.handleConversationUpdate(active);
+            }
+        });
 
         // API service callbacks
         this.apiService.setCallbacks({
@@ -2355,21 +2296,26 @@ class OptimizedAIVoiceControl {
             },
             onProcessingStateChange: (processing) => {
                 this.state.isProcessing = processing;
-                this.updateUI();
             }
         });
     }
 
     /**
-     * Start optimized voice control
+     * Start AI voice control
      */
     async start() {
         try {
-            console.log("[Optimized Voice] Starting natural conversation mode");
+            console.log("[AI Voice] Starting natural conversation mode");
             
             this.state.isActive = true;
-            this.state.conversationStartTime = Date.now();
-            this.state.totalConversations++;
+            this.state.lastInteractionTime = Date.now();
+            this.state.totalApiCalls = 0;
+            
+            // Initialize motor to stopped state (PWM 0)
+            if (this.motorController) {
+                await this.updateMotorPWM(0);
+                console.log("[AI Voice] Motor initialized to stopped state (PWM 0)");
+            }
             
             // Start audio processing
             await this.startAudioProcessing();
@@ -2377,19 +2323,12 @@ class OptimizedAIVoiceControl {
             // Activate conversation mode
             this.handleConversationUpdate(true);
             
-            // Start conversation timer
-            this.startConversationTimer();
-            
-            // Start UI updates
-            this.startUIUpdates();
-            
-            this.showNotification("🎤 Natural conversation started - speak naturally!", "success");
+            console.log("🎤 Natural conversation started - speak naturally!");
             
             return true;
             
         } catch (error) {
-            console.error("Failed to start optimized voice control:", error);
-            this.showNotification("❌ Failed to start voice control", "error");
+            console.error("Failed to start AI voice control:", error);
             return false;
         }
     }
@@ -2398,28 +2337,113 @@ class OptimizedAIVoiceControl {
      * Stop voice control
      */
     async stop() {
-        console.log("[Optimized Voice] Stopping conversation mode");
+        console.log("[AI Voice] Stopping conversation mode");
         
         this.state.isActive = false;
         this.state.isListening = false;
         this.state.conversationActive = false;
         
-        // Stop timers
-        if (this.conversationTimer) {
-            clearTimeout(this.conversationTimer);
-            this.conversationTimer = null;
-        }
-        
-        if (this.uiUpdateTimer) {
-            clearInterval(this.uiUpdateTimer);
-            this.uiUpdateTimer = null;
-        }
-        
         // Stop audio processing
         await this.stopAudioProcessing();
         
-        this.showNotification("🔇 Voice control stopped", "info");
-        this.updateUI();
+        console.log("🔇 Voice control stopped");
+    }
+
+    /**
+     * Start audio processing using Capacitor VoiceRecorder
+     */
+    async startAudioProcessing() {
+        try {
+            console.log("[Audio] Starting audio processing");
+            
+            // Check if Capacitor is available
+            if (!window.Capacitor?.Plugins?.VoiceRecorder) {
+                throw new Error('Capacitor VoiceRecorder plugin not available');
+            }
+
+            // Request permission
+            const permission = await window.Capacitor.Plugins.VoiceRecorder.requestAudioRecordingPermission();
+            if (!permission.value) {
+                throw new Error('Audio recording permission denied');
+            }
+
+            // Remove any existing listeners
+            await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
+            
+            // Add streaming listener for real-time audio chunks
+            window.Capacitor.Plugins.VoiceRecorder.addListener('audioChunk', (data) => {
+                this.processAudioChunk(data.chunk);
+            });
+
+            // Start audio streaming
+            await window.Capacitor.Plugins.VoiceRecorder.startStreaming();
+            
+            console.log("[Audio] Capacitor audio streaming started");
+            return true;
+            
+        } catch (error) {
+            console.error("[Audio] Failed to start audio processing:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Stop audio processing
+     */
+    async stopAudioProcessing() {
+        try {
+            console.log("[Audio] Stopping audio processing");
+            
+            // Check if Capacitor is available
+            if (window.Capacitor?.Plugins?.VoiceRecorder) {
+                // Stop streaming
+                await window.Capacitor.Plugins.VoiceRecorder.stopStreaming();
+                
+                // Remove listeners
+                await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
+            }
+            
+            console.log("[Audio] Audio processing stopped");
+            
+        } catch (error) {
+            console.error("[Audio] Error stopping audio processing:", error);
+        }
+    }
+
+    /**
+     * Process incoming audio chunk from Capacitor VoiceRecorder
+     */
+    processAudioChunk(base64Chunk) {
+        // Only check if active (removed isListening check to fix chicken-and-egg problem)
+        if (!this.state.isActive) {
+            return;
+        }
+
+        try {
+            // Process audio chunk through processor
+            console.log(`[AUDIO CHUNK] Processing chunk: ${base64Chunk.length} chars`);
+            const result = this.processor.processAudioChunk(base64Chunk);
+            
+            if (result) {
+                // Update state with voice activity
+                this.state.lastInteractionTime = Date.now();
+                
+                // Log voice activity for debugging
+                console.log(`[VAD] Voice: ${result.isVoiceActive}, Energy: ${result.energy?.toFixed(4)}, ZCR: ${result.zeroCrossings?.toFixed(4)}`);
+                
+                // Update listening state based on voice activity
+                if (result.isVoiceActive !== this.state.isListening) {
+                    this.state.isListening = result.isVoiceActive;
+                    console.log(`[VAD] Listening state changed: ${this.state.isListening}`);
+                }
+                
+            } else {
+                console.log(`[AUDIO CHUNK] No result from processor`);
+            }
+            
+        } catch (error) {
+            console.error("[Audio] Error processing audio chunk:", error);
+        }
     }
 
     /**
@@ -2434,21 +2458,12 @@ class OptimizedAIVoiceControl {
             
             const startTime = Date.now();
             
-            // Check for immediate commands
-            const isImmediate = this.isImmediateCommand(speechPacket);
+            console.log(`[Speech Processing] Processing command`);
             
-            console.log(`[Speech Processing] ${isImmediate ? 'Immediate' : 'Normal'} command detected`);
-            
-            let response;
-            if (isImmediate) {
-                response = await this.apiService.sendImmediateCommand(speechPacket);
-            } else {
-                response = await this.apiService.processSpeechSegment(speechPacket);
-            }
+            const response = await this.apiService.processSpeechSegment(speechPacket);
             
             const processingTime = Date.now() - startTime;
             this.state.totalProcessingTime += processingTime;
-            this.updatePerformanceStats(processingTime);
             
             // ===== DETAILED API RESPONSE LOGGING =====
             console.log(`[API RESPONSE] Full response:`, response);
@@ -2471,16 +2486,16 @@ class OptimizedAIVoiceControl {
                 console.warn(`[API WARNING] No PWM value in response or response is null`);
             }
             
-            // ===== UPDATE INTERACTION TIME AND RESTART CONVERSATION =====
-            this.state.lastInteractionTime = Date.now(); // Reset interaction timer
-            console.log(`[CONVERSATION] Updated interaction time, restarting conversation for next command`);
+            // ===== RESET STATE FOR NEXT INTERACTION =====
+            this.state.lastInteractionTime = Date.now();
+            console.log(`[CONVERSATION] Updated interaction time, ready for next command`);
             
             // CRITICAL FIX: Reset processor state to ensure it can detect next speech
             console.log(`[RESET] Resetting processor state for next interaction`);
-            this.processor.audioState.isVoiceActive = false;
-            this.processor.audioState.pendingSpeech = false;
-            this.processor.audioState.consecutiveVoiceFrames = 0;
-            this.processor.audioState.consecutiveSilenceFrames = 0;
+            this.processor.isVoiceActive = false;
+            this.processor.isListening = false;
+            this.processor.consecutiveVoiceFrames = 0;
+            this.processor.consecutiveSilenceFrames = 0;
             
             // Ensure conversation stays active for next command
             this.handleConversationUpdate(true);
@@ -2488,10 +2503,8 @@ class OptimizedAIVoiceControl {
         } catch (error) {
             console.error("Speech processing failed:", error);
             this.handleApiError(error);
-            this.showNotification("⚠️ Speech processing failed", "warning");
         } finally {
             this.state.isProcessing = false;
-            this.updateUI();
         }
     }
 
@@ -2504,17 +2517,13 @@ class OptimizedAIVoiceControl {
         
         if (voiceState.isActive) {
             console.log(`[VOICE STATE] Voice started - listening for speech`);
-            this.showNotification("🎙️ Listening...", "info", 1000);
         } else if (voiceState.duration) {
             const durationMs = voiceState.duration;
             console.log(`[VOICE STATE] Voice ended - speech captured (${(durationMs/1000).toFixed(1)}s)`);
-            this.showNotification(`✅ Speech captured (${(durationMs/1000).toFixed(1)}s)`, "success", 1500);
             
-            // CRITICAL FIX: After speech ends, ensure we're ready for next interaction
+            // After speech ends, ensure we're ready for next interaction
             console.log(`[VOICE STATE] Preparing for next voice interaction`);
         }
-        
-        this.updateUI();
     }
 
     /**
@@ -2527,25 +2536,21 @@ class OptimizedAIVoiceControl {
         if (active) {
             console.log(`[CONVERSATION] ✅ Activating conversation - ready for next command`);
             this.processor.setConversationActive(true);
-            this.showNotification("💬 Ready for voice command", "success");
             
             // CRITICAL FIX: Reset all processing flags and ensure clean state
             this.state.isProcessing = false;
             this.state.isListening = false;
             
             // Ensure processor is in clean state for next interaction
-            if (this.processor.audioState) {
-                this.processor.audioState.isVoiceActive = false;
-                this.processor.audioState.pendingSpeech = false;
+            if (this.processor) {
+                this.processor.isVoiceActive = false;
+                this.processor.isListening = false;
                 console.log(`[CONVERSATION] Processor state reset for next interaction`);
             }
             
         } else {
             console.log(`[CONVERSATION] ⏸️ Pausing conversation`);
-            this.showNotification("💤 Conversation paused", "info");
         }
-        
-        this.updateUI();
     }
 
     /**
@@ -2563,12 +2568,10 @@ class OptimizedAIVoiceControl {
             }
         }
         
-        // Show response notification
+        // Log response
         if (response.response) {
-            this.showNotification(`🤖 ${response.response}`, "success", 3000);
+            console.log(`🤖 ${response.response}`);
         }
-        
-        this.updateUI();
     }
 
     /**
@@ -2577,327 +2580,10 @@ class OptimizedAIVoiceControl {
     handleApiError(error) {
         this.state.lastError = error;
         console.error("API Error:", error);
-        
-        this.showNotification("❌ API communication failed", "error");
-        this.updateUI();
     }
 
     /**
      * Update motor PWM with optimization
-     */
-
-
-    /**
-     * Check if speech contains immediate command keywords
-     */
-    isImmediateCommand(speechPacket) {
-        // Simple keyword detection - could be enhanced with ML
-        const duration = speechPacket.duration || 0;
-        const isShort = duration < 2000; // Less than 2 seconds
-        
-        // For now, treat short speech as potentially immediate
-        return isShort;
-    }
-
-    /**
-     * Start conversation timeout timer
-     */
-    startConversationTimer() {
-        // DISABLED: Conversation timeout mechanism removed to match working test-real-api.html
-        // The conversation stays active continuously like in the working version
-        console.log("[Conversation Timer] Disabled - conversation stays active continuously");
-        
-        /* ORIGINAL TIMEOUT CODE - DISABLED
-        if (this.conversationTimer) {
-            clearTimeout(this.conversationTimer);
-        }
-        
-        this.conversationTimer = setTimeout(() => {
-            if (this.state.conversationActive) {
-                const timeSinceInteraction = Date.now() - this.state.lastInteractionTime;
-                if (timeSinceInteraction >= this.config.conversationTimeout) {
-                    console.log("[Conversation] Timeout - ending conversation");
-                    this.handleConversationUpdate(false);
-                } else {
-                    // Restart timer for remaining time
-                    this.startConversationTimer();
-                }
-            }
-        }, this.config.conversationTimeout);
-        */
-    }
-
-    /**
-     * Start UI update timer
-     */
-    startUIUpdates() {
-        if (this.uiUpdateTimer) {
-            clearInterval(this.uiUpdateTimer);
-        }
-        
-        this.uiUpdateTimer = setInterval(() => {
-            this.updateUI();
-        }, this.config.updateInterval);
-    }
-
-    /**
-     * Update performance statistics
-     */
-    updatePerformanceStats(processingTime) {
-        this.state.totalProcessingTime += processingTime;
-        this.state.averageResponseTime = this.state.totalApiCalls > 0 
-            ? this.state.totalProcessingTime / this.state.totalApiCalls 
-            : 0;
-    }
-
-    /**
-     * Update UI displays
-     */
-    updateUI() {
-        // Update status display
-        if (this.ui.statusDisplay) {
-            const status = this.getStatusText();
-            this.ui.statusDisplay.textContent = status;
-            this.ui.statusDisplay.className = `status ${this.getStatusClass()}`;
-        }
-        
-        // Update PWM display
-        if (this.ui.pwmDisplay) {
-            this.ui.pwmDisplay.textContent = `PWM: ${this.state.currentPwm}`;
-        }
-        
-        // Update efficiency display
-        if (this.ui.efficiencyDisplay) {
-            const stats = this.getEfficiencyStats();
-            this.ui.efficiencyDisplay.innerHTML = this.formatEfficiencyStats(stats);
-        }
-        
-        // Update conversation display
-        if (this.ui.conversationDisplay) {
-            const history = this.apiService.getConversationHistory();
-            this.ui.conversationDisplay.innerHTML = this.formatConversationHistory(history);
-        }
-    }
-
-    /**
-     * Get current status text
-     */
-    getStatusText() {
-        if (!this.state.isActive) return "Inactive";
-        if (this.state.isProcessing) return "Processing...";
-        if (this.state.isListening) return "Listening";
-        if (this.state.conversationActive) return "Ready";
-        return "Waiting";
-    }
-
-    /**
-     * Get status CSS class
-     */
-    getStatusClass() {
-        if (!this.state.isActive) return "inactive";
-        if (this.state.isProcessing) return "processing";
-        if (this.state.isListening) return "listening";
-        if (this.state.conversationActive) return "active";
-        return "waiting";
-    }
-
-    /**
-     * Get comprehensive efficiency statistics
-     */
-    getEfficiencyStats() {
-        const processorStats = this.processor.getEfficiencyStats();
-        const apiStats = this.apiService.getEfficiencyStats();
-        
-        return {
-            processor: processorStats,
-            api: apiStats,
-            conversation: {
-                totalConversations: this.state.totalConversations,
-                averageResponseTime: Math.round(this.state.averageResponseTime),
-                conversationDuration: this.state.conversationStartTime > 0 
-                    ? Date.now() - this.state.conversationStartTime 
-                    : 0
-            }
-        };
-    }
-
-    /**
-     * Format efficiency stats for display
-     */
-    formatEfficiencyStats(stats) {
-        return `
-            <div class="efficiency-stats">
-                <div class="stat-group">
-                    <h4>Processing Efficiency</h4>
-                    <div>Chunks: ${stats.processor.totalChunksProcessed}</div>
-                    <div>API Calls: ${stats.processor.apiCallsMade}</div>
-                    <div>Efficiency: ${stats.processor.efficiencyPercentage}%</div>
-                </div>
-                <div class="stat-group">
-                    <h4>Smart Buffering</h4>
-                    <div>VAD Buffer: ${stats.processor.smartBuffering.vadBufferMs}ms</div>
-                    <div>Speech Buffer: ${stats.processor.smartBuffering.speechBufferMs}ms</div>
-                    <div>Pre-context: ${stats.processor.smartBuffering.preSpeechContextMs}ms</div>
-                </div>
-                <div class="stat-group">
-                    <h4>Conversation</h4>
-                    <div>Sessions: ${stats.conversation.totalConversations}</div>
-                    <div>Avg Response: ${stats.conversation.averageResponseTime}ms</div>
-                    <div>Duration: ${Math.round(stats.conversation.conversationDuration/1000)}s</div>
-                </div>
-            </div>
-        `;
-    }
-
-    /**
-     * Format conversation history for display
-     */
-    formatConversationHistory(history) {
-        if (history.length === 0) {
-            return '<div class="no-conversation">No conversation yet...</div>';
-        }
-        
-        return history.slice(-5).map(entry => `
-            <div class="conversation-entry">
-                <div class="user-message">👤 ${entry.user}</div>
-                <div class="assistant-message">🤖 ${entry.assistant}</div>
-                <div class="message-meta">PWM: ${entry.pwm} | ${new Date(entry.timestamp).toLocaleTimeString()}</div>
-            </div>
-        `).join('');
-    }
-
-    /**
-     * Show notification
-     */
-    showNotification(message, type = "info", duration = null) {
-        console.log(`[Notification] ${message}`);
-        
-        if (this.ui.notificationArea) {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.textContent = message;
-            
-            this.ui.notificationArea.appendChild(notification);
-            
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, duration || this.config.notificationDuration);
-        }
-    }
-
-    /**
-     * Set UI elements
-     */
-    setUIElements(elements) {
-        this.ui = { ...this.ui, ...elements };
-    }
-
-    /**
-     * Start audio processing using Capacitor VoiceRecorder
-     */
-    async startAudioProcessing() {
-        try {
-            console.log("[Audio] Starting optimized audio processing");
-            
-            // Check if Capacitor is available
-            if (!window.Capacitor?.Plugins?.VoiceRecorder) {
-                throw new Error('Capacitor VoiceRecorder plugin not available');
-            }
-            
-            // Request audio recording permission
-            const permission = await window.Capacitor.Plugins.VoiceRecorder.requestAudioRecordingPermission();
-            if (!permission.value) {
-                throw new Error('Audio recording permission denied');
-            }
-
-            // Remove any existing listeners
-            await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
-            
-            // Add streaming listener for real-time audio chunks
-            window.Capacitor.Plugins.VoiceRecorder.addListener('audioChunk', (data) => {
-                this.processAudioChunk(data.chunk);
-            });
-
-            // Start audio streaming (not recording)
-            await window.Capacitor.Plugins.VoiceRecorder.startStreaming();
-            
-            this.state.isListening = true;
-            console.log("[Audio] Capacitor audio streaming started");
-            
-        } catch (error) {
-            console.error("[Audio] Failed to start audio processing:", error);
-            this.showNotification("❌ Microphone access denied", "error");
-            throw error;
-        }
-    }
-
-    /**
-     * Stop audio processing
-     */
-    async stopAudioProcessing() {
-        console.log("[Audio] Stopping audio processing");
-        
-        try {
-            // Check if Capacitor is available
-            if (window.Capacitor?.Plugins?.VoiceRecorder) {
-                // Stop audio streaming
-                await window.Capacitor.Plugins.VoiceRecorder.stopStreaming();
-            
-                // Remove listeners
-                await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
-            }
-            
-        } catch (error) {
-            console.warn("[Audio] Error stopping audio processing:", error);
-        }
-        
-        this.state.isListening = false;
-    }
-
-    /**
-     * Process incoming audio chunk from Capacitor VoiceRecorder
-     */
-    processAudioChunk(base64Chunk) {
-        // CRITICAL FIX: Only check if active, not isListening (which creates chicken-and-egg problem)
-        if (!this.state.isActive) {
-            return;
-        }
-
-        try {
-            // Process audio chunk through optimized processor
-            console.log(`[AUDIO CHUNK] Processing chunk: ${base64Chunk.length} chars`);
-            const result = this.processor.processAudioChunk(base64Chunk);
-            
-            if (result) {
-                // Update state with voice activity
-                this.state.lastInteractionTime = Date.now();
-                
-                // Log voice activity for debugging
-                console.log(`[VAD] Voice: ${result.isVoiceActive}, Energy: ${result.energy?.toFixed(4)}, ZCR: ${result.zeroCrossings?.toFixed(4)}`);
-                
-                // Update listening state based on voice activity
-                if (result.isVoiceActive !== this.state.isListening) {
-                    this.state.isListening = result.isVoiceActive;
-                    console.log(`[VAD] Listening state changed: ${this.state.isListening}`);
-                }
-                
-                // Speech packets are handled via onSpeechReady callback
-                // This result only contains VAD status information
-            } else {
-                console.log(`[AUDIO CHUNK] No result from processor`);
-            }
-            
-        } catch (error) {
-            console.error("[Audio] Error processing audio chunk:", error);
-        }
-    }
-
-
-
-    /**
-     * Update motor PWM value with optimization
      */
     async updateMotorPWM(newPwm) {
         console.log(`[MOTOR UPDATE] Requested PWM: ${newPwm}, Current PWM: ${this.state.currentPwm}`);
@@ -2916,7 +2602,6 @@ class OptimizedAIVoiceControl {
             if (this.motorController && this.motorController.isConnected) {
                 console.log(`[MOTOR UPDATE] Motor controller connected, sending PWM command...`);
                 try {
-                    // Use immediate execution instead of setTimeout for debugging
                     await this.motorController.write(newPwm);
                     console.log(`[MOTOR UPDATE] ✅ PWM ${newPwm} sent to motor successfully`);
                     
@@ -2940,6 +2625,27 @@ class OptimizedAIVoiceControl {
         }
     }
 
+
+
+    /**
+     * Get efficiency statistics
+     */
+    getEfficiencyStats() {
+        const processorStats = this.processor.getState();
+        const apiStats = this.apiService.getStats();
+        
+        return {
+            processor: processorStats,
+            api: apiStats,
+            overall: {
+                totalInteractions: this.state.totalApiCalls,
+                averageResponseTime: this.state.totalApiCalls > 0 
+                    ? (this.state.totalProcessingTime / this.state.totalApiCalls).toFixed(0) + 'ms'
+                    : '0ms'
+            }
+        };
+    }
+
     /**
      * Get current state
      */
@@ -2953,19 +2659,24 @@ class OptimizedAIVoiceControl {
     }
 
     /**
-     * Reset to initial state
+     * Reset state
      */
     reset() {
+        this.state.isActive = false;
+        this.state.isListening = false;
+        this.state.isProcessing = false;
         this.state.conversationActive = false;
+        this.state.currentPwm = 0;
+        this.state.lastInteractionTime = 0;
         this.state.lastResponse = null;
         this.state.lastError = null;
-        this.state.currentPwm = 0; // Reset to stopped
+        this.state.totalApiCalls = 0;
+        this.state.totalProcessingTime = 0;
         
         this.processor.reset();
         this.apiService.reset();
         
-        console.log("[Optimized Voice] State reset");
-        this.updateUI();
+        console.log("[AI Voice] State reset");
     }
 }
 
@@ -3625,8 +3336,8 @@ if (typeof window !== 'undefined') {
  */
 
 // Import all modules
-// Import control modes (optimized as primary)
-// Import optimized components (now primary)
+// Import control modes
+// Import core components
 class DulaanSDK {
     constructor() {
         // Core components - use global instances when available (for bundled version)
@@ -3636,16 +3347,16 @@ class DulaanSDK {
         
         // Create core instances with safety checks
         try {
-            this.audio = new OptimizedStreamingProcessor(); // Create instance of optimized processor
+            this.audio = new StreamingProcessor(); // Create instance of streaming processor
         } catch (error) {
-            console.error('Failed to create OptimizedStreamingProcessor:', error);
+            console.error('Failed to create StreamingProcessor:', error);
             this.audio = null;
         }
         
         try {
-            this.api = new OptimizedApiService(); // Create instance of optimized API
+            this.api = new ApiService(); // Create instance of API service
         } catch (error) {
-            console.error('Failed to create OptimizedApiService:', error);
+            console.error('Failed to create ApiService:', error);
             this.api = null;
         }
         
@@ -3659,17 +3370,17 @@ class DulaanSDK {
         
         this.utils = (typeof window !== 'undefined' && window.audioUtils) || {};
         
-        // Control modes (optimized as primary) - with safe instantiation
+        // Control modes - with safe instantiation
         this.modes = {};
         
         try {
-            this.modes.ai = new OptimizedAIVoiceControl({
+            this.modes.ai = new AIVoiceControl({
                 processor: this.audio,
                 apiService: this.api,
                 motorController: this.motor
-            }); // Primary optimized mode
+            }); // Primary AI voice control mode
         } catch (error) {
-            console.warn('Failed to create OptimizedAIVoiceControl:', error);
+            console.warn('Failed to create AIVoiceControl:', error);
             this.modes.ai = null;
         }
         
@@ -3687,11 +3398,11 @@ class DulaanSDK {
             this.modes.touch = null;
         }
         
-        // Direct access to optimized components
-        this.optimized = {
-            processor: OptimizedStreamingProcessor,
-            apiService: OptimizedApiService,
-            voiceControl: OptimizedAIVoiceControl
+        // Direct access to core components
+        this.core = {
+            processor: StreamingProcessor,
+            apiService: ApiService,
+            voiceControl: AIVoiceControl
         };
         
         // State
@@ -3734,12 +3445,12 @@ class DulaanSDK {
                 await this.motor.connect(this.config.motor.deviceAddress);
             }
             
-            // Configure audio processor (optimized version uses internal thresholds)
+            // Configure audio processor
             if (this.audio.setMaxEnergy) {
                 this.audio.setMaxEnergy(this.config.audio.maxEnergy);
             } else {
-                // OptimizedStreamingProcessor uses internal VAD parameters
-                console.log('Using optimized VAD with internal energy thresholds');
+                // StreamingProcessor uses internal VAD parameters
+                console.log('Using VAD with internal energy thresholds');
             }
             
             // Set up remote service callbacks
@@ -3869,7 +3580,7 @@ class DulaanSDK {
         if (this.audio.setMaxEnergy) {
             this.audio.setMaxEnergy(energy);
         } else {
-            console.log('OptimizedStreamingProcessor uses internal VAD thresholds');
+            console.log('StreamingProcessor uses internal VAD thresholds');
         }
         this.config.audio.maxEnergy = energy;
     }
@@ -3885,7 +3596,7 @@ class DulaanSDK {
         if (this.audio.getAudioState) {
             return this.audio.getAudioState();
         }
-        // Return optimized processor state
+        // Return processor state
         return this.audio.audioState || {};
     }
 
@@ -3900,7 +3611,7 @@ class DulaanSDK {
             if (this.audio.setMaxEnergy) {
                 this.audio.setMaxEnergy(newConfig.audio.maxEnergy);
             } else {
-                console.log('OptimizedStreamingProcessor uses internal VAD thresholds');
+                console.log('StreamingProcessor uses internal VAD thresholds');
             }
         }
         

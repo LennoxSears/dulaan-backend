@@ -9,14 +9,14 @@ import { consentService } from './services/consent-service.js';
 import { remoteService } from './services/remote-service.js';
 import * as audioUtils from './utils/audio-utils.js';
 
-// Import control modes (optimized as primary)
-import { OptimizedAIVoiceControl } from './modes/optimized-ai-voice-control.js';
+// Import control modes
+import { AIVoiceControl } from './modes/ai-voice-control.js';
 import { AmbientControl } from './modes/ambient-control.js';
 import { TouchControl } from './modes/touch-control.js';
 
-// Import optimized components (now primary)
-import { OptimizedStreamingProcessor } from './core/optimized-streaming-processor.js';
-import { OptimizedApiService } from './services/optimized-api-service.js';
+// Import core components
+import { StreamingProcessor } from './core/streaming-processor.js';
+import { ApiService } from './services/api-service.js';
 
 class DulaanSDK {
     constructor() {
@@ -27,16 +27,16 @@ class DulaanSDK {
         
         // Create core instances with safety checks
         try {
-            this.audio = new OptimizedStreamingProcessor(); // Create instance of optimized processor
+            this.audio = new StreamingProcessor(); // Create instance of streaming processor
         } catch (error) {
-            console.error('Failed to create OptimizedStreamingProcessor:', error);
+            console.error('Failed to create StreamingProcessor:', error);
             this.audio = null;
         }
         
         try {
-            this.api = new OptimizedApiService(); // Create instance of optimized API
+            this.api = new ApiService(); // Create instance of API service
         } catch (error) {
-            console.error('Failed to create OptimizedApiService:', error);
+            console.error('Failed to create ApiService:', error);
             this.api = null;
         }
         
@@ -50,17 +50,17 @@ class DulaanSDK {
         
         this.utils = (typeof window !== 'undefined' && window.audioUtils) || {};
         
-        // Control modes (optimized as primary) - with safe instantiation
+        // Control modes - with safe instantiation
         this.modes = {};
         
         try {
-            this.modes.ai = new OptimizedAIVoiceControl({
+            this.modes.ai = new AIVoiceControl({
                 processor: this.audio,
                 apiService: this.api,
                 motorController: this.motor
-            }); // Primary optimized mode
+            }); // Primary AI voice control mode
         } catch (error) {
-            console.warn('Failed to create OptimizedAIVoiceControl:', error);
+            console.warn('Failed to create AIVoiceControl:', error);
             this.modes.ai = null;
         }
         
@@ -78,11 +78,11 @@ class DulaanSDK {
             this.modes.touch = null;
         }
         
-        // Direct access to optimized components
-        this.optimized = {
-            processor: OptimizedStreamingProcessor,
-            apiService: OptimizedApiService,
-            voiceControl: OptimizedAIVoiceControl
+        // Direct access to core components
+        this.core = {
+            processor: StreamingProcessor,
+            apiService: ApiService,
+            voiceControl: AIVoiceControl
         };
         
         // State
@@ -125,12 +125,12 @@ class DulaanSDK {
                 await this.motor.connect(this.config.motor.deviceAddress);
             }
             
-            // Configure audio processor (optimized version uses internal thresholds)
+            // Configure audio processor
             if (this.audio.setMaxEnergy) {
                 this.audio.setMaxEnergy(this.config.audio.maxEnergy);
             } else {
-                // OptimizedStreamingProcessor uses internal VAD parameters
-                console.log('Using optimized VAD with internal energy thresholds');
+                // StreamingProcessor uses internal VAD parameters
+                console.log('Using VAD with internal energy thresholds');
             }
             
             // Set up remote service callbacks
@@ -260,7 +260,7 @@ class DulaanSDK {
         if (this.audio.setMaxEnergy) {
             this.audio.setMaxEnergy(energy);
         } else {
-            console.log('OptimizedStreamingProcessor uses internal VAD thresholds');
+            console.log('StreamingProcessor uses internal VAD thresholds');
         }
         this.config.audio.maxEnergy = energy;
     }
@@ -276,7 +276,7 @@ class DulaanSDK {
         if (this.audio.getAudioState) {
             return this.audio.getAudioState();
         }
-        // Return optimized processor state
+        // Return processor state
         return this.audio.audioState || {};
     }
 
@@ -291,7 +291,7 @@ class DulaanSDK {
             if (this.audio.setMaxEnergy) {
                 this.audio.setMaxEnergy(newConfig.audio.maxEnergy);
             } else {
-                console.log('OptimizedStreamingProcessor uses internal VAD thresholds');
+                console.log('StreamingProcessor uses internal VAD thresholds');
             }
         }
         

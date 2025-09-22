@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bundle Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.4;
+        }
+        .test-output {
+            background: #000;
+            border: 1px solid #333;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .button {
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #555;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin: 10px 5px;
+            border-radius: 3px;
+        }
+        .button:hover {
+            background: #555;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff4444; }
+        .warning { color: #ffaa00; }
+        .info { color: #4488ff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dulaan Bundle Test</h1>
+        
+        <button class="button" onclick="testBundle()">Test Bundle Loading</button>
+        <button class="button" onclick="testSDK()">Test SDK Initialization</button>
+        <button class="button" onclick="testComponents()">Test Components</button>
+        <button class="button" onclick="clearOutput()">Clear Output</button>
+        
+        <div id="output" class="test-output">Ready to test bundle...\n</div>
+    </div>
+
+    <script src="dulaan-browser-bundled.js"></script>
+    <script>
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = 'Output cleared...\n';
+        }
+
+        function testBundle() {
+            log('Testing bundle loading...', 'info');
+            
+            try {
+                // Check if global objects exist
+                if (typeof window.dulaanSDK !== 'undefined') {
+                    log('✅ dulaanSDK global object found', 'success');
+                } else {
+                    log('❌ dulaanSDK global object not found', 'error');
+                }
+                
+                if (typeof window.StreamingProcessor !== 'undefined') {
+                    log('✅ StreamingProcessor class found', 'success');
+                } else {
+                    log('❌ StreamingProcessor class not found', 'error');
+                }
+                
+                if (typeof window.ApiService !== 'undefined') {
+                    log('✅ ApiService class found', 'success');
+                } else {
+                    log('❌ ApiService class not found', 'error');
+                }
+                
+                if (typeof window.AIVoiceControl !== 'undefined') {
+                    log('✅ AIVoiceControl class found', 'success');
+                } else {
+                    log('❌ AIVoiceControl class not found', 'error');
+                }
+                
+                log('Bundle loading test completed', 'info');
+                
+            } catch (error) {
+                log(`❌ Bundle test error: ${error.message}`, 'error');
+            }
+        }
+
+        function testSDK() {
+            log('Testing SDK initialization...', 'info');
+            
+            try {
+                if (window.dulaanSDK) {
+                    log('✅ SDK instance available', 'success');
+                    log(`SDK info: ${JSON.stringify(window.dulaanSDK.getSDKInfo(), null, 2)}`, 'info');
+                    
+                    // Test component access
+                    if (window.dulaanSDK.audio) {
+                        log('✅ Audio processor available', 'success');
+                    } else {
+                        log('❌ Audio processor not available', 'error');
+                    }
+                    
+                    if (window.dulaanSDK.api) {
+                        log('✅ API service available', 'success');
+                    } else {
+                        log('❌ API service not available', 'error');
+                    }
+                    
+                    if (window.dulaanSDK.modes.ai) {
+                        log('✅ AI voice control mode available', 'success');
+                    } else {
+                        log('❌ AI voice control mode not available', 'error');
+                    }
+                    
+                } else {
+                    log('❌ SDK instance not available', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ SDK test error: ${error.message}`, 'error');
+            }
+        }
+
+        function testComponents() {
+            log('Testing component instantiation...', 'info');
+            
+            try {
+                // Test StreamingProcessor
+                if (window.StreamingProcessor) {
+                    const processor = new window.StreamingProcessor();
+                    log('✅ StreamingProcessor instantiated successfully', 'success');
+                } else {
+                    log('❌ StreamingProcessor class not available', 'error');
+                }
+                
+                // Test ApiService
+                if (window.ApiService) {
+                    const apiService = new window.ApiService();
+                    log('✅ ApiService instantiated successfully', 'success');
+                } else {
+                    log('❌ ApiService class not available', 'error');
+                }
+                
+                // Test AIVoiceControl
+                if (window.AIVoiceControl) {
+                    const voiceControl = new window.AIVoiceControl();
+                    log('✅ AIVoiceControl instantiated successfully', 'success');
+                } else {
+                    log('❌ AIVoiceControl class not available', 'error');
+                }
+                
+                log('Component instantiation test completed', 'info');
+                
+            } catch (error) {
+                log(`❌ Component test error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run bundle test on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testBundle();
+            }, 100);
+        });
+    </script>
+</body>
+</html>
