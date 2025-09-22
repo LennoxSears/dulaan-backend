@@ -53,7 +53,7 @@ class RingBuffer {
 
 // ===== 2. 全局状态配置 =====
 window.AUDIO_STATE = {
-    ringBuffer: new RingBuffer(480000 * 5), // 16000Hz * 75秒 (very large buffer for long speech)
+    ringBuffer: new RingBuffer(480000 * 2), // 16000Hz * 30秒
     abiBuffer: new RingBuffer(1600),
     isSpeaking: false,
     silenceCounter: 0,

@@ -62,7 +62,7 @@ class AudioProcessor {
     constructor() {
         // Audio processing state
         this.audioState = {
-            ringBuffer: new RingBuffer(480000 * 5), // 16000Hz * 75 seconds (very large buffer for long speech)
+            ringBuffer: new RingBuffer(480000 * 2), // 16000Hz * 30 seconds
             abiBuffer: new RingBuffer(1600),
             isSpeaking: false,
             silenceCounter: 0,
