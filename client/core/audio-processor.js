@@ -69,7 +69,7 @@ class AudioProcessor {
             SILENCE_THRESHOLD: 0.05,
             ZERO_CROSSING: 0.1,
             SILENCE_TIMEOUT: 25,
-            MIN_SPEECH_DURATION: 10,
+            MIN_SPEECH_DURATION: 5,
             lastChunkSize: 0,
             lastRMS: 0,
             lastZeroCrossings: 0

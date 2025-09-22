@@ -491,7 +491,7 @@ exports.speechToTextWithLLM = onRequest(
                     enableAutomaticPunctuation: true,
                     enableWordTimeOffsets: false,
                     enableWordConfidence: true,
-                    model: 'latest_short',  // Optimized for short voice commands (our primary use case)
+                    model: 'latest_long',   // Optimized for longer speech segments
                     useEnhanced: true,     // Use enhanced model for better accuracy
                     profanityFilter: false,
                     maxAlternatives: 1,
@@ -519,10 +519,10 @@ exports.speechToTextWithLLM = onRequest(
                     speechConfig.languageCode = 'en-US'; // Primary language
                     speechConfig.alternativeLanguageCodes = ['es-ES']; // Spanish only
                     
-                    logger.log('Using latest_short model optimized for voice commands', {
+                    logger.log('Using latest_long model optimized for longer speech', {
                         primaryLanguage: speechConfig.languageCode,
                         alternativeLanguages: speechConfig.alternativeLanguageCodes,
-                        model: 'latest_short',
+                        model: 'latest_long',
                         region: 'europe-west1',
                         optimization: 'English + Spanish only, optimized for short commands',
                         useCase: 'Motor control voice commands (stop, turn up, etc.)'
@@ -535,7 +535,7 @@ exports.speechToTextWithLLM = onRequest(
                 };
 
                 // Log audio info for debugging
-                logger.log('Processing short voice command with latest_short model', {
+                logger.log('Processing speech with latest_long model', {
                     encoding: speechConfig.encoding,
                     sampleRateHertz: speechConfig.sampleRateHertz,
                     audioBufferLength: int16Data.length,
@@ -577,7 +577,7 @@ exports.speechToTextWithLLM = onRequest(
                                 transcript, 
                                 confidence,
                                 threshold: 0.3,
-                                model: 'latest_short',
+                                model: 'latest_long',
                                 region: 'europe-west1'
                             });
                             transcript = '';
@@ -591,7 +591,7 @@ exports.speechToTextWithLLM = onRequest(
                     enableAutomaticPunctuation: true,
                     enableWordTimeOffsets: false,
                     enableWordConfidence: true,
-                    model: 'latest_short',
+                    model: 'latest_long',
                     useEnhanced: true,
                     profanityFilter: false,
                     maxAlternatives: 1,
@@ -645,7 +645,7 @@ exports.speechToTextWithLLM = onRequest(
             const apiKey = "AIzaSyD9KKLF3WBa6gi0_orzF-OMydzO4rIX_uY";
 
             const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
             // Prepare conversation history for context (handle different formats safely)
             const conversationHistory = msgHis.map(msg => {
