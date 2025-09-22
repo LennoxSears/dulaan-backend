@@ -25,9 +25,18 @@ class OptimizedAIVoiceControl {
             ...config
         };
 
-        // Core components (use shared instances if provided)
-        this.processor = config.processor || new OptimizedStreamingProcessor();
-        this.apiService = config.apiService || new OptimizedApiService();
+        // Core components (use shared instances if provided, fallback to creating new ones)
+        this.processor = config.processor || 
+                        (typeof OptimizedStreamingProcessor !== 'undefined' ? new OptimizedStreamingProcessor() : null);
+        this.apiService = config.apiService || 
+                         (typeof OptimizedApiService !== 'undefined' ? new OptimizedApiService() : null);
+        
+        if (!this.processor) {
+            throw new Error('OptimizedStreamingProcessor not available');
+        }
+        if (!this.apiService) {
+            throw new Error('OptimizedApiService not available');
+        }
         this.motorController = config.motorController || null;
         
         // State management

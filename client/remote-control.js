@@ -378,6 +378,9 @@ export class RemoteControl {
 // Create singleton instance
 export const remoteControl = new RemoteControl();
 
+// Export class and instance
+export { RemoteControl };
+
 // Global access
 if (typeof window !== 'undefined') {
     window.remoteControl = remoteControl;

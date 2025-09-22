@@ -20,24 +20,63 @@ import { OptimizedApiService } from './services/optimized-api-service.js';
 
 class DulaanSDK {
     constructor() {
-        // Core components (optimized as primary)
-        this.motor = motorController;
-        this.audio = new OptimizedStreamingProcessor(); // Create instance of optimized processor
-        this.api = new OptimizedApiService(); // Create instance of optimized API
-        this.consent = consentService;
-        this.remote = remoteService;
+        // Core components - use global instances when available (for bundled version)
+        this.motor = (typeof motorController !== 'undefined') ? motorController : 
+                     (typeof window !== 'undefined' && window.motorController) ? window.motorController : 
+                     new MotorController();
+        
+        // Create core instances with safety checks
+        try {
+            this.audio = new OptimizedStreamingProcessor(); // Create instance of optimized processor
+        } catch (error) {
+            console.error('Failed to create OptimizedStreamingProcessor:', error);
+            this.audio = null;
+        }
+        
+        try {
+            this.api = new OptimizedApiService(); // Create instance of optimized API
+        } catch (error) {
+            console.error('Failed to create OptimizedApiService:', error);
+            this.api = null;
+        }
+        
+        this.consent = (typeof consentService !== 'undefined') ? consentService :
+                       (typeof window !== 'undefined' && window.consentService) ? window.consentService :
+                       new ConsentService();
+        
+        this.remote = (typeof remoteService !== 'undefined') ? remoteService :
+                      (typeof window !== 'undefined' && window.remoteService) ? window.remoteService :
+                      new RemoteService();
+        
         this.utils = (typeof window !== 'undefined' && window.audioUtils) || {};
         
-        // Control modes (optimized as primary)
-        this.modes = {
-            ai: new OptimizedAIVoiceControl({
+        // Control modes (optimized as primary) - with safe instantiation
+        this.modes = {};
+        
+        try {
+            this.modes.ai = new OptimizedAIVoiceControl({
                 processor: this.audio,
                 apiService: this.api,
                 motorController: this.motor
-            }), // Primary optimized mode
-            ambient: new AmbientControl(this),
-            touch: new TouchControl(this)
-        };
+            }); // Primary optimized mode
+        } catch (error) {
+            console.warn('Failed to create OptimizedAIVoiceControl:', error);
+            this.modes.ai = null;
+        }
+        
+        try {
+            this.modes.ambient = new AmbientControl(this);
+        } catch (error) {
+            console.warn('Failed to create AmbientControl:', error);
+            this.modes.ambient = null;
+        }
+        
+        try {
+            this.modes.touch = new TouchControl(this);
+        } catch (error) {
+            console.warn('Failed to create TouchControl:', error);
+            this.modes.touch = null;
+        }
         
         // Direct access to optimized components
         this.optimized = {

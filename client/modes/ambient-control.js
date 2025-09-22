@@ -126,3 +126,5 @@ export class AmbientControl {
     }
 }
 
+export { AmbientControl };
+

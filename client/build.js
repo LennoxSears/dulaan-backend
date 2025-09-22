@@ -103,11 +103,37 @@ ${FILES_TO_BUNDLE.map(f => ` * - ${f}`).join('\n')}
     // Bundle Initialization
     // ============================================================================
 
-    // Create global instance
-    const dulaan = new DulaanSDK();
-
-    // Initialize automatically
-    dulaan.initialize().catch(console.error);
+    // Create global instance with error handling and delayed initialization
+    let dulaan = null;
+    
+    // Use setTimeout to ensure all classes are fully defined
+    setTimeout(() => {
+        try {
+            console.log('🔍 Checking available classes before DulaanSDK creation:', {
+                DulaanSDK: typeof DulaanSDK,
+                MotorController: typeof MotorController,
+                OptimizedStreamingProcessor: typeof OptimizedStreamingProcessor,
+                OptimizedApiService: typeof OptimizedApiService,
+                ConsentService: typeof ConsentService,
+                RemoteService: typeof RemoteService,
+                RingBuffer: typeof RingBuffer
+            });
+            
+            dulaan = new DulaanSDK();
+            console.log('✅ DulaanSDK instance created successfully');
+            
+            // Update global reference
+            window.dulaan = dulaan;
+            
+            // Initialize automatically
+            dulaan.initialize().catch(error => {
+                console.error('❌ DulaanSDK initialization failed:', error);
+            });
+        } catch (error) {
+            console.error('❌ Failed to create DulaanSDK instance:', error);
+            console.error('Error details:', error.stack);
+        }
+    }, 100); // 100ms delay to ensure all classes are defined
 
     // Export to global scope
     window.dulaan = dulaan;
@@ -115,20 +141,20 @@ ${FILES_TO_BUNDLE.map(f => ` * - ${f}`).join('\n')}
 
     // Export individual components for advanced usage
     window.DULAAN_COMPONENTS = {
-        MotorController,
-        OptimizedStreamingProcessor,
-        OptimizedApiService,
-        ConsentService,
-        RemoteService,
-        RemoteControl,
-        OptimizedAIVoiceControl,
-        AmbientControl,
-        TouchControl,
-        RingBuffer,
-        UTILS,
-        REMOTE_CONFIG,
-        AUDIO_CONFIG,
-        PWM_CONFIG
+        MotorController: typeof MotorController !== 'undefined' ? MotorController : null,
+        OptimizedStreamingProcessor: typeof OptimizedStreamingProcessor !== 'undefined' ? OptimizedStreamingProcessor : null,
+        OptimizedApiService: typeof OptimizedApiService !== 'undefined' ? OptimizedApiService : null,
+        ConsentService: typeof ConsentService !== 'undefined' ? ConsentService : null,
+        RemoteService: typeof RemoteService !== 'undefined' ? RemoteService : null,
+        RemoteControl: typeof RemoteControl !== 'undefined' ? RemoteControl : null,
+        OptimizedAIVoiceControl: typeof OptimizedAIVoiceControl !== 'undefined' ? OptimizedAIVoiceControl : null,
+        AmbientControl: typeof AmbientControl !== 'undefined' ? AmbientControl : null,
+        TouchControl: typeof TouchControl !== 'undefined' ? TouchControl : null,
+        RingBuffer: typeof RingBuffer !== 'undefined' ? RingBuffer : null,
+        UTILS: typeof UTILS !== 'undefined' ? UTILS : null,
+        REMOTE_CONFIG: typeof REMOTE_CONFIG !== 'undefined' ? REMOTE_CONFIG : null,
+        AUDIO_CONFIG: typeof AUDIO_CONFIG !== 'undefined' ? AUDIO_CONFIG : null,
+        PWM_CONFIG: typeof PWM_CONFIG !== 'undefined' ? PWM_CONFIG : null
     };
 
     console.log('🚀 Dulaan Browser Bundle loaded successfully');

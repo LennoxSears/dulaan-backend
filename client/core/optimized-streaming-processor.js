@@ -7,10 +7,19 @@ import { RingBuffer } from '../utils/audio-utils.js';
 
 class OptimizedStreamingProcessor {
     constructor() {
+        // Get RingBuffer class - use global if available (for bundled version)
+        const RingBufferClass = (typeof RingBuffer !== 'undefined') ? RingBuffer :
+                                (typeof window !== 'undefined' && window.DULAAN_COMPONENTS && window.DULAAN_COMPONENTS.RingBuffer) ? window.DULAAN_COMPONENTS.RingBuffer :
+                                null;
+        
+        if (!RingBufferClass) {
+            throw new Error('RingBuffer class not available. Make sure audio-utils.js is loaded.');
+        }
+        
         this.audioState = {
             // Local VAD buffers (optimized for longer speech and better context)
-            vadBuffer: new RingBuffer(4800), // 300ms for VAD analysis (better context)
-            speechBuffer: new RingBuffer(16000 * 30), // 30 seconds max speech (much longer)
+            vadBuffer: new RingBufferClass(4800), // 300ms for VAD analysis (better context)
+            speechBuffer: new RingBufferClass(16000 * 30), // 30 seconds max speech (much longer)
             
             // VAD state
             isVoiceActive: false,
