@@ -62,7 +62,7 @@ class AudioProcessor {
     constructor() {
         // Audio processing state
         this.audioState = {
-            ringBuffer: new RingBuffer(480000 * 2), // 16000Hz * 30 seconds
+            ringBuffer: new RingBuffer(480000 * 4), // 16000Hz * 60 seconds (larger to avoid overflow during long speech)
             abiBuffer: new RingBuffer(1600),
             isSpeaking: false,
             silenceCounter: 0,
@@ -197,17 +197,11 @@ class AudioProcessor {
                 this.audioState.silenceCounter++;
             }
 
-            // Write to ring buffer with improved overflow handling
+            // Write to ring buffer (original logic - only package on silence, not overflow)
             const written = this.audioState.ringBuffer.push(pcmData);
             if (written < pcmData.length) {
-                console.warn("Buffer approaching full, processing current speech to make room");
-                // Process current speech before resetting to avoid losing data
-                if (this.audioState.ringBuffer.count > 0) {
-                    this.triggerSpeechPackaging();
-                }
-                // Reset and add the remaining data
+                console.warn("Buffer overflow, discarding", pcmData.length - written, "samples");
                 this.audioState.ringBuffer.reset();
-                this.audioState.ringBuffer.push(pcmData.subarray(written));
             }
 
             // Silence timeout triggers speech packaging (matches stream.js)

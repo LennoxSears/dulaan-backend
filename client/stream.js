@@ -53,7 +53,7 @@ class RingBuffer {
 
 // ===== 2. 全局状态配置 =====
 window.AUDIO_STATE = {
-    ringBuffer: new RingBuffer(480000 * 2), // 16000Hz * 30秒
+    ringBuffer: new RingBuffer(480000 * 4), // 16000Hz * 60秒 (larger to avoid overflow during long speech)
     abiBuffer: new RingBuffer(1600),
     isSpeaking: false,
     silenceCounter: 0,
@@ -300,17 +300,11 @@ const processChunk = (base64Chunk) => {
         window.AUDIO_STATE.silenceCounter++;
     }
 
-    // 写入环形缓冲区 with improved overflow handling
+    // 写入环形缓冲区 (original logic - only package on silence, not overflow)
     const written = window.AUDIO_STATE.ringBuffer.push(pcmChunk);
     if (written < pcmChunk.length) {
-        console.warn("[处理] 缓冲区接近满，处理当前语音以腾出空间");
-        // Process current speech before resetting to avoid losing data
-        if (window.AUDIO_STATE.ringBuffer.count > 0) {
-            packageSpeechSegment();
-        }
-        // Reset and add the remaining data
+        console.warn("[警告] 缓冲区溢出，丢弃", pcmChunk.length - written, "采样点");
         window.AUDIO_STATE.ringBuffer.reset();
-        window.AUDIO_STATE.ringBuffer.push(pcmChunk.subarray(written));
     }
 
     // 静音超时触发分段
