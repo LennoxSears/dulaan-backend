@@ -95,7 +95,7 @@
         <button class="button" onclick="clearOutput()">🗑️ Clear Output</button>
         
         <div id="test-output" class="test-output">
-Ready to test real API...\n\nClick "Test Real API" to start testing with actual Google Speech-to-Text and Gemini LLM.
+Ready to test real API...\n\nClick "Test Real API" to start testing with direct audio-to-PWM processing via Gemini 2.0.
 
 ⚠️  Note: This will make real API calls to Firebase functions.
         </div>
@@ -493,15 +493,12 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
                 
                 const requestBody = {
                     msgHis: msgHis,
-                    audioBuffer: audioBuffer, // Int16Array format
-                    currentPwm: currentPwm,
-                    encoding: 'LINEAR16',
-                    sampleRateHertz: 16000,
-                    languageCode: languageCode
+                    audioData: audioBuffer, // Int16Array format for direct audio API
+                    currentPwm: currentPwm
                 };
                 
                 log(`   📦 Request payload size: ${JSON.stringify(requestBody).length} bytes`);
-                log(`   🔍 Request structure: msgHis=${requestBody.msgHis.length}, audioBuffer=${requestBody.audioBuffer.length}, currentPwm=${requestBody.currentPwm}, encoding=${requestBody.encoding}, sampleRate=${requestBody.sampleRateHertz}, lang=${requestBody.languageCode}`);
+                log(`   🔍 Request structure: msgHis=${requestBody.msgHis.length}, audioData=${requestBody.audioData.length}, currentPwm=${requestBody.currentPwm}`);
                 
                 const response = await fetch(API_URL, {
                     method: 'POST',
@@ -923,7 +920,7 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with actual 
         
         // Initialize
         log('🧪 Real API Test Runner Initialized', 'success');
-        log('Ready to test with actual Google APIs!');
+        log('Ready to test with direct audio processing via Gemini 2.0!');
         log('⚠️  Note: This will make real API calls and may incur costs.');
     </script>
 </body>
