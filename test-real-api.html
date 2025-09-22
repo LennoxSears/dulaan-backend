@@ -55,6 +55,37 @@
             border-radius: 5px;
             margin: 20px 0;
         }
+        .vad-status {
+            background: #1a1a3a;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 3px solid #4488ff;
+        }
+        .vad-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            background: #666;
+        }
+        .vad-indicator.listening {
+            background: #00ff00;
+            animation: pulse 1s infinite;
+        }
+        .vad-indicator.processing {
+            background: #ffaa00;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
         .api-info {
             background: #1a3a1a;
             padding: 10px;
@@ -90,7 +121,8 @@
         <button class="button" onclick="testSingleLanguage('spanish')" id="testEsBtn">🇪🇸 Test Spanish</button>
         <button class="button" onclick="testSingleLanguage('chinese')" id="testZhBtn">🇨🇳 Test Chinese</button>
         <button class="button" onclick="testApiConnectivity()" id="testConnBtn">🔧 Test API Connectivity</button>
-        <button class="button" onclick="testWithMicrophone()" id="testMicBtn">🎤 Test with Real Microphone</button>
+        <button class="button" onclick="startOptimizedVoiceControl()" id="startVoiceBtn">🎤 Start Natural Voice Control (VAD)</button>
+        <button class="button" onclick="stopOptimizedVoiceControl()" id="stopVoiceBtn" disabled>🔇 Stop Voice Control</button>
         <button class="button" onclick="testLLMOnly()" id="testLLMBtn">🤖 Test LLM Only</button>
         <button class="button" onclick="clearOutput()">🗑️ Clear Output</button>
         
@@ -100,14 +132,109 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
 ⚠️  Note: This will make real API calls to Firebase functions.
         </div>
         
+        <div id="vad-status" class="vad-status" style="display: none;">
+            <h2>🎙️ Optimized Voice Control Status</h2>
+            <div id="vad-content">
+                <div style="margin-bottom: 10px;">
+                    <span id="vad-indicator" class="vad-indicator"></span>
+                    <span id="vad-text" style="font-weight: bold;">Ready</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <div><strong>🎛️ Motor Control:</strong></div>
+                        <div>Current PWM: <span id="current-pwm" style="color: #00ff00; font-weight: bold;">100</span></div>
+                        <div>Last Command: <span id="last-command">None</span></div>
+                    </div>
+                    <div>
+                        <div><strong>📊 Efficiency Stats:</strong></div>
+                        <div>API Reduction: <span id="efficiency-display" style="color: #00ff00; font-weight: bold;">0%</span></div>
+                        <div>Chunks: <span id="total-chunks">0</span> | Calls: <span id="api-calls">0</span></div>
+                    </div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <div><strong>🔊 Audio Analysis:</strong></div>
+                    <div>RMS Energy: <span id="rms-energy">0.000</span> | ZCR: <span id="zcr-rate">0.000</span></div>
+                    <div>Speech Buffer: <span id="speech-buffer-size">0</span> samples | VAD Buffer: <span id="vad-buffer-size">0</span> samples</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="efficiency-comparison" class="stats" style="display: none;">
+            <h2>📈 Efficiency Comparison</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="background: #3a1a1a; padding: 15px; border-radius: 5px; border-left: 3px solid #ff4444;">
+                    <h3 style="color: #ff4444; margin-top: 0;">❌ Traditional Streaming</h3>
+                    <div>API Calls: <span id="traditional-calls">0</span></div>
+                    <div>Bandwidth: <span id="traditional-bandwidth">0 KB</span></div>
+                    <div>Efficiency: <span style="color: #ff4444;">0%</span></div>
+                </div>
+                <div style="background: #1a3a1a; padding: 15px; border-radius: 5px; border-left: 3px solid #00ff00;">
+                    <h3 style="color: #00ff00; margin-top: 0;">✅ Optimized VAD</h3>
+                    <div>API Calls: <span id="optimized-calls">0</span></div>
+                    <div>Bandwidth: <span id="optimized-bandwidth">0 KB</span></div>
+                    <div>Efficiency: <span id="optimized-efficiency" style="color: #00ff00;">0%</span></div>
+                </div>
+            </div>
+            <div style="margin-top: 15px; text-align: center;">
+                <strong>💰 Cost Savings: <span id="cost-savings" style="color: #00ff00;">$0.00</span> per hour</strong>
+            </div>
+        </div>
+
         <div id="test-stats" class="stats" style="display: none;">
             <h2>📊 Real API Test Results</h2>
             <div id="stats-content"></div>
         </div>
     </div>
 
-    <script>
+    <script type="module">
         const API_URL = 'https://directaudiotopwm-qveg3gkwxa-ew.a.run.app';
+        
+        // Ring Buffer implementation for efficient audio buffering
+        class RingBuffer {
+            constructor(capacity) {
+                this.capacity = capacity;
+                this.buffer = new Float32Array(capacity);
+                this.writeIndex = 0;
+                this.count = 0;
+            }
+
+            push(data) {
+                if (Array.isArray(data) || data instanceof Float32Array || data instanceof Int16Array) {
+                    for (let i = 0; i < data.length; i++) {
+                        this.pushSingle(data[i]);
+                    }
+                } else {
+                    this.pushSingle(data);
+                }
+            }
+
+            pushSingle(value) {
+                this.buffer[this.writeIndex] = value;
+                this.writeIndex = (this.writeIndex + 1) % this.capacity;
+                this.count = Math.min(this.count + 1, this.capacity);
+            }
+
+            readLast(samples) {
+                const result = new Float32Array(Math.min(samples, this.count));
+                let readIndex = (this.writeIndex - Math.min(samples, this.count) + this.capacity) % this.capacity;
+                
+                for (let i = 0; i < result.length; i++) {
+                    result[i] = this.buffer[readIndex];
+                    readIndex = (readIndex + 1) % this.capacity;
+                }
+                
+                return result;
+            }
+
+            readAll() {
+                return this.readLast(this.count);
+            }
+
+            reset() {
+                this.writeIndex = 0;
+                this.count = 0;
+            }
+        }
         
         // Test output management
         function log(message, type = 'info') {
@@ -124,10 +251,439 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
         }
         
         function setButtonsEnabled(enabled) {
-            const buttons = ['runAllBtn', 'testEnBtn', 'testEsBtn', 'testZhBtn', 'testConnBtn', 'testMicBtn', 'testLLMBtn'];
+            const buttons = ['runAllBtn', 'testEnBtn', 'testEsBtn', 'testZhBtn', 'testConnBtn', 'startVoiceBtn', 'testLLMBtn'];
             buttons.forEach(id => {
                 document.getElementById(id).disabled = !enabled;
             });
+        }
+
+        // Optimized VAD System with Ring Buffers
+        class OptimizedVADProcessor {
+            constructor() {
+                this.isActive = false;
+                this.isListening = false;
+                this.isProcessing = false;
+                this.currentPwm = 100;
+                
+                // Ring buffers for efficient memory usage
+                this.vadBuffer = new RingBuffer(1600); // 100ms for VAD analysis
+                this.speechBuffer = new RingBuffer(16000 * 10); // 10 seconds max speech
+                
+                // VAD state
+                this.consecutiveVoiceFrames = 0;
+                this.consecutiveSilenceFrames = 0;
+                this.isVoiceActive = false;
+                this.voiceStartTime = 0;
+                
+                // Efficiency tracking
+                this.totalChunks = 0;
+                this.apiCalls = 0;
+                this.lastRMS = 0;
+                this.lastZeroCrossings = 0;
+                
+                // Audio processing
+                this.audioContext = null;
+                this.mediaStream = null;
+                this.processor = null;
+                
+                // Optimized thresholds
+                this.VAD_ENERGY_THRESHOLD = 0.015;
+                this.VAD_ZCR_THRESHOLD = 0.12;
+                this.VAD_VOICE_FRAMES = 2; // Faster voice detection
+                this.VAD_SILENCE_FRAMES = 15; // Longer silence confirmation
+                this.MIN_SPEECH_DURATION = 8000; // 500ms minimum (in samples)
+                this.MAX_SPEECH_DURATION = 80000; // 5 seconds maximum
+            }
+
+            async start() {
+                try {
+                    log("🎤 Starting optimized voice control with VAD...", 'info');
+                    
+                    // Request microphone access
+                    this.mediaStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            sampleRate: 16000,
+                            channelCount: 1,
+                            echoCancellation: true,
+                            noiseSuppression: true
+                        }
+                    });
+                    
+                    // Create audio context
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+                    const source = this.audioContext.createMediaStreamSource(this.mediaStream);
+                    this.processor = this.audioContext.createScriptProcessor(1024, 1, 1);
+                    
+                    // Process audio chunks
+                    this.processor.onaudioprocess = (e) => {
+                        if (this.isActive) {
+                            this.processAudioChunk(e.inputBuffer.getChannelData(0));
+                        }
+                    };
+                    
+                    source.connect(this.processor);
+                    this.processor.connect(this.audioContext.destination);
+                    
+                    this.isActive = true;
+                    this.updateVADStatus('Ready - speak naturally', false, false);
+                    
+                    log("✅ Voice control started! Speak naturally - no buttons needed.", 'success');
+                    log("🎯 Say commands like: 'turn it up', 'más fuerte', '加强'", 'info');
+                    
+                    document.getElementById('vad-status').style.display = 'block';
+                    document.getElementById('startVoiceBtn').disabled = true;
+                    document.getElementById('stopVoiceBtn').disabled = false;
+                    
+                    return true;
+                    
+                } catch (error) {
+                    log(`❌ Failed to start voice control: ${error.message}`, 'error');
+                    return false;
+                }
+            }
+
+            stop() {
+                log("🔇 Stopping voice control...", 'info');
+                
+                this.isActive = false;
+                this.isListening = false;
+                this.isProcessing = false;
+                
+                if (this.mediaStream) {
+                    this.mediaStream.getTracks().forEach(track => track.stop());
+                    this.mediaStream = null;
+                }
+                
+                if (this.processor) {
+                    this.processor.disconnect();
+                    this.processor = null;
+                }
+                
+                if (this.audioContext) {
+                    this.audioContext.close();
+                    this.audioContext = null;
+                }
+                
+                this.updateVADStatus('Stopped', false, false);
+                
+                document.getElementById('startVoiceBtn').disabled = false;
+                document.getElementById('stopVoiceBtn').disabled = true;
+                
+                log("✅ Voice control stopped", 'success');
+            }
+
+            processAudioChunk(audioData) {
+                this.totalChunks++;
+                
+                // Always buffer audio for pre/post-speech context (smart buffering)
+                this.vadBuffer.push(audioData);
+                
+                // Advanced Voice Activity Detection
+                const isVoiceActive = this.detectVoiceActivity(audioData);
+                
+                if (isVoiceActive) {
+                    this.consecutiveVoiceFrames++;
+                    this.consecutiveSilenceFrames = 0;
+                    
+                    // Voice start detection
+                    if (!this.isVoiceActive && this.consecutiveVoiceFrames >= this.VAD_VOICE_FRAMES) {
+                        this.handleVoiceStart();
+                    }
+                    
+                    // Buffer speech audio during active speech
+                    if (this.isVoiceActive) {
+                        this.speechBuffer.push(audioData);
+                        this.checkSpeechBufferLimits();
+                    }
+                    
+                } else {
+                    this.consecutiveSilenceFrames++;
+                    this.consecutiveVoiceFrames = 0;
+                    
+                    // Voice end detection
+                    if (this.isVoiceActive && this.consecutiveSilenceFrames >= this.VAD_SILENCE_FRAMES) {
+                        this.handleVoiceEnd();
+                    }
+                }
+                
+                // Update efficiency display
+                this.updateEfficiencyDisplay();
+            }
+
+            detectVoiceActivity(audioData) {
+                // Calculate RMS energy
+                const rms = this.calculateRMS(audioData);
+                this.lastRMS = rms;
+                
+                // Calculate zero crossing rate
+                const zcr = this.calculateZeroCrossingRate(audioData);
+                this.lastZeroCrossings = zcr;
+                
+                // Combined VAD decision
+                const energyActive = rms > this.VAD_ENERGY_THRESHOLD;
+                const zcrActive = zcr > this.VAD_ZCR_THRESHOLD;
+                
+                // Voice is active if both energy and ZCR indicate speech
+                return energyActive && zcrActive;
+            }
+
+            calculateRMS(audioData) {
+                let sum = 0;
+                for (let i = 0; i < audioData.length; i++) {
+                    sum += audioData[i] * audioData[i];
+                }
+                return Math.sqrt(sum / audioData.length);
+            }
+
+            calculateZeroCrossingRate(audioData) {
+                let crossings = 0;
+                for (let i = 1; i < audioData.length; i++) {
+                    if ((audioData[i] >= 0) !== (audioData[i - 1] >= 0)) {
+                        crossings++;
+                    }
+                }
+                return crossings / audioData.length;
+            }
+
+            checkSpeechBufferLimits() {
+                const speechDuration = Date.now() - this.voiceStartTime;
+                const bufferSize = this.speechBuffer.count;
+                
+                // Send if max duration reached or buffer is full
+                if (speechDuration >= (this.MAX_SPEECH_DURATION / 16000 * 1000) || 
+                    bufferSize >= this.speechBuffer.capacity * 0.9) {
+                    
+                    log("📦 Buffer limit reached - sending speech chunk", 'warning');
+                    this.processSpeech(false); // Not final
+                    
+                    // Keep some overlap for continuity
+                    const overlapSize = Math.min(3200, bufferSize * 0.1); // 200ms overlap
+                    const overlapData = this.speechBuffer.readLast(overlapSize);
+                    this.speechBuffer.reset();
+                    if (overlapData.length > 0) {
+                        this.speechBuffer.push(overlapData);
+                    }
+                }
+            }
+
+
+
+            handleVoiceStart() {
+                this.isVoiceActive = true;
+                this.isListening = true;
+                this.voiceStartTime = Date.now();
+                
+                // Smart buffering: Include pre-speech context for natural start
+                this.speechBuffer.reset();
+                
+                // Add recent VAD buffer content as pre-speech context (last 200ms)
+                const preSpeechSamples = Math.min(3200, this.vadBuffer.count); // 200ms at 16kHz
+                if (preSpeechSamples > 0) {
+                    const preSpeechData = this.vadBuffer.readLast(preSpeechSamples);
+                    this.speechBuffer.push(preSpeechData);
+                    log(`🎙️ Voice start - added ${preSpeechSamples} pre-speech samples`, 'info');
+                }
+                
+                this.updateVADStatus('Listening...', true, false);
+                log("🎙️ Voice detected - listening...", 'info');
+            }
+
+            async handleVoiceEnd() {
+                // Add small post-speech buffer for natural ending (100ms)
+                const postSpeechDelay = 100;
+                
+                setTimeout(async () => {
+                    this.isVoiceActive = false;
+                    this.isListening = false;
+                    const speechDuration = Date.now() - this.voiceStartTime;
+                    
+                    // Add recent VAD buffer as post-speech context
+                    const postSpeechSamples = Math.min(1600, this.vadBuffer.count); // 100ms
+                    if (postSpeechSamples > 0) {
+                        const postSpeechData = this.vadBuffer.readLast(postSpeechSamples);
+                        this.speechBuffer.push(postSpeechData);
+                        log(`🔇 Voice end - added ${postSpeechSamples} post-speech samples`, 'info');
+                    }
+                    
+                    log(`🔇 Speech duration: ${speechDuration}ms, Buffer: ${this.speechBuffer.count} samples`);
+                    
+                    // Send speech to API if we have enough audio
+                    if (this.speechBuffer.count >= this.MIN_SPEECH_DURATION) {
+                        await this.processSpeech(true); // Mark as final
+                    } else {
+                        log("🔇 Speech too short, discarding", 'warning');
+                        this.speechBuffer.reset();
+                        this.updateVADStatus('Ready - speak naturally', false, false);
+                    }
+                }, postSpeechDelay);
+            }
+
+            async processSpeech(isFinal = true) {
+                this.isProcessing = true;
+                this.apiCalls++;
+                
+                this.updateVADStatus('Processing speech...', false, true);
+                
+                try {
+                    const speechData = this.speechBuffer.readAll();
+                    if (speechData.length === 0) return null;
+
+                    // Convert to Int16Array for API
+                    const int16Data = new Int16Array(speechData.length);
+                    for (let i = 0; i < speechData.length; i++) {
+                        const scaled = Math.max(-1, Math.min(1, speechData[i])) * 32767;
+                        int16Data[i] = Math.max(-32768, Math.min(32767, scaled));
+                    }
+
+                    const speechDuration = (speechData.length / 16000).toFixed(2);
+                    log(`⚡ Processing ${speechDuration}s of speech (API call #${this.apiCalls})`, 'info');
+                    
+                    // Call real API with speech data
+                    const result = await callRealApi(
+                        Array.from(int16Data),
+                        this.currentPwm,
+                        [],
+                        'auto',
+                        { language: 'Auto-detected', command: 'Natural voice input' }
+                    );
+                    
+                    // Update PWM if changed
+                    if (result.newPwmValue !== undefined) {
+                        this.currentPwm = result.newPwmValue;
+                        document.getElementById('current-pwm').textContent = this.currentPwm;
+                    }
+                    
+                    // Log results
+                    log(`✅ Speech processed successfully!`, 'success');
+                    log(`🎤 "${result.transcription || 'No transcription'}"`, 'info');
+                    log(`🤖 "${result.response || 'No response'}"`, 'info');
+                    log(`⚡ PWM: ${result.previousPwm || this.currentPwm} → ${result.newPwmValue || this.currentPwm}`, 'info');
+                    
+                    // Update last command display
+                    if (result.transcription) {
+                        document.getElementById('last-command').textContent = result.transcription;
+                    }
+                    
+                    if (result.intentDetected) {
+                        log(`🎯 Motor command detected and executed!`, 'success');
+                    } else {
+                        log(`💬 Conversational response (no motor action)`, 'info');
+                    }
+
+                    // Reset buffer after sending if final
+                    if (isFinal) {
+                        this.speechBuffer.reset();
+                    }
+
+                    return result;
+                    
+                } catch (error) {
+                    log(`❌ Speech processing failed: ${error.message}`, 'error');
+                    throw error;
+                } finally {
+                    this.isProcessing = false;
+                    if (isFinal) {
+                        this.updateVADStatus('Ready - speak naturally', false, false);
+                    }
+                }
+            }
+
+            updateVADStatus(text, listening, processing) {
+                const indicator = document.getElementById('vad-indicator');
+                const textElement = document.getElementById('vad-text');
+                
+                if (processing) {
+                    indicator.className = 'vad-indicator processing';
+                } else if (listening) {
+                    indicator.className = 'vad-indicator listening';
+                } else {
+                    indicator.className = 'vad-indicator';
+                }
+                
+                textElement.textContent = text;
+            }
+
+            updateEfficiencyComparison() {
+                // Show comparison panel
+                document.getElementById('efficiency-comparison').style.display = 'block';
+                
+                // Traditional approach would call API for every chunk
+                const traditionalCalls = this.totalChunks;
+                const optimizedCalls = this.apiCalls;
+                
+                // Estimate bandwidth (assuming 1KB per chunk for traditional, 10KB per speech segment for optimized)
+                const traditionalBandwidth = (traditionalCalls * 1).toFixed(1);
+                const optimizedBandwidth = (optimizedCalls * 10).toFixed(1);
+                
+                // Calculate efficiency
+                const efficiency = this.totalChunks > 0 ? 
+                    ((1 - this.apiCalls / this.totalChunks) * 100).toFixed(1) : 0;
+                
+                // Estimate cost savings (assuming $0.001 per API call)
+                const costSavings = ((traditionalCalls - optimizedCalls) * 0.001 * 3600 / Math.max(1, this.totalChunks / 100)).toFixed(2);
+                
+                // Update display
+                document.getElementById('traditional-calls').textContent = traditionalCalls;
+                document.getElementById('traditional-bandwidth').textContent = traditionalBandwidth;
+                document.getElementById('optimized-calls').textContent = optimizedCalls;
+                document.getElementById('optimized-bandwidth').textContent = optimizedBandwidth;
+                document.getElementById('optimized-efficiency').textContent = efficiency + '%';
+                document.getElementById('cost-savings').textContent = '$' + costSavings;
+            }
+
+            updateEfficiencyDisplay() {
+                const efficiency = this.totalChunks > 0 ? 
+                    ((1 - this.apiCalls / this.totalChunks) * 100).toFixed(1) : 0;
+                
+                // Update efficiency stats
+                document.getElementById('efficiency-display').textContent = efficiency + '%';
+                document.getElementById('total-chunks').textContent = this.totalChunks;
+                document.getElementById('api-calls').textContent = this.apiCalls;
+                
+                // Update audio analysis
+                document.getElementById('rms-energy').textContent = this.lastRMS.toFixed(3);
+                document.getElementById('zcr-rate').textContent = this.lastZeroCrossings.toFixed(3);
+                document.getElementById('speech-buffer-size').textContent = this.speechBuffer.count;
+                document.getElementById('vad-buffer-size').textContent = this.vadBuffer.count;
+                
+                // Color coding for efficiency
+                const efficiencyElement = document.getElementById('efficiency-display');
+                if (parseFloat(efficiency) > 90) {
+                    efficiencyElement.style.color = '#00ff00'; // Green for excellent
+                } else if (parseFloat(efficiency) > 70) {
+                    efficiencyElement.style.color = '#ffaa00'; // Orange for good
+                } else {
+                    efficiencyElement.style.color = '#ff4444'; // Red for poor
+                }
+                
+                // Update efficiency comparison
+                this.updateEfficiencyComparison();
+            }
+        }
+
+        // Global VAD processor instance
+        let vadProcessor = null;
+
+        // Start optimized voice control
+        async function startOptimizedVoiceControl() {
+            if (!vadProcessor) {
+                vadProcessor = new OptimizedVADProcessor();
+            }
+            
+            const success = await vadProcessor.start();
+            if (success) {
+                setButtonsEnabled(false);
+                document.getElementById('stopVoiceBtn').disabled = false;
+            }
+        }
+
+        // Stop optimized voice control
+        function stopOptimizedVoiceControl() {
+            if (vadProcessor) {
+                vadProcessor.stop();
+                setButtonsEnabled(true);
+                document.getElementById('stopVoiceBtn').disabled = true;
+            }
         }
         
         // Test API connectivity with minimal request
