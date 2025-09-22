@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-22T13:15:05.733Z
+ * Generated on: 2025-09-22T13:31:18.473Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -568,7 +568,7 @@ class MotorController {
     constructor() {
         this.deviceAddress = null;
         this.isConnected = false;
-        this.currentPwm = 0;
+        this.currentPwm = 0; // Motor starts stopped
         this.isScanning = false;
         this.scanResults = [];
         this.onScanResult = null;
@@ -763,26 +763,32 @@ class MotorController {
      * Write PWM value to motor (0-255)
      */
     async write(pwmValue) {
+        console.log(`[MOTOR WRITE] Attempting to write PWM: ${pwmValue}`);
+        console.log(`[MOTOR WRITE] Connection status: ${this.isConnected}, Device: ${this.deviceAddress}`);
+        
         if (!this.isConnected || !this.deviceAddress) {
-            console.warn('Motor not connected, cannot write PWM value');
+            console.warn('[MOTOR WRITE] ❌ Motor not connected, cannot write PWM value');
             return false;
         }
 
         try {
             // Validate PWM value
             const pwm = Math.max(0, Math.min(255, Math.round(pwmValue)));
+            console.log(`[MOTOR WRITE] Validated PWM: ${pwm} (from ${pwmValue})`);
             
             // Convert to hex string
             const hexValue = this.decimalToHexString(pwm);
+            console.log(`[MOTOR WRITE] Hex value: ${hexValue}`);
             
             // Write to BLE characteristic
             const BleClient = getBleClient();
             if (!BleClient) {
-                console.warn('BleClient not available - PWM value stored but not transmitted');
+                console.warn('[MOTOR WRITE] ⚠️ BleClient not available - PWM value stored but not transmitted');
                 this.currentPwm = pwm;
                 return true;
             }
             
+            console.log(`[MOTOR WRITE] Sending BLE command to device ${this.deviceAddress}`);
             await BleClient.write(
                 this.deviceAddress,
                 this.SERVICE_UUID,
@@ -791,10 +797,10 @@ class MotorController {
             );
             
             this.currentPwm = pwm;
-            console.log(`Motor PWM set to: ${pwm}`);
+            console.log(`[MOTOR WRITE] ✅ Motor PWM successfully set to: ${pwm}`);
             return true;
         } catch (error) {
-            console.error('Failed to write PWM value:', error);
+            console.error('[MOTOR WRITE] ❌ Failed to write PWM value:', error);
             return false;
         }
     }
@@ -1014,6 +1020,7 @@ class OptimizedStreamingProcessor {
                 // Voice start detection
                 if (!this.audioState.isVoiceActive && 
                     this.audioState.consecutiveVoiceFrames >= this.audioState.VAD_VOICE_FRAMES) {
+                    console.log(`[VAD] 🎤 Voice START detected (${this.audioState.consecutiveVoiceFrames} consecutive frames)`);
                     this.handleVoiceStart();
                 }
                 
@@ -1030,6 +1037,7 @@ class OptimizedStreamingProcessor {
                 // Voice end detection
                 if (this.audioState.isVoiceActive && 
                     this.audioState.consecutiveSilenceFrames >= this.audioState.VAD_SILENCE_FRAMES) {
+                    console.log(`[VAD] 🔇 Voice END detected (${this.audioState.consecutiveSilenceFrames} consecutive silence frames)`);
                     this.handleVoiceEnd();
                 }
             }
@@ -1347,7 +1355,7 @@ class OptimizedApiService {
         // Conversation state
         this.conversationState = {
             history: [],
-            currentPwm: 100,
+            currentPwm: 0, // Motor starts stopped
             isProcessing: false,
             lastResponse: 0,
             totalApiCalls: 0,
@@ -1604,7 +1612,7 @@ class OptimizedApiService {
      */
     reset() {
         this.conversationState.history = [];
-        this.conversationState.currentPwm = 100;
+        this.conversationState.currentPwm = 0; // Reset to stopped
         this.conversationState.isProcessing = false;
         this.conversationState.totalApiCalls = 0;
         this.conversationState.totalProcessingTime = 0;
@@ -2266,7 +2274,7 @@ class OptimizedAIVoiceControl {
             isListening: false,
             isProcessing: false,
             conversationActive: false,
-            currentPwm: 100,
+            currentPwm: 0, // Motor starts stopped
             lastResponse: null,
             lastError: null,
             
@@ -2342,6 +2350,9 @@ class OptimizedAIVoiceControl {
             // Start audio processing
             await this.startAudioProcessing();
             
+            // Activate conversation mode
+            this.handleConversationUpdate(true);
+            
             // Start conversation timer
             this.startConversationTimer();
             
@@ -2415,15 +2426,30 @@ class OptimizedAIVoiceControl {
             this.state.totalProcessingTime += processingTime;
             this.updatePerformanceStats(processingTime);
             
+            // ===== DETAILED API RESPONSE LOGGING =====
+            console.log(`[API RESPONSE] Full response:`, response);
+            console.log(`[API RESPONSE] Transcription: "${response?.transcription || 'N/A'}"`);
+            console.log(`[API RESPONSE] Assistant Response: "${response?.response || 'N/A'}"`);
+            console.log(`[API RESPONSE] New PWM Value: ${response?.newPwmValue || 'N/A'}`);
+            console.log(`[API RESPONSE] Processing Time: ${processingTime}ms`);
+            
             if (response && response.newPwmValue !== undefined) {
                 // Update motor with new PWM value
-                this.updateMotorPWM(response.newPwmValue);
+                console.log(`[MOTOR] Sending PWM ${response.newPwmValue} to motor controller`);
+                const motorSuccess = await this.updateMotorPWM(response.newPwmValue);
+                console.log(`[MOTOR] Motor update ${motorSuccess ? 'successful' : 'failed'}`);
                 
-                // Update conversation state (handled automatically by API service)
-                // The updateConversationState method is called internally by the API service
+                // Store the last response
+                this.state.lastResponse = response;
                 
-                console.log(`[Response] PWM: ${response.newPwmValue}, Processing: ${processingTime}ms`);
+                console.log(`[PROCESSING COMPLETE] Speech processed successfully`);
+            } else {
+                console.warn(`[API WARNING] No PWM value in response or response is null`);
             }
+            
+            // ===== RESTART CONVERSATION FOR NEXT COMMAND =====
+            console.log(`[CONVERSATION] Restarting conversation for next command`);
+            this.handleConversationUpdate(true);
             
         } catch (error) {
             console.error("Speech processing failed:", error);
@@ -2456,12 +2482,19 @@ class OptimizedAIVoiceControl {
      * Handle conversation state updates
      */
     handleConversationUpdate(active) {
+        console.log(`[CONVERSATION] State change: ${this.state.conversationActive} → ${active}`);
         this.state.conversationActive = active;
         
         if (active) {
+            console.log(`[CONVERSATION] ✅ Activating conversation - ready for next command`);
             this.processor.setConversationActive(true);
-            this.showNotification("💬 Conversation active", "success");
+            this.showNotification("💬 Ready for voice command", "success");
+            
+            // Reset any processing flags to ensure we can process next command
+            this.state.isProcessing = false;
+            
         } else {
+            console.log(`[CONVERSATION] ⏸️ Pausing conversation`);
             this.showNotification("💤 Conversation paused", "info");
         }
         
@@ -2803,28 +2836,44 @@ class OptimizedAIVoiceControl {
     /**
      * Update motor PWM value with optimization
      */
-    updateMotorPWM(newPwm) {
+    async updateMotorPWM(newPwm) {
+        console.log(`[MOTOR UPDATE] Requested PWM: ${newPwm}, Current PWM: ${this.state.currentPwm}`);
+        
         // Only update if change is significant (reduces motor wear)
         const pwmDifference = Math.abs(newPwm - this.state.currentPwm);
+        console.log(`[MOTOR UPDATE] PWM difference: ${pwmDifference}, Threshold: ${this.config.pwmUpdateThreshold}`);
         
         if (pwmDifference >= this.config.pwmUpdateThreshold) {
+            const oldPwm = this.state.currentPwm;
             this.state.currentPwm = newPwm;
+            
+            console.log(`[MOTOR UPDATE] PWM changed from ${oldPwm} to ${newPwm}`);
             
             // Send to motor controller if available
             if (this.motorController && this.motorController.isConnected) {
-                setTimeout(async () => {
+                console.log(`[MOTOR UPDATE] Motor controller connected, sending PWM command...`);
+                try {
+                    // Use immediate execution instead of setTimeout for debugging
                     await this.motorController.write(newPwm);
-                }, this.config.motorResponseDelay);
+                    console.log(`[MOTOR UPDATE] ✅ PWM ${newPwm} sent to motor successfully`);
+                    
+                    // Trigger callbacks
+                    if (this.config.onPwmUpdate) {
+                        this.config.onPwmUpdate(newPwm);
+                    }
+                    
+                    return true;
+                } catch (error) {
+                    console.error(`[MOTOR UPDATE] ❌ Failed to send PWM to motor:`, error);
+                    return false;
+                }
+            } else {
+                console.warn(`[MOTOR UPDATE] ⚠️ Motor controller not available (connected: ${this.motorController?.isConnected}, exists: ${!!this.motorController})`);
+                return false;
             }
-            
-            // Trigger callbacks
-            if (this.config.onPwmUpdate) {
-                this.config.onPwmUpdate(newPwm);
-            }
-            
-            console.log(`[Motor] PWM updated: ${this.state.currentPwm}`);
         } else {
-            console.log(`[Motor] PWM change too small (${pwmDifference}), skipping update`);
+            console.log(`[MOTOR UPDATE] ⏭️ PWM change too small (${pwmDifference}), skipping update`);
+            return true; // Not an error, just skipped
         }
     }
 
@@ -2847,7 +2896,7 @@ class OptimizedAIVoiceControl {
         this.state.conversationActive = false;
         this.state.lastResponse = null;
         this.state.lastError = null;
-        this.state.currentPwm = 100;
+        this.state.currentPwm = 0; // Reset to stopped
         
         this.processor.reset();
         this.apiService.reset();

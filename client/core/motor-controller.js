@@ -33,7 +33,7 @@ class MotorController {
     constructor() {
         this.deviceAddress = null;
         this.isConnected = false;
-        this.currentPwm = 0;
+        this.currentPwm = 0; // Motor starts stopped
         this.isScanning = false;
         this.scanResults = [];
         this.onScanResult = null;
@@ -228,26 +228,32 @@ class MotorController {
      * Write PWM value to motor (0-255)
      */
     async write(pwmValue) {
+        console.log(`[MOTOR WRITE] Attempting to write PWM: ${pwmValue}`);
+        console.log(`[MOTOR WRITE] Connection status: ${this.isConnected}, Device: ${this.deviceAddress}`);
+        
         if (!this.isConnected || !this.deviceAddress) {
-            console.warn('Motor not connected, cannot write PWM value');
+            console.warn('[MOTOR WRITE] ❌ Motor not connected, cannot write PWM value');
             return false;
         }
 
         try {
             // Validate PWM value
             const pwm = Math.max(0, Math.min(255, Math.round(pwmValue)));
+            console.log(`[MOTOR WRITE] Validated PWM: ${pwm} (from ${pwmValue})`);
             
             // Convert to hex string
             const hexValue = this.decimalToHexString(pwm);
+            console.log(`[MOTOR WRITE] Hex value: ${hexValue}`);
             
             // Write to BLE characteristic
             const BleClient = getBleClient();
             if (!BleClient) {
-                console.warn('BleClient not available - PWM value stored but not transmitted');
+                console.warn('[MOTOR WRITE] ⚠️ BleClient not available - PWM value stored but not transmitted');
                 this.currentPwm = pwm;
                 return true;
             }
             
+            console.log(`[MOTOR WRITE] Sending BLE command to device ${this.deviceAddress}`);
             await BleClient.write(
                 this.deviceAddress,
                 this.SERVICE_UUID,
@@ -256,10 +262,10 @@ class MotorController {
             );
             
             this.currentPwm = pwm;
-            console.log(`Motor PWM set to: ${pwm}`);
+            console.log(`[MOTOR WRITE] ✅ Motor PWM successfully set to: ${pwm}`);
             return true;
         } catch (error) {
-            console.error('Failed to write PWM value:', error);
+            console.error('[MOTOR WRITE] ❌ Failed to write PWM value:', error);
             return false;
         }
     }

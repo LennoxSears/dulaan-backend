@@ -121,6 +121,7 @@ class OptimizedStreamingProcessor {
                 // Voice start detection
                 if (!this.audioState.isVoiceActive && 
                     this.audioState.consecutiveVoiceFrames >= this.audioState.VAD_VOICE_FRAMES) {
+                    console.log(`[VAD] 🎤 Voice START detected (${this.audioState.consecutiveVoiceFrames} consecutive frames)`);
                     this.handleVoiceStart();
                 }
                 
@@ -137,6 +138,7 @@ class OptimizedStreamingProcessor {
                 // Voice end detection
                 if (this.audioState.isVoiceActive && 
                     this.audioState.consecutiveSilenceFrames >= this.audioState.VAD_SILENCE_FRAMES) {
+                    console.log(`[VAD] 🔇 Voice END detected (${this.audioState.consecutiveSilenceFrames} consecutive silence frames)`);
                     this.handleVoiceEnd();
                 }
             }

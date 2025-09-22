@@ -13,7 +13,7 @@ class OptimizedApiService {
         // Conversation state
         this.conversationState = {
             history: [],
-            currentPwm: 100,
+            currentPwm: 0, // Motor starts stopped
             isProcessing: false,
             lastResponse: 0,
             totalApiCalls: 0,
@@ -270,7 +270,7 @@ class OptimizedApiService {
      */
     reset() {
         this.conversationState.history = [];
-        this.conversationState.currentPwm = 100;
+        this.conversationState.currentPwm = 0; // Reset to stopped
         this.conversationState.isProcessing = false;
         this.conversationState.totalApiCalls = 0;
         this.conversationState.totalProcessingTime = 0;
