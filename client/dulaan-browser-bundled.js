@@ -1210,22 +1210,15 @@ if (typeof window !== 'undefined') {
 
 /**
  * API Service - External API integrations
- * Handles communication with Cloud Functions for speech-to-text and LLM processing
+ * Handles communication with Cloud Functions for direct audio processing
  */
 
 class ApiService {
     constructor(config = {}) {
         this.baseUrls = {
-            speechToTextWithLLM: 'https://speechtotextwithllm-qveg3gkwxa-ew.a.run.app',
             directAudioToPWM: 'https://directaudiotopwm-qveg3gkwxa-ew.a.run.app',
             storeUserData: 'https://storeuserdata-qveg3gkwxa-ew.a.run.app',
             ...config.endpoints
-        };
-        
-        this.defaultOptions = {
-            encoding: 'LINEAR16',  // Changed to match Int16 PCM data from client
-            sampleRateHertz: 16000, // Changed to match actual audio processing rate
-            ...config.options
         };
         
         this.apiKey = config.apiKey || null;
@@ -1239,15 +1232,14 @@ class ApiService {
     }
 
     /**
-     * Process speech with direct audio-to-PWM (recommended - faster and more accurate)
+     * Process audio directly to PWM commands via Gemini 2.0
      * @param {Array} audioBuffer - Int16Array as regular array for JSON transmission
      * @param {number} currentPwm - Current PWM value
      * @param {Array} msgHis - Message history
-     * @param {Object} options - Additional options
+     * @param {Object} options - Additional options (unused but kept for compatibility)
      */
-    async speechToTextWithLLM(audioBuffer, currentPwm, msgHis = [], options = {}) {
+    async processAudioToPWM(audioBuffer, currentPwm, msgHis = [], options = {}) {
         try {
-            // Use direct audio processing by default for better performance
             const response = await fetch(this.baseUrls.directAudioToPWM, {
                 method: 'POST',
                 headers: {
@@ -1255,7 +1247,7 @@ class ApiService {
                 },
                 body: JSON.stringify({
                     msgHis: msgHis,
-                    audioData: audioBuffer, // Direct audio format
+                    audioData: audioBuffer,
                     currentPwm: currentPwm
                 })
             });
@@ -1273,41 +1265,11 @@ class ApiService {
     }
 
     /**
-     * Legacy speech processing via STT + LLM (fallback method)
-     * @param {Array} audioBuffer - Int16Array as regular array for JSON transmission
-     * @param {number} currentPwm - Current PWM value
-     * @param {Array} msgHis - Message history
-     * @param {Object} options - Additional options
+     * Legacy method name for backward compatibility
+     * @deprecated Use processAudioToPWM instead
      */
-    async speechToTextWithLLMLegacy(audioBuffer, currentPwm, msgHis = [], options = {}) {
-        try {
-            const requestOptions = { ...this.defaultOptions, ...options };
-            
-            const response = await fetch(this.baseUrls.speechToTextWithLLM, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    msgHis: msgHis,
-                    audioBuffer: audioBuffer, // Send Int16Array as regular array
-                    currentPwm: currentPwm,
-                    encoding: requestOptions.encoding,
-                    sampleRateHertz: requestOptions.sampleRateHertz,
-                    languageCode: requestOptions.languageCode
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`Speech-to-text with LLM API error: ${response.status}`);
-            }
-
-            const result = await response.json();
-            return result;
-        } catch (error) {
-            console.error('Speech-to-text with LLM error:', error);
-            throw error;
-        }
+    async speechToTextWithLLM(audioBuffer, currentPwm, msgHis = [], options = {}) {
+        return this.processAudioToPWM(audioBuffer, currentPwm, msgHis, options);
     }
 
     /**
