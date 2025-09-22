@@ -22,15 +22,19 @@ class DulaanSDK {
     constructor() {
         // Core components (optimized as primary)
         this.motor = motorController;
-        this.audio = OptimizedStreamingProcessor; // Use optimized processor as primary
-        this.api = OptimizedApiService; // Use optimized API as primary
+        this.audio = new OptimizedStreamingProcessor(); // Create instance of optimized processor
+        this.api = new OptimizedApiService(); // Create instance of optimized API
         this.consent = consentService;
         this.remote = remoteService;
-        this.utils = audioUtils;
+        this.utils = (typeof window !== 'undefined' && window.audioUtils) || {};
         
         // Control modes (optimized as primary)
         this.modes = {
-            ai: new OptimizedAIVoiceControl(this), // Primary optimized mode
+            ai: new OptimizedAIVoiceControl({
+                processor: this.audio,
+                apiService: this.api,
+                motorController: this.motor
+            }), // Primary optimized mode
             ambient: new AmbientControl(this),
             touch: new TouchControl(this)
         };
@@ -82,8 +86,13 @@ class DulaanSDK {
                 await this.motor.connect(this.config.motor.deviceAddress);
             }
             
-            // Configure audio processor
-            this.audio.setMaxEnergy(this.config.audio.maxEnergy);
+            // Configure audio processor (optimized version uses internal thresholds)
+            if (this.audio.setMaxEnergy) {
+                this.audio.setMaxEnergy(this.config.audio.maxEnergy);
+            } else {
+                // OptimizedStreamingProcessor uses internal VAD parameters
+                console.log('Using optimized VAD with internal energy thresholds');
+            }
             
             // Set up remote service callbacks
             this.remote.setEventCallbacks({
@@ -209,16 +218,27 @@ class DulaanSDK {
      * Audio API
      */
     setAudioSensitivity(energy) {
-        this.audio.setMaxEnergy(energy);
+        if (this.audio.setMaxEnergy) {
+            this.audio.setMaxEnergy(energy);
+        } else {
+            console.log('OptimizedStreamingProcessor uses internal VAD thresholds');
+        }
         this.config.audio.maxEnergy = energy;
     }
 
     getAudioSensitivity() {
-        return this.audio.getMaxEnergy();
+        if (this.audio.getMaxEnergy) {
+            return this.audio.getMaxEnergy();
+        }
+        return this.config.audio.maxEnergy;
     }
 
     getAudioState() {
-        return this.audio.getAudioState();
+        if (this.audio.getAudioState) {
+            return this.audio.getAudioState();
+        }
+        // Return optimized processor state
+        return this.audio.audioState || {};
     }
 
     /**
@@ -229,7 +249,11 @@ class DulaanSDK {
         
         // Apply configuration changes
         if (newConfig.audio?.maxEnergy) {
-            this.audio.setMaxEnergy(newConfig.audio.maxEnergy);
+            if (this.audio.setMaxEnergy) {
+                this.audio.setMaxEnergy(newConfig.audio.maxEnergy);
+            } else {
+                console.log('OptimizedStreamingProcessor uses internal VAD thresholds');
+            }
         }
         
         if (newConfig.api?.geminiApiKey) {

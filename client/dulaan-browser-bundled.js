@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-22T12:05:25.142Z
+ * Generated on: 2025-09-22T12:11:40.131Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -3398,7 +3398,7 @@ class DulaanSDK {
         this.api = new OptimizedApiService(); // Create instance of optimized API
         this.consent = consentService;
         this.remote = remoteService;
-        this.utils = audioUtils;
+        this.utils = (typeof window !== 'undefined' && window.audioUtils) || {};
         
         // Control modes (optimized as primary)
         this.modes = {
@@ -3590,16 +3590,27 @@ class DulaanSDK {
      * Audio API
      */
     setAudioSensitivity(energy) {
-        this.audio.setMaxEnergy(energy);
+        if (this.audio.setMaxEnergy) {
+            this.audio.setMaxEnergy(energy);
+        } else {
+            console.log('OptimizedStreamingProcessor uses internal VAD thresholds');
+        }
         this.config.audio.maxEnergy = energy;
     }
 
     getAudioSensitivity() {
-        return this.audio.getMaxEnergy();
+        if (this.audio.getMaxEnergy) {
+            return this.audio.getMaxEnergy();
+        }
+        return this.config.audio.maxEnergy;
     }
 
     getAudioState() {
-        return this.audio.getAudioState();
+        if (this.audio.getAudioState) {
+            return this.audio.getAudioState();
+        }
+        // Return optimized processor state
+        return this.audio.audioState || {};
     }
 
     /**
@@ -3610,7 +3621,11 @@ class DulaanSDK {
         
         // Apply configuration changes
         if (newConfig.audio?.maxEnergy) {
-            this.audio.setMaxEnergy(newConfig.audio.maxEnergy);
+            if (this.audio.setMaxEnergy) {
+                this.audio.setMaxEnergy(newConfig.audio.maxEnergy);
+            } else {
+                console.log('OptimizedStreamingProcessor uses internal VAD thresholds');
+            }
         }
         
         if (newConfig.api?.geminiApiKey) {

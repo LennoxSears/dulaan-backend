@@ -25,9 +25,10 @@ class OptimizedAIVoiceControl {
             ...config
         };
 
-        // Core components
-        this.processor = new OptimizedStreamingProcessor();
-        this.apiService = new OptimizedApiService();
+        // Core components (use shared instances if provided)
+        this.processor = config.processor || new OptimizedStreamingProcessor();
+        this.apiService = config.apiService || new OptimizedApiService();
+        this.motorController = config.motorController || null;
         
         // State management
         this.state = {
