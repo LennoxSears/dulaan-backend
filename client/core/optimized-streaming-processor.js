@@ -21,13 +21,13 @@ class OptimizedStreamingProcessor {
             
             // Optimized VAD thresholds for best accuracy
             VAD_ENERGY_THRESHOLD: 0.008, // Balanced threshold - not too sensitive to noise
-            VAD_ZCR_THRESHOLD: 0.08, // Balanced ZCR threshold
+            VAD_ZCR_THRESHOLD: 0.02, // Lower ZCR threshold for realistic speech
             VAD_VOICE_FRAMES: 3, // 3 consecutive frames to confirm voice (reduce false positives)
             VAD_SILENCE_FRAMES: 20, // 20 frames of silence to end speech (1.25 seconds)
             
             // Smart buffering
             MIN_SPEECH_DURATION: 6400, // 400ms minimum (in samples) - shorter for quick commands
-            MAX_SPEECH_DURATION: 320000, // 20 seconds maximum (much longer for complex speech)
+            MAX_SPEECH_DURATION: 20000, // 20 seconds maximum in milliseconds
             SPEECH_TIMEOUT: 1250, // 1.25 seconds of silence ends speech
             
             // Efficiency tracking
@@ -75,16 +75,23 @@ class OptimizedStreamingProcessor {
         const energyActive = rms > this.audioState.VAD_ENERGY_THRESHOLD;
         const zcrActive = zcr > this.audioState.VAD_ZCR_THRESHOLD && zcr < 0.5; // ZCR too high = noise
         
-        // Adaptive threshold based on recent energy history
+        // Adaptive threshold based on recent SILENCE energy history (not speech)
         if (!this.energyHistory) this.energyHistory = [];
-        this.energyHistory.push(rms);
-        if (this.energyHistory.length > 100) this.energyHistory.shift();
         
-        const avgEnergy = this.energyHistory.reduce((a, b) => a + b, 0) / this.energyHistory.length;
-        const adaptiveThreshold = Math.max(this.audioState.VAD_ENERGY_THRESHOLD, avgEnergy * 2);
+        // Only add to history if it's likely silence (low energy)
+        if (rms <= this.audioState.VAD_ENERGY_THRESHOLD * 2) {
+            this.energyHistory.push(rms);
+            if (this.energyHistory.length > 50) this.energyHistory.shift();
+        }
+        
+        const avgSilenceEnergy = this.energyHistory.length > 0 ? 
+            this.energyHistory.reduce((a, b) => a + b, 0) / this.energyHistory.length : 
+            this.audioState.VAD_ENERGY_THRESHOLD;
+        const adaptiveThreshold = Math.max(this.audioState.VAD_ENERGY_THRESHOLD, avgSilenceEnergy * 4);
         
         // Combined decision: energy must be active, ZCR should be reasonable
-        const voiceDetected = energyActive && (zcrActive || rms > adaptiveThreshold * 1.5);
+        const adaptiveCheck = rms > adaptiveThreshold * 1.5;
+        const voiceDetected = energyActive && (zcrActive || adaptiveCheck);
         
         return voiceDetected;
     }
@@ -207,9 +214,15 @@ class OptimizedStreamingProcessor {
             
             console.log(`[Voice End] Speech duration: ${speechDuration}ms, Buffer: ${this.audioState.speechBuffer.count} samples`);
             
-            // Send speech to API if we have enough audio
+            // Send speech to API if we have enough audio and haven't sent recently
             if (this.audioState.speechBuffer.count >= this.audioState.MIN_SPEECH_DURATION) {
-                await this.sendSpeechToAPI(true); // Mark as final
+                const timeSinceLastSend = Date.now() - this.audioState.lastApiCall;
+                if (timeSinceLastSend > 500) { // Prevent duplicate sends within 500ms
+                    await this.sendSpeechToAPI(true); // Mark as final
+                } else {
+                    console.log("[Voice End] Speech already sent recently, skipping");
+                    this.audioState.speechBuffer.reset();
+                }
             } else {
                 console.log("[Voice End] Speech too short, discarding");
                 this.audioState.speechBuffer.reset();
@@ -329,22 +342,25 @@ class OptimizedStreamingProcessor {
      */
     base64ToFloat32Array(base64String) {
         try {
-            const binaryString = atob(base64String);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
+            // Remove MIME header if present (matches legacy audio-processor.js)
+            const pureBase64 = base64String.includes(',') ? base64String.split(',')[1] : base64String;
+
+            // Decode Base64
+            const binary = atob(pureBase64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
             }
-            
-            const int16Array = new Int16Array(bytes.buffer);
-            const float32Array = new Float32Array(int16Array.length);
-            
-            for (let i = 0; i < int16Array.length; i++) {
-                float32Array[i] = int16Array[i] / 32768.0;
+
+            // Convert to Float32Array with little-endian parsing (matches legacy)
+            const view = new DataView(bytes.buffer);
+            const floats = new Float32Array(bytes.length / 4);
+            for (let i = 0; i < floats.length; i++) {
+                floats[i] = view.getFloat32(i * 4, true); // true = little-endian
             }
-            
-            return float32Array;
+            return floats;
         } catch (error) {
-            console.error("Base64 conversion failed:", error);
+            console.error("Base64 to Float32Array conversion failed:", error);
             return new Float32Array(0);
         }
     }

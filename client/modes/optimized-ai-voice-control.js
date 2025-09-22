@@ -72,18 +72,16 @@ class OptimizedAIVoiceControl {
      * Setup callbacks for processor and API service
      */
     setupCallbacks() {
-        // Processor callbacks
-        this.processor.setCallbacks({
-            onSpeechReady: async (speechPacket) => {
-                await this.handleSpeechReady(speechPacket);
-            },
-            onVoiceStateChange: (voiceState) => {
-                this.handleVoiceStateChange(voiceState);
-            },
-            onConversationUpdate: (active) => {
-                this.handleConversationUpdate(active);
-            }
-        });
+        // Processor callbacks (set directly on processor)
+        this.processor.onSpeechReady = async (speechPacket) => {
+            await this.handleSpeechReady(speechPacket);
+        };
+        this.processor.onVoiceStateChange = (voiceState) => {
+            this.handleVoiceStateChange(voiceState);
+        };
+        this.processor.onConversationUpdate = (active) => {
+            this.handleConversationUpdate(active);
+        };
 
         // API service callbacks
         this.apiService.setCallbacks({
@@ -164,6 +162,11 @@ class OptimizedAIVoiceControl {
      */
     async handleSpeechReady(speechPacket) {
         try {
+            console.log(`[Speech] Processing speech packet: ${speechPacket.audioData.length} samples`);
+            
+            this.state.isProcessing = true;
+            this.state.totalApiCalls++;
+            
             const startTime = Date.now();
             
             // Check for immediate commands
@@ -179,13 +182,30 @@ class OptimizedAIVoiceControl {
             }
             
             const processingTime = Date.now() - startTime;
+            this.state.totalProcessingTime += processingTime;
             this.updatePerformanceStats(processingTime);
             
-            console.log(`[API Response] Processed in ${processingTime}ms: "${response.transcription}"`);
+            if (response && response.newPwmValue !== undefined) {
+                // Update motor with new PWM value
+                this.updateMotorPWM(response.newPwmValue);
+                
+                // Update conversation history
+                this.apiService.updateConversationHistory(
+                    response.transcription || "Voice command",
+                    response.response || "Motor updated",
+                    response.newPwmValue
+                );
+                
+                console.log(`[Response] PWM: ${response.newPwmValue}, Processing: ${processingTime}ms`);
+            }
             
         } catch (error) {
             console.error("Speech processing failed:", error);
+            this.handleApiError(error);
             this.showNotification("⚠️ Speech processing failed", "warning");
+        } finally {
+            this.state.isProcessing = false;
+            this.updateUI();
         }
     }
 
@@ -233,7 +253,7 @@ class OptimizedAIVoiceControl {
         if (response.newPwmValue !== undefined) {
             const pwmDiff = Math.abs(response.newPwmValue - this.state.currentPwm);
             if (pwmDiff >= this.config.pwmUpdateThreshold) {
-                this.updateMotorPwm(response.newPwmValue);
+                this.updateMotorPWM(response.newPwmValue);
             }
         }
         
@@ -259,18 +279,7 @@ class OptimizedAIVoiceControl {
     /**
      * Update motor PWM with optimization
      */
-    updateMotorPwm(newPwm) {
-        const oldPwm = this.state.currentPwm;
-        this.state.currentPwm = newPwm;
-        
-        // Add small delay for motor response
-        setTimeout(() => {
-            console.log(`[Motor] PWM: ${oldPwm} → ${newPwm}`);
-            this.showNotification(`⚙️ Motor: ${newPwm}`, "info", 1500);
-        }, this.config.motorResponseDelay);
-        
-        this.updateUI();
-    }
+
 
     /**
      * Check if speech contains immediate command keywords
@@ -474,12 +483,42 @@ class OptimizedAIVoiceControl {
     }
 
     /**
-     * Start audio processing (placeholder - implement with actual audio API)
+     * Start audio processing using Capacitor VoiceRecorder
      */
     async startAudioProcessing() {
-        // This would integrate with actual audio capture
-        console.log("[Audio] Starting optimized audio processing");
-        this.state.isListening = true;
+        try {
+            console.log("[Audio] Starting optimized audio processing");
+            
+            // Check if Capacitor is available
+            if (!window.Capacitor?.Plugins?.VoiceRecorder) {
+                throw new Error('Capacitor VoiceRecorder plugin not available');
+            }
+            
+            // Request audio recording permission
+            const permission = await window.Capacitor.Plugins.VoiceRecorder.requestAudioRecordingPermission();
+            if (!permission.value) {
+                throw new Error('Audio recording permission denied');
+            }
+
+            // Remove any existing listeners
+            await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
+            
+            // Add streaming listener for real-time audio chunks
+            window.Capacitor.Plugins.VoiceRecorder.addListener('audioChunk', (data) => {
+                this.processAudioChunk(data.chunk);
+            });
+
+            // Start audio streaming (not recording)
+            await window.Capacitor.Plugins.VoiceRecorder.startStreaming();
+            
+            this.state.isListening = true;
+            console.log("[Audio] Capacitor audio streaming started");
+            
+        } catch (error) {
+            console.error("[Audio] Failed to start audio processing:", error);
+            this.showNotification("❌ Microphone access denied", "error");
+            throw error;
+        }
     }
 
     /**
@@ -487,7 +526,80 @@ class OptimizedAIVoiceControl {
      */
     async stopAudioProcessing() {
         console.log("[Audio] Stopping audio processing");
+        
+        try {
+            // Check if Capacitor is available
+            if (window.Capacitor?.Plugins?.VoiceRecorder) {
+                // Stop audio streaming
+                await window.Capacitor.Plugins.VoiceRecorder.stopStreaming();
+            
+                // Remove listeners
+                await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
+            }
+            
+        } catch (error) {
+            console.warn("[Audio] Error stopping audio processing:", error);
+        }
+        
         this.state.isListening = false;
+    }
+
+    /**
+     * Process incoming audio chunk from Capacitor VoiceRecorder
+     */
+    processAudioChunk(base64Chunk) {
+        if (!this.state.isActive || !this.state.isListening) {
+            return;
+        }
+
+        try {
+            // Process audio chunk through optimized processor
+            const result = this.processor.processAudioChunk(base64Chunk);
+            
+            if (result) {
+                // Update state with voice activity
+                this.state.lastInteractionTime = Date.now();
+                
+                // Log voice activity for debugging
+                console.log(`[VAD] Voice: ${result.isVoiceActive}, Energy: ${result.energy?.toFixed(4)}, ZCR: ${result.zeroCrossings?.toFixed(4)}`);
+                
+                // Speech packets are handled via onSpeechReady callback
+                // This result only contains VAD status information
+            }
+            
+        } catch (error) {
+            console.error("[Audio] Error processing audio chunk:", error);
+        }
+    }
+
+
+
+    /**
+     * Update motor PWM value with optimization
+     */
+    updateMotorPWM(newPwm) {
+        // Only update if change is significant (reduces motor wear)
+        const pwmDifference = Math.abs(newPwm - this.state.currentPwm);
+        
+        if (pwmDifference >= this.config.pwmUpdateThreshold) {
+            this.state.currentPwm = newPwm;
+            
+            // Send to motor controller if available
+            if (this.motorController && this.motorController.isConnected) {
+                setTimeout(async () => {
+                    await this.motorController.write(newPwm);
+                }, this.config.motorResponseDelay);
+            }
+            
+            // Trigger callbacks
+            if (this.config.onPwmUpdate) {
+                this.config.onPwmUpdate(newPwm);
+            }
+            
+            console.log(`[Motor] PWM updated: ${this.state.currentPwm}`);
+        } else {
+            console.log(`[Motor] PWM change too small (${pwmDifference}), skipping update`);
+        }
     }
 
     /**

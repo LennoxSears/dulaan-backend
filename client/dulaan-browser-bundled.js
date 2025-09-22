@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-22T12:11:40.131Z
+ * Generated on: 2025-09-22T12:47:26.783Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -914,13 +914,13 @@ class OptimizedStreamingProcessor {
             
             // Optimized VAD thresholds for best accuracy
             VAD_ENERGY_THRESHOLD: 0.008, // Balanced threshold - not too sensitive to noise
-            VAD_ZCR_THRESHOLD: 0.08, // Balanced ZCR threshold
+            VAD_ZCR_THRESHOLD: 0.02, // Lower ZCR threshold for realistic speech
             VAD_VOICE_FRAMES: 3, // 3 consecutive frames to confirm voice (reduce false positives)
             VAD_SILENCE_FRAMES: 20, // 20 frames of silence to end speech (1.25 seconds)
             
             // Smart buffering
             MIN_SPEECH_DURATION: 6400, // 400ms minimum (in samples) - shorter for quick commands
-            MAX_SPEECH_DURATION: 320000, // 20 seconds maximum (much longer for complex speech)
+            MAX_SPEECH_DURATION: 20000, // 20 seconds maximum in milliseconds
             SPEECH_TIMEOUT: 1250, // 1.25 seconds of silence ends speech
             
             // Efficiency tracking
@@ -968,16 +968,23 @@ class OptimizedStreamingProcessor {
         const energyActive = rms > this.audioState.VAD_ENERGY_THRESHOLD;
         const zcrActive = zcr > this.audioState.VAD_ZCR_THRESHOLD && zcr < 0.5; // ZCR too high = noise
         
-        // Adaptive threshold based on recent energy history
+        // Adaptive threshold based on recent SILENCE energy history (not speech)
         if (!this.energyHistory) this.energyHistory = [];
-        this.energyHistory.push(rms);
-        if (this.energyHistory.length > 100) this.energyHistory.shift();
         
-        const avgEnergy = this.energyHistory.reduce((a, b) => a + b, 0) / this.energyHistory.length;
-        const adaptiveThreshold = Math.max(this.audioState.VAD_ENERGY_THRESHOLD, avgEnergy * 2);
+        // Only add to history if it's likely silence (low energy)
+        if (rms <= this.audioState.VAD_ENERGY_THRESHOLD * 2) {
+            this.energyHistory.push(rms);
+            if (this.energyHistory.length > 50) this.energyHistory.shift();
+        }
+        
+        const avgSilenceEnergy = this.energyHistory.length > 0 ? 
+            this.energyHistory.reduce((a, b) => a + b, 0) / this.energyHistory.length : 
+            this.audioState.VAD_ENERGY_THRESHOLD;
+        const adaptiveThreshold = Math.max(this.audioState.VAD_ENERGY_THRESHOLD, avgSilenceEnergy * 4);
         
         // Combined decision: energy must be active, ZCR should be reasonable
-        const voiceDetected = energyActive && (zcrActive || rms > adaptiveThreshold * 1.5);
+        const adaptiveCheck = rms > adaptiveThreshold * 1.5;
+        const voiceDetected = energyActive && (zcrActive || adaptiveCheck);
         
         return voiceDetected;
     }
@@ -1100,9 +1107,15 @@ class OptimizedStreamingProcessor {
             
             console.log(`[Voice End] Speech duration: ${speechDuration}ms, Buffer: ${this.audioState.speechBuffer.count} samples`);
             
-            // Send speech to API if we have enough audio
+            // Send speech to API if we have enough audio and haven't sent recently
             if (this.audioState.speechBuffer.count >= this.audioState.MIN_SPEECH_DURATION) {
-                await this.sendSpeechToAPI(true); // Mark as final
+                const timeSinceLastSend = Date.now() - this.audioState.lastApiCall;
+                if (timeSinceLastSend > 500) { // Prevent duplicate sends within 500ms
+                    await this.sendSpeechToAPI(true); // Mark as final
+                } else {
+                    console.log("[Voice End] Speech already sent recently, skipping");
+                    this.audioState.speechBuffer.reset();
+                }
             } else {
                 console.log("[Voice End] Speech too short, discarding");
                 this.audioState.speechBuffer.reset();
@@ -1222,22 +1235,25 @@ class OptimizedStreamingProcessor {
      */
     base64ToFloat32Array(base64String) {
         try {
-            const binaryString = atob(base64String);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
+            // Remove MIME header if present (matches legacy audio-processor.js)
+            const pureBase64 = base64String.includes(',') ? base64String.split(',')[1] : base64String;
+
+            // Decode Base64
+            const binary = atob(pureBase64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
             }
-            
-            const int16Array = new Int16Array(bytes.buffer);
-            const float32Array = new Float32Array(int16Array.length);
-            
-            for (let i = 0; i < int16Array.length; i++) {
-                float32Array[i] = int16Array[i] / 32768.0;
+
+            // Convert to Float32Array with little-endian parsing (matches legacy)
+            const view = new DataView(bytes.buffer);
+            const floats = new Float32Array(bytes.length / 4);
+            for (let i = 0; i < floats.length; i++) {
+                floats[i] = view.getFloat32(i * 4, true); // true = little-endian
             }
-            
-            return float32Array;
+            return floats;
         } catch (error) {
-            console.error("Base64 conversion failed:", error);
+            console.error("Base64 to Float32Array conversion failed:", error);
             return new Float32Array(0);
         }
     }
@@ -2286,18 +2302,16 @@ class OptimizedAIVoiceControl {
      * Setup callbacks for processor and API service
      */
     setupCallbacks() {
-        // Processor callbacks
-        this.processor.setCallbacks({
-            onSpeechReady: async (speechPacket) => {
-                await this.handleSpeechReady(speechPacket);
-            },
-            onVoiceStateChange: (voiceState) => {
-                this.handleVoiceStateChange(voiceState);
-            },
-            onConversationUpdate: (active) => {
-                this.handleConversationUpdate(active);
-            }
-        });
+        // Processor callbacks (set directly on processor)
+        this.processor.onSpeechReady = async (speechPacket) => {
+            await this.handleSpeechReady(speechPacket);
+        };
+        this.processor.onVoiceStateChange = (voiceState) => {
+            this.handleVoiceStateChange(voiceState);
+        };
+        this.processor.onConversationUpdate = (active) => {
+            this.handleConversationUpdate(active);
+        };
 
         // API service callbacks
         this.apiService.setCallbacks({
@@ -2378,6 +2392,11 @@ class OptimizedAIVoiceControl {
      */
     async handleSpeechReady(speechPacket) {
         try {
+            console.log(`[Speech] Processing speech packet: ${speechPacket.audioData.length} samples`);
+            
+            this.state.isProcessing = true;
+            this.state.totalApiCalls++;
+            
             const startTime = Date.now();
             
             // Check for immediate commands
@@ -2393,13 +2412,30 @@ class OptimizedAIVoiceControl {
             }
             
             const processingTime = Date.now() - startTime;
+            this.state.totalProcessingTime += processingTime;
             this.updatePerformanceStats(processingTime);
             
-            console.log(`[API Response] Processed in ${processingTime}ms: "${response.transcription}"`);
+            if (response && response.newPwmValue !== undefined) {
+                // Update motor with new PWM value
+                this.updateMotorPWM(response.newPwmValue);
+                
+                // Update conversation history
+                this.apiService.updateConversationHistory(
+                    response.transcription || "Voice command",
+                    response.response || "Motor updated",
+                    response.newPwmValue
+                );
+                
+                console.log(`[Response] PWM: ${response.newPwmValue}, Processing: ${processingTime}ms`);
+            }
             
         } catch (error) {
             console.error("Speech processing failed:", error);
+            this.handleApiError(error);
             this.showNotification("⚠️ Speech processing failed", "warning");
+        } finally {
+            this.state.isProcessing = false;
+            this.updateUI();
         }
     }
 
@@ -2447,7 +2483,7 @@ class OptimizedAIVoiceControl {
         if (response.newPwmValue !== undefined) {
             const pwmDiff = Math.abs(response.newPwmValue - this.state.currentPwm);
             if (pwmDiff >= this.config.pwmUpdateThreshold) {
-                this.updateMotorPwm(response.newPwmValue);
+                this.updateMotorPWM(response.newPwmValue);
             }
         }
         
@@ -2473,18 +2509,7 @@ class OptimizedAIVoiceControl {
     /**
      * Update motor PWM with optimization
      */
-    updateMotorPwm(newPwm) {
-        const oldPwm = this.state.currentPwm;
-        this.state.currentPwm = newPwm;
-        
-        // Add small delay for motor response
-        setTimeout(() => {
-            console.log(`[Motor] PWM: ${oldPwm} → ${newPwm}`);
-            this.showNotification(`⚙️ Motor: ${newPwm}`, "info", 1500);
-        }, this.config.motorResponseDelay);
-        
-        this.updateUI();
-    }
+
 
     /**
      * Check if speech contains immediate command keywords
@@ -2688,12 +2713,42 @@ class OptimizedAIVoiceControl {
     }
 
     /**
-     * Start audio processing (placeholder - implement with actual audio API)
+     * Start audio processing using Capacitor VoiceRecorder
      */
     async startAudioProcessing() {
-        // This would integrate with actual audio capture
-        console.log("[Audio] Starting optimized audio processing");
-        this.state.isListening = true;
+        try {
+            console.log("[Audio] Starting optimized audio processing");
+            
+            // Check if Capacitor is available
+            if (!window.Capacitor?.Plugins?.VoiceRecorder) {
+                throw new Error('Capacitor VoiceRecorder plugin not available');
+            }
+            
+            // Request audio recording permission
+            const permission = await window.Capacitor.Plugins.VoiceRecorder.requestAudioRecordingPermission();
+            if (!permission.value) {
+                throw new Error('Audio recording permission denied');
+            }
+
+            // Remove any existing listeners
+            await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
+            
+            // Add streaming listener for real-time audio chunks
+            window.Capacitor.Plugins.VoiceRecorder.addListener('audioChunk', (data) => {
+                this.processAudioChunk(data.chunk);
+            });
+
+            // Start audio streaming (not recording)
+            await window.Capacitor.Plugins.VoiceRecorder.startStreaming();
+            
+            this.state.isListening = true;
+            console.log("[Audio] Capacitor audio streaming started");
+            
+        } catch (error) {
+            console.error("[Audio] Failed to start audio processing:", error);
+            this.showNotification("❌ Microphone access denied", "error");
+            throw error;
+        }
     }
 
     /**
@@ -2701,7 +2756,80 @@ class OptimizedAIVoiceControl {
      */
     async stopAudioProcessing() {
         console.log("[Audio] Stopping audio processing");
+        
+        try {
+            // Check if Capacitor is available
+            if (window.Capacitor?.Plugins?.VoiceRecorder) {
+                // Stop audio streaming
+                await window.Capacitor.Plugins.VoiceRecorder.stopStreaming();
+            
+                // Remove listeners
+                await window.Capacitor.Plugins.VoiceRecorder.removeAllListeners();
+            }
+            
+        } catch (error) {
+            console.warn("[Audio] Error stopping audio processing:", error);
+        }
+        
         this.state.isListening = false;
+    }
+
+    /**
+     * Process incoming audio chunk from Capacitor VoiceRecorder
+     */
+    processAudioChunk(base64Chunk) {
+        if (!this.state.isActive || !this.state.isListening) {
+            return;
+        }
+
+        try {
+            // Process audio chunk through optimized processor
+            const result = this.processor.processAudioChunk(base64Chunk);
+            
+            if (result) {
+                // Update state with voice activity
+                this.state.lastInteractionTime = Date.now();
+                
+                // Log voice activity for debugging
+                console.log(`[VAD] Voice: ${result.isVoiceActive}, Energy: ${result.energy?.toFixed(4)}, ZCR: ${result.zeroCrossings?.toFixed(4)}`);
+                
+                // Speech packets are handled via onSpeechReady callback
+                // This result only contains VAD status information
+            }
+            
+        } catch (error) {
+            console.error("[Audio] Error processing audio chunk:", error);
+        }
+    }
+
+
+
+    /**
+     * Update motor PWM value with optimization
+     */
+    updateMotorPWM(newPwm) {
+        // Only update if change is significant (reduces motor wear)
+        const pwmDifference = Math.abs(newPwm - this.state.currentPwm);
+        
+        if (pwmDifference >= this.config.pwmUpdateThreshold) {
+            this.state.currentPwm = newPwm;
+            
+            // Send to motor controller if available
+            if (this.motorController && this.motorController.isConnected) {
+                setTimeout(async () => {
+                    await this.motorController.write(newPwm);
+                }, this.config.motorResponseDelay);
+            }
+            
+            // Trigger callbacks
+            if (this.config.onPwmUpdate) {
+                this.config.onPwmUpdate(newPwm);
+            }
+            
+            console.log(`[Motor] PWM updated: ${this.state.currentPwm}`);
+        } else {
+            console.log(`[Motor] PWM change too small (${pwmDifference}), skipping update`);
+        }
     }
 
     /**
