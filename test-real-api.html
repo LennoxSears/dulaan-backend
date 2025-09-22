@@ -155,6 +155,7 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
                     <div><strong>🔊 Audio Analysis:</strong></div>
                     <div>RMS Energy: <span id="rms-energy">0.000</span> | ZCR: <span id="zcr-rate">0.000</span></div>
                     <div>Speech Buffer: <span id="speech-buffer-size">0</span> samples | VAD Buffer: <span id="vad-buffer-size">0</span> samples</div>
+                    <div>Audio Level: <span id="audio-level" style="color: #00ff00;">████████████████████</span></div>
                 </div>
             </div>
         </div>
@@ -286,11 +287,11 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
                 this.mediaStream = null;
                 this.processor = null;
                 
-                // Optimized thresholds
-                this.VAD_ENERGY_THRESHOLD = 0.015;
-                this.VAD_ZCR_THRESHOLD = 0.12;
+                // Optimized thresholds (more sensitive for testing)
+                this.VAD_ENERGY_THRESHOLD = 0.005; // Lower threshold for easier detection
+                this.VAD_ZCR_THRESHOLD = 0.05; // Lower threshold for easier detection
                 this.VAD_VOICE_FRAMES = 2; // Faster voice detection
-                this.VAD_SILENCE_FRAMES = 15; // Longer silence confirmation
+                this.VAD_SILENCE_FRAMES = 10; // Shorter silence for faster response
                 this.MIN_SPEECH_DURATION = 8000; // 500ms minimum (in samples)
                 this.MAX_SPEECH_DURATION = 80000; // 5 seconds maximum
             }
@@ -331,6 +332,7 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
                     log("🎯 Say commands like: 'turn it up', 'más fuerte', '加强'", 'info');
                     
                     document.getElementById('vad-status').style.display = 'block';
+                    document.getElementById('efficiency-comparison').style.display = 'block';
                     document.getElementById('startVoiceBtn').disabled = true;
                     document.getElementById('stopVoiceBtn').disabled = false;
                     
@@ -408,6 +410,16 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
                 
                 // Update efficiency display
                 this.updateEfficiencyDisplay();
+                
+                // Visual feedback for audio processing
+                if (this.totalChunks % 10 === 0) {
+                    const indicator = document.getElementById('vad-indicator');
+                    if (isVoiceActive) {
+                        indicator.style.backgroundColor = '#00ff00'; // Green for voice
+                    } else {
+                        indicator.style.backgroundColor = '#666'; // Gray for silence
+                    }
+                }
             }
 
             detectVoiceActivity(audioData) {
@@ -423,8 +435,13 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
                 const energyActive = rms > this.VAD_ENERGY_THRESHOLD;
                 const zcrActive = zcr > this.VAD_ZCR_THRESHOLD;
                 
-                // Voice is active if both energy and ZCR indicate speech
-                return energyActive && zcrActive;
+                // Debug logging (every 50 chunks to avoid spam)
+                if (this.totalChunks % 50 === 0) {
+                    console.log(`[VAD Debug] RMS: ${rms.toFixed(4)} (>${this.VAD_ENERGY_THRESHOLD}=${energyActive}) | ZCR: ${zcr.toFixed(4)} (>${this.VAD_ZCR_THRESHOLD}=${zcrActive})`);
+                }
+                
+                // Voice is active if energy indicates speech (simplified for testing)
+                return energyActive; // Simplified: only use energy threshold for now
             }
 
             calculateRMS(audioData) {
@@ -645,6 +662,15 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
                 document.getElementById('zcr-rate').textContent = this.lastZeroCrossings.toFixed(3);
                 document.getElementById('speech-buffer-size').textContent = this.speechBuffer.count;
                 document.getElementById('vad-buffer-size').textContent = this.vadBuffer.count;
+                
+                // Update audio level meter
+                const levelMeter = document.getElementById('audio-level');
+                if (levelMeter) {
+                    const level = Math.min(20, Math.floor(this.lastRMS * 1000)); // Scale to 0-20
+                    const bars = '█'.repeat(level) + '░'.repeat(20 - level);
+                    levelMeter.textContent = bars;
+                    levelMeter.style.color = level > 5 ? '#00ff00' : '#666';
+                }
                 
                 // Color coding for efficiency
                 const efficiencyElement = document.getElementById('efficiency-display');
