@@ -62,14 +62,14 @@ class AudioProcessor {
     constructor() {
         // Audio processing state
         this.audioState = {
-            ringBuffer: new RingBuffer(480000 * 3), // 16000Hz * 45 seconds (larger buffer)
+            ringBuffer: new RingBuffer(480000 * 5), // 16000Hz * 75 seconds (very large buffer for long speech)
             abiBuffer: new RingBuffer(1600),
             isSpeaking: false,
             silenceCounter: 0,
-            SILENCE_THRESHOLD: 0.03,  // Lower threshold to be less sensitive to quiet parts
-            ZERO_CROSSING: 0.08,     // Lower zero crossing to be less sensitive
-            SILENCE_TIMEOUT: 25,     // 2.5s to ensure complete sentences are captured
-            MIN_SPEECH_DURATION: 5,  // 500ms minimum to ensure we capture full words
+            SILENCE_THRESHOLD: 0.01,  // Very low threshold for normal speaking volume
+            ZERO_CROSSING: 0.05,     // Lower zero crossing for better sensitivity
+            SILENCE_TIMEOUT: 40,     // 4s to capture complete long sentences
+            MIN_SPEECH_DURATION: 3,  // 300ms minimum (back to reasonable value)
             lastChunkSize: 0,
             lastRMS: 0,
             lastZeroCrossings: 0
@@ -197,11 +197,17 @@ class AudioProcessor {
                 this.audioState.silenceCounter++;
             }
 
-            // Write to ring buffer (matches stream.js logic)
+            // Write to ring buffer with improved overflow handling
             const written = this.audioState.ringBuffer.push(pcmData);
             if (written < pcmData.length) {
-                console.warn("Buffer overflow, discarding", pcmData.length - written, "samples");
+                console.warn("Buffer approaching full, processing current speech to make room");
+                // Process current speech before resetting to avoid losing data
+                if (this.audioState.ringBuffer.count > 0) {
+                    this.triggerSpeechPackaging();
+                }
+                // Reset and add the remaining data
                 this.audioState.ringBuffer.reset();
+                this.audioState.ringBuffer.push(pcmData.subarray(written));
             }
 
             // Silence timeout triggers speech packaging (matches stream.js)

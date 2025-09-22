@@ -53,14 +53,14 @@ class RingBuffer {
 
 // ===== 2. 全局状态配置 =====
 window.AUDIO_STATE = {
-    ringBuffer: new RingBuffer(480000 * 3), // 16000Hz * 45秒 (larger buffer)
+    ringBuffer: new RingBuffer(480000 * 5), // 16000Hz * 75秒 (very large buffer for long speech)
     abiBuffer: new RingBuffer(1600),
     isSpeaking: false,
     silenceCounter: 0,
-    SILENCE_THRESHOLD: 0.03,  // Lower threshold to be less sensitive to quiet parts
-    ZERO_CROSSING: 0.08,     // Lower zero crossing to be less sensitive
-    SILENCE_TIMEOUT: 25,     // 2.5s to ensure complete sentences are captured
-    MIN_SPEECH_DURATION: 5,  // 500ms minimum to ensure we capture full words
+    SILENCE_THRESHOLD: 0.01,  // Very low threshold for normal speaking volume
+    ZERO_CROSSING: 0.05,     // Lower zero crossing for better sensitivity
+    SILENCE_TIMEOUT: 40,     // 4s to capture complete long sentences
+    MIN_SPEECH_DURATION: 3,  // 300ms minimum (back to reasonable value)
     lastChunkSize: 0,
     lastRMS: 0,
     lastZeroCrossings: 0
@@ -300,11 +300,17 @@ const processChunk = (base64Chunk) => {
         window.AUDIO_STATE.silenceCounter++;
     }
 
-    // 写入环形缓冲区
+    // 写入环形缓冲区 with improved overflow handling
     const written = window.AUDIO_STATE.ringBuffer.push(pcmChunk);
     if (written < pcmChunk.length) {
-        console.warn("[警告] 缓冲区溢出，丢弃", pcmChunk.length - written, "采样点");
-        window.AUDIO_STATE.ringBuffer.reset()
+        console.warn("[处理] 缓冲区接近满，处理当前语音以腾出空间");
+        // Process current speech before resetting to avoid losing data
+        if (window.AUDIO_STATE.ringBuffer.count > 0) {
+            packageSpeechSegment();
+        }
+        // Reset and add the remaining data
+        window.AUDIO_STATE.ringBuffer.reset();
+        window.AUDIO_STATE.ringBuffer.push(pcmChunk.subarray(written));
     }
 
     // 静音超时触发分段
