@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-22T13:31:18.473Z
+ * Generated on: 2025-09-22T13:41:00.663Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -2249,7 +2249,7 @@ class OptimizedAIVoiceControl {
         this.config = {
             // Conversation flow optimization
             responseTimeout: 3000, // 3 seconds max wait for response
-            conversationTimeout: 30000, // 30 seconds of silence ends conversation
+            conversationTimeout: 300000, // 5 minutes of silence ends conversation (much longer)
             immediateCommandKeywords: ['stop', 'emergency', 'halt', 'now'],
             
             // Motor control optimization
@@ -2447,8 +2447,9 @@ class OptimizedAIVoiceControl {
                 console.warn(`[API WARNING] No PWM value in response or response is null`);
             }
             
-            // ===== RESTART CONVERSATION FOR NEXT COMMAND =====
-            console.log(`[CONVERSATION] Restarting conversation for next command`);
+            // ===== UPDATE INTERACTION TIME AND RESTART CONVERSATION =====
+            this.state.lastInteractionTime = Date.now(); // Reset interaction timer
+            console.log(`[CONVERSATION] Updated interaction time, restarting conversation for next command`);
             this.handleConversationUpdate(true);
             
         } catch (error) {
@@ -2556,6 +2557,11 @@ class OptimizedAIVoiceControl {
      * Start conversation timeout timer
      */
     startConversationTimer() {
+        // DISABLED: Conversation timeout mechanism removed to match working test-real-api.html
+        // The conversation stays active continuously like in the working version
+        console.log("[Conversation Timer] Disabled - conversation stays active continuously");
+        
+        /* ORIGINAL TIMEOUT CODE - DISABLED
         if (this.conversationTimer) {
             clearTimeout(this.conversationTimer);
         }
@@ -2572,6 +2578,7 @@ class OptimizedAIVoiceControl {
                 }
             }
         }, this.config.conversationTimeout);
+        */
     }
 
     /**
