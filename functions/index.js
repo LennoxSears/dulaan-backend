@@ -645,7 +645,7 @@ exports.speechToTextWithLLM = onRequest(
             const apiKey = "AIzaSyD9KKLF3WBa6gi0_orzF-OMydzO4rIX_uY";
 
             const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
             // Prepare conversation history for context (handle different formats safely)
             const conversationHistory = msgHis.map(msg => {
