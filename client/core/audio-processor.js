@@ -68,8 +68,8 @@ class AudioProcessor {
             silenceCounter: 0,
             SILENCE_THRESHOLD: 0.05,
             ZERO_CROSSING: 0.1,
-            SILENCE_TIMEOUT: 5,  // Optimal: 500ms for natural speech pauses
-            MIN_SPEECH_DURATION: 2,  // Optimal: 200ms allows short commands like "stop"
+            SILENCE_TIMEOUT: 12,  // 1.2s to prevent splitting commands with natural pauses
+            MIN_SPEECH_DURATION: 3,  // 300ms minimum to filter noise but allow short commands
             lastChunkSize: 0,
             lastRMS: 0,
             lastZeroCrossings: 0

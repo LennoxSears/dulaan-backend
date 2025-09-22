@@ -25,7 +25,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 // Firestore under the path /messages/:documentId/original
 exports.addmessage = onRequest(
     {
-        region: "europe-west4"
+        region: "europe-west1"
     },
     async (req, res) => {
         // Grab the text parameter.
@@ -44,7 +44,7 @@ exports.addmessage = onRequest(
 exports.makeuppercase = onDocumentCreated( 
     {
         document: "/messages/{documentId}",
-        region: "europe-west4"
+        region: "europe-west1"
     },
     (event) => {
     // Grab the current value of what was written to Firestore.
@@ -65,7 +65,7 @@ exports.makeuppercase = onDocumentCreated(
 // User data storage API endpoint
 exports.storeUserData = onRequest(
     {
-        region: "europe-west4",
+        region: "europe-west1",
         invoker: "public",
         cors: {
             origin: [
@@ -171,7 +171,7 @@ exports.storeUserData = onRequest(
 // User consent storage/update API endpoint
 exports.storeUserConsent = onRequest(
     {
-        region: "europe-west4",
+        region: "europe-west1",
         invoker: "public",
         cors: {
             origin: [
@@ -336,7 +336,7 @@ exports.storeUserConsent = onRequest(
 // Get user consent API endpoint
 exports.getUserConsent = onRequest(
     {
-        region: "europe-west4",
+        region: "europe-west1",
         invoker: "public",
         cors: {
             origin: [
@@ -413,7 +413,7 @@ exports.getUserConsent = onRequest(
 // Speech-to-Text with LLM processing API endpoint
 exports.speechToTextWithLLM = onRequest(
     {
-        region: "europe-west4",
+        region: "europe-west1",
         invoker: "public",
         cors: {
             origin: [
@@ -491,7 +491,7 @@ exports.speechToTextWithLLM = onRequest(
                     enableAutomaticPunctuation: true,
                     enableWordTimeOffsets: false,
                     enableWordConfidence: true,
-                    model: 'chirp',        // BEST: Google's latest universal speech model (available in europe-west4)
+                    model: 'latest_short',  // Optimized for short voice commands (our primary use case)
                     useEnhanced: true,     // Use enhanced model for better accuracy
                     profanityFilter: false,
                     maxAlternatives: 1,
@@ -519,12 +519,13 @@ exports.speechToTextWithLLM = onRequest(
                     speechConfig.languageCode = 'en-US'; // Primary language
                     speechConfig.alternativeLanguageCodes = ['es-ES']; // Spanish only
                     
-                    logger.log('Using CHIRP model with streamlined language detection', {
+                    logger.log('Using latest_short model optimized for voice commands', {
                         primaryLanguage: speechConfig.languageCode,
                         alternativeLanguages: speechConfig.alternativeLanguageCodes,
-                        model: 'chirp',
-                        region: 'europe-west4',
-                        optimization: 'English + Spanish only for maximum performance'
+                        model: 'latest_short',
+                        region: 'europe-west1',
+                        optimization: 'English + Spanish only, optimized for short commands',
+                        useCase: 'Motor control voice commands (stop, turn up, etc.)'
                     });
                 }
 
@@ -534,19 +535,32 @@ exports.speechToTextWithLLM = onRequest(
                 };
 
                 // Log audio info for debugging
-                logger.log('Processing audio with CHIRP model in europe-west4', {
+                logger.log('Processing short voice command with latest_short model', {
                     encoding: speechConfig.encoding,
                     sampleRateHertz: speechConfig.sampleRateHertz,
                     audioBufferLength: int16Data.length,
                     audioBufferBytes: int16Data.buffer.byteLength,
                     model: speechConfig.model,
-                    region: 'europe-west4',
+                    region: 'europe-west1',
                     interactionType: speechConfig.metadata.interactionType,
-                    expectedAccuracy: '90-95%'
+                    expectedAccuracy: '80-85%',
+                    optimizedFor: 'Short voice commands and motor control'
                 });
 
-                // Perform speech recognition
-                const [speechResponse] = await speechClient.recognize(speechRequest);
+                // Perform speech recognition with error handling
+                let speechResponse;
+                try {
+                    [speechResponse] = await speechClient.recognize(speechRequest);
+                } catch (speechError) {
+                    logger.error('Speech recognition error details', {
+                        error: speechError.message,
+                        code: speechError.code,
+                        details: speechError.details,
+                        model: speechConfig.model,
+                        region: 'europe-west4'
+                    });
+                    throw speechError;
+                }
                 
                 // Extract transcription with confidence filtering
                 if (speechResponse.results && speechResponse.results.length > 0) {
@@ -557,14 +571,14 @@ exports.speechToTextWithLLM = onRequest(
                         confidence = bestAlternative.confidence || 0;
                         detectedLanguage = bestResult.languageCode || null;
                         
-                        // CHIRP model has better confidence scores, use lower threshold
-                        if (confidence < 0.2 && transcript.trim().length > 0) {
+                        // latest_short model confidence filtering
+                        if (confidence < 0.3 && transcript.trim().length > 0) {
                             logger.log('Low confidence transcription filtered out', { 
                                 transcript, 
                                 confidence,
-                                threshold: 0.2,
-                                model: 'chirp',
-                                region: 'europe-west4'
+                                threshold: 0.3,
+                                model: 'latest_short',
+                                region: 'europe-west1'
                             });
                             transcript = '';
                         }

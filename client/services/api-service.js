@@ -6,8 +6,8 @@
 class ApiService {
     constructor(config = {}) {
         this.baseUrls = {
-            speechToTextWithLLM: 'https://europe-west4-dulaan-backend.cloudfunctions.net/speechToTextWithLLM',
-            storeUserData: 'https://europe-west4-dulaan-backend.cloudfunctions.net/storeUserData',
+            speechToTextWithLLM: 'https://europe-west1-dulaan-backend.cloudfunctions.net/speechToTextWithLLM',
+            storeUserData: 'https://europe-west1-dulaan-backend.cloudfunctions.net/storeUserData',
             ...config.endpoints
         };
         

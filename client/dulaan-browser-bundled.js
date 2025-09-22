@@ -77,7 +77,7 @@ const PWM_CONFIG = {
 // API Configuration
 const API_CONFIG = {
     ENDPOINTS: {
-        SPEECH_TO_TEXT_LLM: 'https://europe-west4-dulaan-backend.cloudfunctions.net/speechToTextWithLLM',
+        SPEECH_TO_TEXT_LLM: 'https://europe-west1-dulaan-backend.cloudfunctions.net/speechToTextWithLLM',
         STORE_USER_DATA: 'https://storeuserdata-qveg3gkwxa-ew.a.run.app',
         STORE_USER_CONSENT: 'https://storeuserconsent-qveg3gkwxa-ew.a.run.app',
         GET_USER_CONSENT: 'https://getuserconsent-qveg3gkwxa-ew.a.run.app'
@@ -1216,7 +1216,7 @@ if (typeof window !== 'undefined') {
 class ApiService {
     constructor(config = {}) {
         this.baseUrls = {
-            speechToTextWithLLM: 'https://europe-west4-dulaan-backend.cloudfunctions.net/speechToTextWithLLM',
+            speechToTextWithLLM: 'https://europe-west1-dulaan-backend.cloudfunctions.net/speechToTextWithLLM',
             storeUserData: 'https://storeuserdata-qveg3gkwxa-ew.a.run.app',
             ...config.endpoints
         };

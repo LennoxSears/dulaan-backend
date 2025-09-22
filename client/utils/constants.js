@@ -48,10 +48,10 @@ export const PWM_CONFIG = {
 // API Configuration
 export const API_CONFIG = {
     ENDPOINTS: {
-        SPEECH_TO_TEXT_LLM: 'https://europe-west4-dulaan-backend.cloudfunctions.net/speechToTextWithLLM',
-        STORE_USER_DATA: 'https://europe-west4-dulaan-backend.cloudfunctions.net/storeUserData',
-        STORE_USER_CONSENT: 'https://europe-west4-dulaan-backend.cloudfunctions.net/storeUserConsent',
-        GET_USER_CONSENT: 'https://europe-west4-dulaan-backend.cloudfunctions.net/getUserConsent'
+        SPEECH_TO_TEXT_LLM: 'https://europe-west1-dulaan-backend.cloudfunctions.net/speechToTextWithLLM',
+        STORE_USER_DATA: 'https://europe-west1-dulaan-backend.cloudfunctions.net/storeUserData',
+        STORE_USER_CONSENT: 'https://europe-west1-dulaan-backend.cloudfunctions.net/storeUserConsent',
+        GET_USER_CONSENT: 'https://europe-west1-dulaan-backend.cloudfunctions.net/getUserConsent'
     },
     
     DEFAULT_OPTIONS: {
