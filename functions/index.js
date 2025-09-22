@@ -447,7 +447,7 @@ exports.directAudioToPWM = onRequest(
             // Extract request data
             const { 
                 audioData, 
-                currentPwm = 100, 
+                currentPwm = 0, 
                 msgHis = [],
                 streamingMode = false,
                 isFinal = true,

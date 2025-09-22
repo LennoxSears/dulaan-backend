@@ -11,7 +11,7 @@ class ApiService {
         // Conversation state
         this.conversationState = {
             history: [],
-            currentPwm: 100, // Motor starts at 100
+            currentPwm: 0, // Motor starts at 100
             isProcessing: false,
             lastResponse: 0,
             totalApiCalls: 0,
@@ -175,7 +175,7 @@ class ApiService {
                 body: JSON.stringify({
                     msgHis: [],
                     audioData: testAudio,
-                    currentPwm: 100
+                    currentPwm: 0
                 })
             });
 
@@ -249,7 +249,7 @@ class ApiService {
      */
     reset() {
         this.conversationState.history = [];
-        this.conversationState.currentPwm = 100;
+        this.conversationState.currentPwm = 0;
         this.conversationState.isProcessing = false;
         this.conversationState.totalApiCalls = 0;
         this.conversationState.totalProcessingTime = 0;

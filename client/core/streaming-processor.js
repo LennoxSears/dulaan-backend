@@ -21,7 +21,7 @@ class StreamingProcessor {
         this.isActive = false;
         this.isListening = false;
         this.isProcessing = false;
-        this.currentPwm = 100;
+        this.currentPwm = 0;
         
         // Ring buffers for efficient memory usage
         this.vadBuffer = new RingBufferClass(4800); // 300ms for VAD analysis
@@ -44,7 +44,7 @@ class StreamingProcessor {
         this.VAD_ZCR_THRESHOLD = 0.08; // Balanced ZCR threshold
         this.VAD_VOICE_FRAMES = 3; // 3 consecutive frames to confirm voice
         this.VAD_SILENCE_FRAMES = 20; // 20 frames of silence to end speech
-        this.MIN_SPEECH_DURATION = 6400; // 400ms minimum (in samples)
+        this.MIN_SPEECH_DURATION = 500; // 400ms minimum (in samples)
         this.MAX_SPEECH_DURATION = 320000; // 20 seconds maximum
         
         // Energy history for adaptive thresholds
@@ -54,6 +54,9 @@ class StreamingProcessor {
         this.onSpeechReady = null;
         this.onVoiceStateChange = null;
         this.onConversationUpdate = null;
+
+        this.lastApiCall = 0; // Initialize to 0 to allow first API call
+
     }
 
     /**
@@ -61,9 +64,9 @@ class StreamingProcessor {
      */
     processAudioChunk(base64Chunk) {
         try {
-            console.log(`[PROCESSOR] Received chunk: ${base64Chunk.length} chars`);
+            //console.log(`[PROCESSOR] Received chunk: ${base64Chunk.length} chars`);
             const pcmData = this.base64ToFloat32Array(base64Chunk);
-            console.log(`[PROCESSOR] Converted to PCM: ${pcmData.length} samples`);
+            //console.log(`[PROCESSOR] Converted to PCM: ${pcmData.length} samples`);
             
             if (pcmData.length === 0) {
                 console.warn(`[PROCESSOR] Empty PCM data from base64 chunk`);
@@ -238,7 +241,7 @@ class StreamingProcessor {
             
             // Send speech to API if we have enough audio
             if (this.speechBuffer.count >= this.MIN_SPEECH_DURATION) {
-                const timeSinceLastSend = Date.now() - this.lastApiCall;
+                const timeSinceLastSend = this.lastApiCall === 0 ? 1000 : Date.now() - this.lastApiCall;
                 if (timeSinceLastSend > 500) { // Prevent duplicate sends within 500ms
                     await this.sendSpeechToAPI(true); // Mark as final
                 } else {
