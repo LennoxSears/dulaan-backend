@@ -734,84 +734,7 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
             }
         }
 
-        
-        // Test LLM processing only (bypass speech recognition)
-        async function testLLMOnly() {
-            setButtonsEnabled(false);
-            
-            log(`\n🤖 Testing LLM Processing Only...`);
-            log(`This bypasses speech recognition and tests the motor control logic directly.`);
-            
-            const testCases = [
-                { transcript: 'turn it up', language: 'English', expected: 'increase' },
-                { transcript: 'más fuerte', language: 'Spanish', expected: 'increase' },
-                { transcript: '加强', language: 'Chinese', expected: 'increase' }
-            ];
-            
-            for (const testCase of testCases) {
-                try {
-                    log(`\n🧪 Testing "${testCase.transcript}" (${testCase.language})`);
-                    
-                    const testRequest = {
-                        msgHis: [],
-                        testMode: true, // Enable test mode
-                        testTranscript: testCase.transcript, // Provide transcript directly
-                        currentPwm: 100,
-                        encoding: 'LINEAR16',
-                        sampleRateHertz: 16000,
-                        languageCode: testCase.language === 'English' ? 'en-US' : 
-                                     testCase.language === 'Spanish' ? 'es-ES' : 'zh-CN'
-                    };
-                    
-                    log(`📡 Sending test request with transcript: "${testCase.transcript}"`);
-                    
-                    const response = await fetch(API_URL, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(testRequest)
-                    });
-                    
-                    log(`📊 Response Status: ${response.status} ${response.statusText}`);
-                    
-                    if (response.ok) {
-                        const result = await response.json();
-                        log(`✅ LLM test successful!`, 'success');
-                        log(`🎤 Transcript: "${result.transcription}"`);
-                        log(`🤖 Response: "${result.response}"`);
-                        log(`⚡ PWM: ${result.previousPwm} → ${result.newPwmValue}`);
-                        log(`🎯 Intent detected: ${result.intentDetected}`);
-                        log(`📈 Confidence: ${(result.confidence * 100).toFixed(1)}%`);
-                        
-                        // Validate results
-                        const pwmIncreased = result.newPwmValue > result.previousPwm;
-                        const intentDetected = result.intentDetected;
-                        const hasResponse = result.response && result.response.length > 0;
-                        
-                        log(`📋 Validation:`);
-                        log(`   - Intent detected: ${intentDetected ? '✅' : '❌'}`);
-                        log(`   - PWM increased: ${pwmIncreased ? '✅' : '❌'}`);
-                        log(`   - Has response: ${hasResponse ? '✅' : '❌'}`);
-                        log(`   - Overall: ${(intentDetected && pwmIncreased && hasResponse) ? '✅ SUCCESS' : '❌ FAILED'}`, 
-                            (intentDetected && pwmIncreased && hasResponse) ? 'success' : 'error');
-                        
-                    } else {
-                        const errorText = await response.text();
-                        log(`❌ LLM test failed: ${errorText}`, 'error');
-                    }
-                    
-                } catch (error) {
-                    log(`❌ LLM test error: ${error.message}`, 'error');
-                }
-                
-                // Small delay between tests
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-            
-            log(`\n🏁 LLM-only testing completed!`, 'success');
-            setButtonsEnabled(true);
-        }
+
         
         // Generate test audio data - using white noise with speech-like characteristics
         function generateTestAudio(duration, language) {
@@ -915,6 +838,84 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
                 languageCode: 'zh-CN'
             }
         ];
+        
+        // Test LLM processing only (bypass speech recognition)
+        async function testLLMOnly() {
+            setButtonsEnabled(false);
+            
+            log(`\n🤖 Testing LLM Processing Only...`);
+            log(`This bypasses speech recognition and tests the motor control logic directly.`);
+            
+            const testCases = [
+                { transcript: 'turn it up', language: 'English', expected: 'increase' },
+                { transcript: 'más fuerte', language: 'Spanish', expected: 'increase' },
+                { transcript: '加强', language: 'Chinese', expected: 'increase' }
+            ];
+            
+            for (const testCase of testCases) {
+                try {
+                    log(`\n🧪 Testing "${testCase.transcript}" (${testCase.language})`);
+                    
+                    const testRequest = {
+                        msgHis: [],
+                        testMode: true, // Enable test mode
+                        testTranscript: testCase.transcript, // Provide transcript directly
+                        currentPwm: 100,
+                        encoding: 'LINEAR16',
+                        sampleRateHertz: 16000,
+                        languageCode: testCase.language === 'English' ? 'en-US' : 
+                                     testCase.language === 'Spanish' ? 'es-ES' : 'zh-CN'
+                    };
+                    
+                    log(`📡 Sending test request with transcript: "${testCase.transcript}"`);
+                    
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(testRequest)
+                    });
+                    
+                    log(`📊 Response Status: ${response.status} ${response.statusText}`);
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        log(`✅ LLM test successful!`, 'success');
+                        log(`🎤 Transcript: "${result.transcription}"`);
+                        log(`🤖 Response: "${result.response}"`);
+                        log(`⚡ PWM: ${result.previousPwm} → ${result.newPwmValue}`);
+                        log(`🎯 Intent detected: ${result.intentDetected}`);
+                        log(`📈 Confidence: ${(result.confidence * 100).toFixed(1)}%`);
+                        
+                        // Validate results
+                        const pwmIncreased = result.newPwmValue > result.previousPwm;
+                        const intentDetected = result.intentDetected;
+                        const hasResponse = result.response && result.response.length > 0;
+                        
+                        log(`📋 Validation:`);
+                        log(`   - Intent detected: ${intentDetected ? '✅' : '❌'}`);
+                        log(`   - PWM increased: ${pwmIncreased ? '✅' : '❌'}`);
+                        log(`   - Has response: ${hasResponse ? '✅' : '❌'}`);
+                        log(`   - Overall: ${(intentDetected && pwmIncreased && hasResponse) ? '✅ SUCCESS' : '❌ FAILED'}`, 
+                            (intentDetected && pwmIncreased && hasResponse) ? 'success' : 'error');
+                        
+                    } else {
+                        const errorText = await response.text();
+                        log(`❌ LLM test failed: ${errorText}`, 'error');
+                    }
+                    
+                } catch (error) {
+                    log(`❌ LLM test error: ${error.message}`, 'error');
+                }
+                
+                // Small delay between tests
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            log(`\n🏁 LLM-only testing completed!`, 'success');
+            setButtonsEnabled(true);
+        }
         
         // Real API call
         async function callRealApi(audioBuffer, currentPwm, msgHis, languageCode, testCase) {
@@ -1021,84 +1022,7 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
             }
         }
 
-        
-        // Test LLM processing only (bypass speech recognition)
-        async function testLLMOnly() {
-            setButtonsEnabled(false);
-            
-            log(`\n🤖 Testing LLM Processing Only...`);
-            log(`This bypasses speech recognition and tests the motor control logic directly.`);
-            
-            const testCases = [
-                { transcript: 'turn it up', language: 'English', expected: 'increase' },
-                { transcript: 'más fuerte', language: 'Spanish', expected: 'increase' },
-                { transcript: '加强', language: 'Chinese', expected: 'increase' }
-            ];
-            
-            for (const testCase of testCases) {
-                try {
-                    log(`\n🧪 Testing "${testCase.transcript}" (${testCase.language})`);
-                    
-                    const testRequest = {
-                        msgHis: [],
-                        testMode: true, // Enable test mode
-                        testTranscript: testCase.transcript, // Provide transcript directly
-                        currentPwm: 100,
-                        encoding: 'LINEAR16',
-                        sampleRateHertz: 16000,
-                        languageCode: testCase.language === 'English' ? 'en-US' : 
-                                     testCase.language === 'Spanish' ? 'es-ES' : 'zh-CN'
-                    };
-                    
-                    log(`📡 Sending test request with transcript: "${testCase.transcript}"`);
-                    
-                    const response = await fetch(API_URL, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(testRequest)
-                    });
-                    
-                    log(`📊 Response Status: ${response.status} ${response.statusText}`);
-                    
-                    if (response.ok) {
-                        const result = await response.json();
-                        log(`✅ LLM test successful!`, 'success');
-                        log(`🎤 Transcript: "${result.transcription}"`);
-                        log(`🤖 Response: "${result.response}"`);
-                        log(`⚡ PWM: ${result.previousPwm} → ${result.newPwmValue}`);
-                        log(`🎯 Intent detected: ${result.intentDetected}`);
-                        log(`📈 Confidence: ${(result.confidence * 100).toFixed(1)}%`);
-                        
-                        // Validate results
-                        const pwmIncreased = result.newPwmValue > result.previousPwm;
-                        const intentDetected = result.intentDetected;
-                        const hasResponse = result.response && result.response.length > 0;
-                        
-                        log(`📋 Validation:`);
-                        log(`   - Intent detected: ${intentDetected ? '✅' : '❌'}`);
-                        log(`   - PWM increased: ${pwmIncreased ? '✅' : '❌'}`);
-                        log(`   - Has response: ${hasResponse ? '✅' : '❌'}`);
-                        log(`   - Overall: ${(intentDetected && pwmIncreased && hasResponse) ? '✅ SUCCESS' : '❌ FAILED'}`, 
-                            (intentDetected && pwmIncreased && hasResponse) ? 'success' : 'error');
-                        
-                    } else {
-                        const errorText = await response.text();
-                        log(`❌ LLM test failed: ${errorText}`, 'error');
-                    }
-                    
-                } catch (error) {
-                    log(`❌ LLM test error: ${error.message}`, 'error');
-                }
-                
-                // Small delay between tests
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-            
-            log(`\n🏁 LLM-only testing completed!`, 'success');
-            setButtonsEnabled(true);
-        }
+
         
         // Run all tests
         async function runRealApiTests() {
