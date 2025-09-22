@@ -491,7 +491,7 @@ exports.speechToTextWithLLM = onRequest(
                     enableAutomaticPunctuation: true,
                     enableWordTimeOffsets: false,
                     enableWordConfidence: true,
-                    model: 'chirp',        // BEST: Google's latest universal speech model (90-95% accuracy)
+                    model: 'latest_short', // Reliable model for short audio (rollback from chirp due to 500 error)
                     useEnhanced: true,     // Use enhanced model for better accuracy
                     profanityFilter: false,
                     maxAlternatives: 1,
@@ -519,11 +519,12 @@ exports.speechToTextWithLLM = onRequest(
                     speechConfig.languageCode = 'en-US'; // Primary language
                     speechConfig.alternativeLanguageCodes = ['es-ES']; // Spanish only
                     
-                    logger.log('Using CHIRP model with streamlined language detection', {
+                    logger.log('Using latest_short model with streamlined language detection', {
                         primaryLanguage: speechConfig.languageCode,
                         alternativeLanguages: speechConfig.alternativeLanguageCodes,
-                        model: 'chirp',
-                        optimization: 'English + Spanish only for maximum performance'
+                        model: 'latest_short',
+                        optimization: 'English + Spanish only for maximum performance',
+                        note: 'Rollback from CHIRP due to 500 error'
                     });
                 }
 
@@ -533,14 +534,15 @@ exports.speechToTextWithLLM = onRequest(
                 };
 
                 // Log audio info for debugging
-                logger.log('Processing audio with CHIRP model', {
+                logger.log('Processing audio with latest_short model', {
                     encoding: speechConfig.encoding,
                     sampleRateHertz: speechConfig.sampleRateHertz,
                     audioBufferLength: int16Data.length,
                     audioBufferBytes: int16Data.buffer.byteLength,
                     model: speechConfig.model,
                     interactionType: speechConfig.metadata.interactionType,
-                    expectedAccuracy: '90-95%'
+                    expectedAccuracy: '80-85%',
+                    note: 'Rollback from CHIRP due to 500 error'
                 });
 
                 // Perform speech recognition
@@ -555,13 +557,13 @@ exports.speechToTextWithLLM = onRequest(
                         confidence = bestAlternative.confidence || 0;
                         detectedLanguage = bestResult.languageCode || null;
                         
-                        // CHIRP model has better confidence scores, use lower threshold
-                        if (confidence < 0.2 && transcript.trim().length > 0) {
+                        // Filter out low-confidence results (back to 0.3 for latest_short)
+                        if (confidence < 0.3 && transcript.trim().length > 0) {
                             logger.log('Low confidence transcription filtered out', { 
                                 transcript, 
                                 confidence,
-                                threshold: 0.2,
-                                model: 'chirp'
+                                threshold: 0.3,
+                                model: 'latest_short'
                             });
                             transcript = '';
                         }
