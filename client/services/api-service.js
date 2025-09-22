@@ -54,13 +54,7 @@ class ApiService {
         }
     }
 
-    /**
-     * Legacy method name for backward compatibility
-     * @deprecated Use processAudioToPWM instead
-     */
-    async speechToTextWithLLM(audioBuffer, currentPwm, msgHis = [], options = {}) {
-        return this.processAudioToPWM(audioBuffer, currentPwm, msgHis, options);
-    }
+
 
     /**
      * Store user data

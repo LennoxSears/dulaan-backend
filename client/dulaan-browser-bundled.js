@@ -1264,13 +1264,7 @@ class ApiService {
         }
     }
 
-    /**
-     * Legacy method name for backward compatibility
-     * @deprecated Use processAudioToPWM instead
-     */
-    async speechToTextWithLLM(audioBuffer, currentPwm, msgHis = [], options = {}) {
-        return this.processAudioToPWM(audioBuffer, currentPwm, msgHis, options);
-    }
+
 
     /**
      * Store user data
@@ -2084,7 +2078,7 @@ class AIVoiceControl {
             });
             
             // speechData is now an Int16Array (as regular array) instead of base64 string
-            const result = await this.sdk.api.speechToTextWithLLM(
+            const result = await this.sdk.api.processAudioToPWM(
                 speechData, // Int16Array buffer
                 this.sdk.motor.getCurrentPwm(),
                 this.messageHistory
