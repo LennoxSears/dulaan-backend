@@ -186,7 +186,7 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
         </div>
     </div>
 
-    <script type="module">
+    <script>
         const API_URL = 'https://directaudiotopwm-qveg3gkwxa-ew.a.run.app';
         
         // Ring Buffer implementation for efficient audio buffering
@@ -1157,6 +1157,15 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
             
             statsDiv.style.display = 'block';
         }
+        
+        // Make functions globally accessible
+        window.startOptimizedVoiceControl = startOptimizedVoiceControl;
+        window.stopOptimizedVoiceControl = stopOptimizedVoiceControl;
+        window.testApiConnectivity = testApiConnectivity;
+        window.testLLMOnly = testLLMOnly;
+        window.testSingleLanguage = testSingleLanguage;
+        window.runRealApiTests = runRealApiTests;
+        window.clearOutput = clearOutput;
         
         // Initialize
         log('🧪 Real API Test Runner Initialized', 'success');
