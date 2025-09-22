@@ -1217,6 +1217,7 @@ class ApiService {
     constructor(config = {}) {
         this.baseUrls = {
             speechToTextWithLLM: 'https://speechtotextwithllm-qveg3gkwxa-ew.a.run.app',
+            directAudioToPWM: 'https://directaudiotopwm-qveg3gkwxa-ew.a.run.app',
             storeUserData: 'https://storeuserdata-qveg3gkwxa-ew.a.run.app',
             ...config.endpoints
         };
@@ -1238,13 +1239,47 @@ class ApiService {
     }
 
     /**
-     * Process speech with LLM for motor control
+     * Process speech with direct audio-to-PWM (recommended - faster and more accurate)
      * @param {Array} audioBuffer - Int16Array as regular array for JSON transmission
      * @param {number} currentPwm - Current PWM value
      * @param {Array} msgHis - Message history
      * @param {Object} options - Additional options
      */
     async speechToTextWithLLM(audioBuffer, currentPwm, msgHis = [], options = {}) {
+        try {
+            // Use direct audio processing by default for better performance
+            const response = await fetch(this.baseUrls.directAudioToPWM, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    msgHis: msgHis,
+                    audioData: audioBuffer, // Direct audio format
+                    currentPwm: currentPwm
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Direct audio-to-PWM API error: ${response.status}`);
+            }
+
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            console.error('Direct audio-to-PWM error:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Legacy speech processing via STT + LLM (fallback method)
+     * @param {Array} audioBuffer - Int16Array as regular array for JSON transmission
+     * @param {number} currentPwm - Current PWM value
+     * @param {Array} msgHis - Message history
+     * @param {Object} options - Additional options
+     */
+    async speechToTextWithLLMLegacy(audioBuffer, currentPwm, msgHis = [], options = {}) {
         try {
             const requestOptions = { ...this.defaultOptions, ...options };
             
