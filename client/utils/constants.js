@@ -48,7 +48,6 @@ export const PWM_CONFIG = {
 // API Configuration
 export const API_CONFIG = {
     ENDPOINTS: {
-        SPEECH_TO_TEXT_LLM: 'https://speechtotextwithllm-qveg3gkwxa-ew.a.run.app',
         DIRECT_AUDIO_TO_PWM: 'https://directaudiotopwm-qveg3gkwxa-ew.a.run.app',
         STORE_USER_DATA: 'https://storeuserdata-qveg3gkwxa-ew.a.run.app',
         STORE_USER_CONSENT: 'https://storeuserconsent-qveg3gkwxa-ew.a.run.app',

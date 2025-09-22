@@ -103,7 +103,7 @@ export class AIVoiceControl {
             });
             
             // speechData is now an Int16Array (as regular array) instead of base64 string
-            const result = await this.sdk.api.speechToTextWithLLM(
+            const result = await this.sdk.api.processAudioToPWM(
                 speechData, // Int16Array buffer
                 this.sdk.motor.getCurrentPwm(),
                 this.messageHistory
