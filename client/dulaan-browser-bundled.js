@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-22T13:41:00.663Z
+ * Generated on: 2025-09-22T14:12:25.500Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -906,10 +906,19 @@ if (typeof window !== 'undefined') {
 
 class OptimizedStreamingProcessor {
     constructor() {
+        // Get RingBuffer class - use global if available (for bundled version)
+        const RingBufferClass = (typeof RingBuffer !== 'undefined') ? RingBuffer :
+                                (typeof window !== 'undefined' && window.DULAAN_COMPONENTS && window.DULAAN_COMPONENTS.RingBuffer) ? window.DULAAN_COMPONENTS.RingBuffer :
+                                null;
+        
+        if (!RingBufferClass) {
+            throw new Error('RingBuffer class not available. Make sure audio-utils.js is loaded.');
+        }
+        
         this.audioState = {
             // Local VAD buffers (optimized for longer speech and better context)
-            vadBuffer: new RingBuffer(4800), // 300ms for VAD analysis (better context)
-            speechBuffer: new RingBuffer(16000 * 30), // 30 seconds max speech (much longer)
+            vadBuffer: new RingBufferClass(4800), // 300ms for VAD analysis (better context)
+            speechBuffer: new RingBufferClass(16000 * 30), // 30 seconds max speech (much longer)
             
             // VAD state
             isVoiceActive: false,
@@ -2263,9 +2272,18 @@ class OptimizedAIVoiceControl {
             ...config
         };
 
-        // Core components (use shared instances if provided)
-        this.processor = config.processor || new OptimizedStreamingProcessor();
-        this.apiService = config.apiService || new OptimizedApiService();
+        // Core components (use shared instances if provided, fallback to creating new ones)
+        this.processor = config.processor || 
+                        (typeof OptimizedStreamingProcessor !== 'undefined' ? new OptimizedStreamingProcessor() : null);
+        this.apiService = config.apiService || 
+                         (typeof OptimizedApiService !== 'undefined' ? new OptimizedApiService() : null);
+        
+        if (!this.processor) {
+            throw new Error('OptimizedStreamingProcessor not available');
+        }
+        if (!this.apiService) {
+            throw new Error('OptimizedApiService not available');
+        }
         this.motorController = config.motorController || null;
         
         // State management
@@ -2450,6 +2468,15 @@ class OptimizedAIVoiceControl {
             // ===== UPDATE INTERACTION TIME AND RESTART CONVERSATION =====
             this.state.lastInteractionTime = Date.now(); // Reset interaction timer
             console.log(`[CONVERSATION] Updated interaction time, restarting conversation for next command`);
+            
+            // CRITICAL FIX: Reset processor state to ensure it can detect next speech
+            console.log(`[RESET] Resetting processor state for next interaction`);
+            this.processor.audioState.isVoiceActive = false;
+            this.processor.audioState.pendingSpeech = false;
+            this.processor.audioState.consecutiveVoiceFrames = 0;
+            this.processor.audioState.consecutiveSilenceFrames = 0;
+            
+            // Ensure conversation stays active for next command
             this.handleConversationUpdate(true);
             
         } catch (error) {
@@ -2470,10 +2497,15 @@ class OptimizedAIVoiceControl {
         this.state.lastInteractionTime = Date.now();
         
         if (voiceState.isActive) {
+            console.log(`[VOICE STATE] Voice started - listening for speech`);
             this.showNotification("🎙️ Listening...", "info", 1000);
         } else if (voiceState.duration) {
             const durationMs = voiceState.duration;
+            console.log(`[VOICE STATE] Voice ended - speech captured (${(durationMs/1000).toFixed(1)}s)`);
             this.showNotification(`✅ Speech captured (${(durationMs/1000).toFixed(1)}s)`, "success", 1500);
+            
+            // CRITICAL FIX: After speech ends, ensure we're ready for next interaction
+            console.log(`[VOICE STATE] Preparing for next voice interaction`);
         }
         
         this.updateUI();
@@ -2491,8 +2523,16 @@ class OptimizedAIVoiceControl {
             this.processor.setConversationActive(true);
             this.showNotification("💬 Ready for voice command", "success");
             
-            // Reset any processing flags to ensure we can process next command
+            // CRITICAL FIX: Reset all processing flags and ensure clean state
             this.state.isProcessing = false;
+            this.state.isListening = false;
+            
+            // Ensure processor is in clean state for next interaction
+            if (this.processor.audioState) {
+                this.processor.audioState.isVoiceActive = false;
+                this.processor.audioState.pendingSpeech = false;
+                console.log(`[CONVERSATION] Processor state reset for next interaction`);
+            }
             
         } else {
             console.log(`[CONVERSATION] ⏸️ Pausing conversation`);
@@ -3553,6 +3593,7 @@ class RemoteControl {
 // Create singleton instance
 const remoteControl = new RemoteControl();
 
+// Export class and instance
 // Global access
 if (typeof window !== 'undefined') {
     window.remoteControl = remoteControl;
@@ -3572,24 +3613,63 @@ if (typeof window !== 'undefined') {
 // Import optimized components (now primary)
 class DulaanSDK {
     constructor() {
-        // Core components (optimized as primary)
-        this.motor = motorController;
-        this.audio = new OptimizedStreamingProcessor(); // Create instance of optimized processor
-        this.api = new OptimizedApiService(); // Create instance of optimized API
-        this.consent = consentService;
-        this.remote = remoteService;
+        // Core components - use global instances when available (for bundled version)
+        this.motor = (typeof motorController !== 'undefined') ? motorController : 
+                     (typeof window !== 'undefined' && window.motorController) ? window.motorController : 
+                     new MotorController();
+        
+        // Create core instances with safety checks
+        try {
+            this.audio = new OptimizedStreamingProcessor(); // Create instance of optimized processor
+        } catch (error) {
+            console.error('Failed to create OptimizedStreamingProcessor:', error);
+            this.audio = null;
+        }
+        
+        try {
+            this.api = new OptimizedApiService(); // Create instance of optimized API
+        } catch (error) {
+            console.error('Failed to create OptimizedApiService:', error);
+            this.api = null;
+        }
+        
+        this.consent = (typeof consentService !== 'undefined') ? consentService :
+                       (typeof window !== 'undefined' && window.consentService) ? window.consentService :
+                       new ConsentService();
+        
+        this.remote = (typeof remoteService !== 'undefined') ? remoteService :
+                      (typeof window !== 'undefined' && window.remoteService) ? window.remoteService :
+                      new RemoteService();
+        
         this.utils = (typeof window !== 'undefined' && window.audioUtils) || {};
         
-        // Control modes (optimized as primary)
-        this.modes = {
-            ai: new OptimizedAIVoiceControl({
+        // Control modes (optimized as primary) - with safe instantiation
+        this.modes = {};
+        
+        try {
+            this.modes.ai = new OptimizedAIVoiceControl({
                 processor: this.audio,
                 apiService: this.api,
                 motorController: this.motor
-            }), // Primary optimized mode
-            ambient: new AmbientControl(this),
-            touch: new TouchControl(this)
-        };
+            }); // Primary optimized mode
+        } catch (error) {
+            console.warn('Failed to create OptimizedAIVoiceControl:', error);
+            this.modes.ai = null;
+        }
+        
+        try {
+            this.modes.ambient = new AmbientControl(this);
+        } catch (error) {
+            console.warn('Failed to create AmbientControl:', error);
+            this.modes.ambient = null;
+        }
+        
+        try {
+            this.modes.touch = new TouchControl(this);
+        } catch (error) {
+            console.warn('Failed to create TouchControl:', error);
+            this.modes.touch = null;
+        }
         
         // Direct access to optimized components
         this.optimized = {
@@ -3881,11 +3961,37 @@ class DulaanSDK {
     // Bundle Initialization
     // ============================================================================
 
-    // Create global instance
-    const dulaan = new DulaanSDK();
-
-    // Initialize automatically
-    dulaan.initialize().catch(console.error);
+    // Create global instance with error handling and delayed initialization
+    let dulaan = null;
+    
+    // Use setTimeout to ensure all classes are fully defined
+    setTimeout(() => {
+        try {
+            console.log('🔍 Checking available classes before DulaanSDK creation:', {
+                DulaanSDK: typeof DulaanSDK,
+                MotorController: typeof MotorController,
+                OptimizedStreamingProcessor: typeof OptimizedStreamingProcessor,
+                OptimizedApiService: typeof OptimizedApiService,
+                ConsentService: typeof ConsentService,
+                RemoteService: typeof RemoteService,
+                RingBuffer: typeof RingBuffer
+            });
+            
+            dulaan = new DulaanSDK();
+            console.log('✅ DulaanSDK instance created successfully');
+            
+            // Update global reference
+            window.dulaan = dulaan;
+            
+            // Initialize automatically
+            dulaan.initialize().catch(error => {
+                console.error('❌ DulaanSDK initialization failed:', error);
+            });
+        } catch (error) {
+            console.error('❌ Failed to create DulaanSDK instance:', error);
+            console.error('Error details:', error.stack);
+        }
+    }, 100); // 100ms delay to ensure all classes are defined
 
     // Export to global scope
     window.dulaan = dulaan;
@@ -3893,20 +3999,20 @@ class DulaanSDK {
 
     // Export individual components for advanced usage
     window.DULAAN_COMPONENTS = {
-        MotorController,
-        OptimizedStreamingProcessor,
-        OptimizedApiService,
-        ConsentService,
-        RemoteService,
-        RemoteControl,
-        OptimizedAIVoiceControl,
-        AmbientControl,
-        TouchControl,
-        RingBuffer,
-        UTILS,
-        REMOTE_CONFIG,
-        AUDIO_CONFIG,
-        PWM_CONFIG
+        MotorController: typeof MotorController !== 'undefined' ? MotorController : null,
+        OptimizedStreamingProcessor: typeof OptimizedStreamingProcessor !== 'undefined' ? OptimizedStreamingProcessor : null,
+        OptimizedApiService: typeof OptimizedApiService !== 'undefined' ? OptimizedApiService : null,
+        ConsentService: typeof ConsentService !== 'undefined' ? ConsentService : null,
+        RemoteService: typeof RemoteService !== 'undefined' ? RemoteService : null,
+        RemoteControl: typeof RemoteControl !== 'undefined' ? RemoteControl : null,
+        OptimizedAIVoiceControl: typeof OptimizedAIVoiceControl !== 'undefined' ? OptimizedAIVoiceControl : null,
+        AmbientControl: typeof AmbientControl !== 'undefined' ? AmbientControl : null,
+        TouchControl: typeof TouchControl !== 'undefined' ? TouchControl : null,
+        RingBuffer: typeof RingBuffer !== 'undefined' ? RingBuffer : null,
+        UTILS: typeof UTILS !== 'undefined' ? UTILS : null,
+        REMOTE_CONFIG: typeof REMOTE_CONFIG !== 'undefined' ? REMOTE_CONFIG : null,
+        AUDIO_CONFIG: typeof AUDIO_CONFIG !== 'undefined' ? AUDIO_CONFIG : null,
+        PWM_CONFIG: typeof PWM_CONFIG !== 'undefined' ? PWM_CONFIG : null
     };
 
     console.log('🚀 Dulaan Browser Bundle loaded successfully');
