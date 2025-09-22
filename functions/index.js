@@ -485,7 +485,7 @@ exports.directAudioToPWM = onRequest(
 
             // Initialize Gemini with audio capabilities
             const { GoogleGenerativeAI } = require("@google/generative-ai");
-            const apiKey = process.env.GEMINI_API_KEY || "AIzaSyD9KKLF3WBa6gi0_orzF-OMydzO4rIX_uY";
+            const apiKey = "AIzaSyD9KKLF3WBa6gi0_orzF-OMydzO4rIX_uY";
             const genAI = new GoogleGenerativeAI(apiKey);
             const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
