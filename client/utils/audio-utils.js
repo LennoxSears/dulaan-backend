@@ -3,6 +3,93 @@
  */
 
 /**
+ * Efficient Ring Buffer for audio data
+ * Optimized for real-time audio processing with minimal memory allocation
+ */
+export class RingBuffer {
+    constructor(capacity) {
+        this.capacity = capacity;
+        this.buffer = new Float32Array(capacity);
+        this.writeIndex = 0;
+        this.count = 0;
+    }
+
+    /**
+     * Add data to the buffer (single value or array)
+     */
+    push(data) {
+        if (Array.isArray(data) || data instanceof Float32Array || data instanceof Int16Array) {
+            for (let i = 0; i < data.length; i++) {
+                this.pushSingle(data[i]);
+            }
+        } else {
+            this.pushSingle(data);
+        }
+    }
+
+    /**
+     * Add single value to buffer
+     */
+    pushSingle(value) {
+        this.buffer[this.writeIndex] = value;
+        this.writeIndex = (this.writeIndex + 1) % this.capacity;
+        this.count = Math.min(this.count + 1, this.capacity);
+    }
+
+    /**
+     * Read last N samples from buffer
+     */
+    readLast(samples) {
+        const numSamples = Math.min(samples, this.count);
+        const result = new Float32Array(numSamples);
+        let readIndex = (this.writeIndex - numSamples + this.capacity) % this.capacity;
+        
+        for (let i = 0; i < numSamples; i++) {
+            result[i] = this.buffer[readIndex];
+            readIndex = (readIndex + 1) % this.capacity;
+        }
+        
+        return result;
+    }
+
+    /**
+     * Read all data from buffer
+     */
+    readAll() {
+        return this.readLast(this.count);
+    }
+
+    /**
+     * Reset buffer to empty state
+     */
+    reset() {
+        this.writeIndex = 0;
+        this.count = 0;
+    }
+
+    /**
+     * Check if buffer is full
+     */
+    isFull() {
+        return this.count === this.capacity;
+    }
+
+    /**
+     * Check if buffer is empty
+     */
+    isEmpty() {
+        return this.count === 0;
+    }
+
+    /**
+     * Get current fill percentage
+     */
+    getFillPercentage() {
+        return (this.count / this.capacity) * 100;
+    }
+}
+
+/**
  * Convert base64 to Float32Array with error handling
  */
 export function base64ToFloat32Array(base64) {
@@ -170,6 +257,7 @@ export const AudioFormat = {
 // Global access
 if (typeof window !== 'undefined') {
     window.audioUtils = {
+        RingBuffer,
         base64ToFloat32Array,
         float32ArrayToBase64,
         calculateRMS,

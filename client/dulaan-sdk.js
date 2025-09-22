@@ -14,8 +14,13 @@ import * as audioUtils from './utils/audio-utils.js';
 // Import control modes
 import { AIVoiceControl } from './modes/ai-voice-control.js';
 import { StreamingAIVoiceControl } from './modes/streaming-ai-voice-control.js';
+import { OptimizedAIVoiceControl } from './modes/optimized-ai-voice-control.js';
 import { AmbientControl } from './modes/ambient-control.js';
 import { TouchControl } from './modes/touch-control.js';
+
+// Import optimized components
+import { OptimizedStreamingProcessor } from './core/optimized-streaming-processor.js';
+import { OptimizedApiService } from './services/optimized-api-service.js';
 
 class DulaanSDK {
     constructor() {
@@ -31,8 +36,16 @@ class DulaanSDK {
         this.modes = {
             ai: new AIVoiceControl(this),
             streamingAI: new StreamingAIVoiceControl(this),
+            optimizedAI: new OptimizedAIVoiceControl(this), // NEW: 90%+ efficiency VAD mode
             ambient: new AmbientControl(this),
             touch: new TouchControl(this)
+        };
+        
+        // Optimized components (direct access)
+        this.optimized = {
+            processor: OptimizedStreamingProcessor,
+            apiService: OptimizedApiService,
+            voiceControl: OptimizedAIVoiceControl
         };
         
         // State

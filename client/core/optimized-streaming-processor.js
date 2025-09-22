@@ -8,9 +8,9 @@ import { RingBuffer } from '../utils/audio-utils.js';
 class OptimizedStreamingProcessor {
     constructor() {
         this.audioState = {
-            // Local VAD buffers
-            vadBuffer: new RingBuffer(1600), // 100ms for VAD analysis
-            speechBuffer: new RingBuffer(16000 * 10), // 10 seconds max speech
+            // Local VAD buffers (optimized for longer speech and better context)
+            vadBuffer: new RingBuffer(4800), // 300ms for VAD analysis (better context)
+            speechBuffer: new RingBuffer(16000 * 30), // 30 seconds max speech (much longer)
             
             // VAD state
             isVoiceActive: false,
@@ -19,16 +19,16 @@ class OptimizedStreamingProcessor {
             consecutiveVoiceFrames: 0,
             consecutiveSilenceFrames: 0,
             
-            // Optimized VAD thresholds
-            VAD_ENERGY_THRESHOLD: 0.015,
-            VAD_ZCR_THRESHOLD: 0.12,
-            VAD_VOICE_FRAMES: 2, // Faster voice detection
-            VAD_SILENCE_FRAMES: 15, // Longer silence confirmation
+            // Optimized VAD thresholds for best accuracy
+            VAD_ENERGY_THRESHOLD: 0.008, // Balanced threshold - not too sensitive to noise
+            VAD_ZCR_THRESHOLD: 0.08, // Balanced ZCR threshold
+            VAD_VOICE_FRAMES: 3, // 3 consecutive frames to confirm voice (reduce false positives)
+            VAD_SILENCE_FRAMES: 20, // 20 frames of silence to end speech (1.25 seconds)
             
             // Smart buffering
-            MIN_SPEECH_DURATION: 8000, // 500ms minimum
-            MAX_SPEECH_DURATION: 80000, // 5 seconds maximum
-            SPEECH_TIMEOUT: 1500, // 1.5 seconds of silence ends speech
+            MIN_SPEECH_DURATION: 6400, // 400ms minimum (in samples) - shorter for quick commands
+            MAX_SPEECH_DURATION: 320000, // 20 seconds maximum (much longer for complex speech)
+            SPEECH_TIMEOUT: 1250, // 1.25 seconds of silence ends speech
             
             // Efficiency tracking
             lastRMS: 0,
@@ -71,11 +71,22 @@ class OptimizedStreamingProcessor {
         const zcr = zeroCrossings / audioData.length;
         this.audioState.lastZeroCrossings = zcr;
 
-        // Voice activity decision
-        const hasEnergy = rms > this.audioState.VAD_ENERGY_THRESHOLD;
-        const hasVoiceCharacteristics = zcr < this.audioState.VAD_ZCR_THRESHOLD;
+        // Advanced VAD decision with adaptive thresholds
+        const energyActive = rms > this.audioState.VAD_ENERGY_THRESHOLD;
+        const zcrActive = zcr > this.audioState.VAD_ZCR_THRESHOLD && zcr < 0.5; // ZCR too high = noise
         
-        return hasEnergy && hasVoiceCharacteristics;
+        // Adaptive threshold based on recent energy history
+        if (!this.energyHistory) this.energyHistory = [];
+        this.energyHistory.push(rms);
+        if (this.energyHistory.length > 100) this.energyHistory.shift();
+        
+        const avgEnergy = this.energyHistory.reduce((a, b) => a + b, 0) / this.energyHistory.length;
+        const adaptiveThreshold = Math.max(this.audioState.VAD_ENERGY_THRESHOLD, avgEnergy * 2);
+        
+        // Combined decision: energy must be active, ZCR should be reasonable
+        const voiceDetected = energyActive && (zcrActive || rms > adaptiveThreshold * 1.5);
+        
+        return voiceDetected;
     }
 
     /**
@@ -152,12 +163,12 @@ class OptimizedStreamingProcessor {
         // Smart buffering: Include pre-speech context for natural start
         this.audioState.speechBuffer.reset();
         
-        // Add recent VAD buffer content as pre-speech context (last 200ms)
-        const preSpeechSamples = Math.min(3200, this.audioState.vadBuffer.count); // 200ms at 16kHz
+        // Add recent VAD buffer content as pre-speech context (last 300ms for better quality)
+        const preSpeechSamples = Math.min(4800, this.audioState.vadBuffer.count); // 300ms at 16kHz
         if (preSpeechSamples > 0) {
             const preSpeechData = this.audioState.vadBuffer.readLast(preSpeechSamples);
             this.audioState.speechBuffer.push(preSpeechData);
-            console.log(`[Voice Start] Added ${preSpeechSamples} pre-speech samples for context`);
+            console.log(`[Voice Start] Added ${preSpeechSamples} pre-speech samples (${(preSpeechSamples/16000*1000).toFixed(0)}ms) for context`);
         }
         
         this.audioState.pendingSpeech = true;
@@ -186,12 +197,12 @@ class OptimizedStreamingProcessor {
             this.audioState.voiceEndTime = Date.now();
             const speechDuration = this.audioState.voiceEndTime - this.audioState.voiceStartTime;
             
-            // Add recent VAD buffer as post-speech context
-            const postSpeechSamples = Math.min(1600, this.audioState.vadBuffer.count); // 100ms
+            // Add recent VAD buffer as post-speech context (200ms for natural ending)
+            const postSpeechSamples = Math.min(3200, this.audioState.vadBuffer.count); // 200ms
             if (postSpeechSamples > 0) {
                 const postSpeechData = this.audioState.vadBuffer.readLast(postSpeechSamples);
                 this.audioState.speechBuffer.push(postSpeechData);
-                console.log(`[Voice End] Added ${postSpeechSamples} post-speech samples for natural ending`);
+                console.log(`[Voice End] Added ${postSpeechSamples} post-speech samples (${(postSpeechSamples/16000*1000).toFixed(0)}ms) for natural ending`);
             }
             
             console.log(`[Voice End] Speech duration: ${speechDuration}ms, Buffer: ${this.audioState.speechBuffer.count} samples`);

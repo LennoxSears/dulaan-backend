@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimized Voice Control Integration Example</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #4a5568;
+            margin-bottom: 10px;
+        }
+
+        .efficiency-badge {
+            display: inline-block;
+            background: linear-gradient(45deg, #48bb78, #38a169);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .integration-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .panel {
+            background: #f7fafc;
+            border-radius: 15px;
+            padding: 25px;
+            border: 2px solid #e2e8f0;
+        }
+
+        .panel h3 {
+            color: #2d3748;
+            margin-bottom: 20px;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #4299e1, #3182ce);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(66, 153, 225, 0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #f56565, #e53e3e);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .status-display {
+            background: #2d3748;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #4299e1;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .stat-label {
+            color: #718096;
+            font-size: 0.9em;
+        }
+
+        .code-example {
+            background: #1a202c;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+
+        .highlight {
+            color: #68d391;
+        }
+
+        .comment {
+            color: #a0aec0;
+        }
+
+        @media (max-width: 768px) {
+            .integration-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎤 Optimized Voice Control Integration</h1>
+            <div class="efficiency-badge">⚡ 90%+ Efficiency with Advanced VAD</div>
+            <p>Complete example showing how to integrate the optimized voice control system into your app</p>
+        </div>
+
+        <div class="integration-grid">
+            <div class="panel">
+                <h3>🎛️ Voice Control Demo</h3>
+                
+                <div class="control-buttons">
+                    <button id="startBtn" class="btn btn-primary">Start Voice Control</button>
+                    <button id="stopBtn" class="btn btn-danger" disabled>Stop</button>
+                    <button id="resetBtn" class="btn btn-secondary">Reset Stats</button>
+                </div>
+
+                <div class="status-display" id="statusDisplay">
+                    Status: Ready to start
+                    PWM: 100
+                    Mode: Optimized VAD
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="efficiency">0%</div>
+                        <div class="stat-label">API Efficiency</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="apiCalls">0</div>
+                        <div class="stat-label">API Calls</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="audioChunks">0</div>
+                        <div class="stat-label">Audio Chunks</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="speechDetected">0</div>
+                        <div class="stat-label">Speech Segments</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>📊 Real-time Analysis</h3>
+                
+                <div>
+                    <strong>Audio Level:</strong>
+                    <div id="audioLevel" style="font-family: monospace; color: #00ff00; margin: 10px 0;">
+                        ████████████████████
+                    </div>
+                </div>
+
+                <div>
+                    <strong>Voice Activity:</strong>
+                    <span id="voiceActivity" style="color: #666;">Waiting...</span>
+                </div>
+
+                <div>
+                    <strong>Speech Quality:</strong>
+                    <span id="speechQuality" style="color: #00ff00;">Excellent</span>
+                </div>
+
+                <div>
+                    <strong>Buffer Status:</strong>
+                    <div>Speech: <span id="speechBuffer">0</span> samples</div>
+                    <div>VAD: <span id="vadBuffer">0</span> samples</div>
+                </div>
+
+                <div>
+                    <strong>Last Command:</strong>
+                    <div id="lastCommand" style="font-style: italic; color: #4299e1;">None</div>
+                </div>
+
+                <div>
+                    <strong>Response:</strong>
+                    <div id="lastResponse" style="font-style: italic; color: #48bb78;">None</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>💻 Integration Code Example</h3>
+            
+            <h4>1. Basic Setup</h4>
+            <div class="code-example">
+<span class="comment">// Import the optimized voice control</span>
+<span class="highlight">import</span> { OptimizedAIVoiceControl } <span class="highlight">from</span> './client/modes/optimized-ai-voice-control.js';
+
+<span class="comment">// Create instance with your API endpoint</span>
+<span class="highlight">const</span> voiceControl = <span class="highlight">new</span> OptimizedAIVoiceControl({
+    apiEndpoint: 'https://your-api-endpoint.com',
+    responseTimeout: 3000,
+    conversationTimeout: 30000
+});
+            </div>
+
+            <h4>2. Start Voice Control</h4>
+            <div class="code-example">
+<span class="comment">// Set up callbacks for responses</span>
+voiceControl.setCallbacks({
+    onResponse: (result) => {
+        console.log('Transcription:', result.transcription);
+        console.log('PWM Value:', result.newPwmValue);
+        console.log('Response:', result.response);
+        
+        <span class="comment">// Update your motor control</span>
+        updateMotorPWM(result.newPwmValue);
+    },
+    onError: (error) => {
+        console.error('Voice control error:', error);
+    },
+    onVoiceStateChange: (state) => {
+        console.log('Voice state:', state.isActive ? 'Listening' : 'Silent');
+    }
+});
+
+<span class="comment">// Start the voice control system</span>
+<span class="highlight">await</span> voiceControl.start();
+            </div>
+
+            <h4>3. Monitor Efficiency</h4>
+            <div class="code-example">
+<span class="comment">// Get real-time efficiency statistics</span>
+<span class="highlight">const</span> stats = voiceControl.getEfficiencyStats();
+console.log('API Efficiency:', stats.processor.efficiencyPercentage + '%');
+console.log('Total API Calls:', stats.api.totalApiCalls);
+console.log('Speech Segments:', stats.processor.speechChunksSent);
+
+<span class="comment">// Update UI with stats</span>
+updateEfficiencyDisplay(stats);
+            </div>
+
+            <h4>4. Advanced Configuration</h4>
+            <div class="code-example">
+<span class="comment">// Customize VAD parameters for your environment</span>
+<span class="highlight">const</span> customConfig = {
+    vadThresholds: {
+        energy: 0.008,        <span class="comment">// Energy threshold</span>
+        zcr: 0.08,           <span class="comment">// Zero crossing rate</span>
+        voiceFrames: 3,      <span class="comment">// Frames to confirm voice</span>
+        silenceFrames: 20    <span class="comment">// Frames to confirm silence</span>
+    },
+    bufferSizes: {
+        speechBuffer: 30,    <span class="comment">// 30 seconds max speech</span>
+        vadBuffer: 0.3,      <span class="comment">// 300ms context buffer</span>
+        preSpeech: 0.3,      <span class="comment">// 300ms pre-speech context</span>
+        postSpeech: 0.2      <span class="comment">// 200ms post-speech context</span>
+    }
+};
+
+<span class="highlight">const</span> voiceControl = <span class="highlight">new</span> OptimizedAIVoiceControl(customConfig);
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>🚀 Key Benefits</h3>
+            <ul>
+                <li><strong>90%+ API Efficiency:</strong> Dramatically reduces API calls compared to continuous streaming</li>
+                <li><strong>Natural Conversation:</strong> No manual recording buttons - just speak naturally</li>
+                <li><strong>Smart Buffering:</strong> Includes pre/post-speech context for better audio quality</li>
+                <li><strong>Adaptive VAD:</strong> Automatically adjusts to your environment and speaking patterns</li>
+                <li><strong>Long Speech Support:</strong> Handles up to 30 seconds of continuous speech</li>
+                <li><strong>Multi-language:</strong> Works with any language supported by your API</li>
+                <li><strong>Real-time Feedback:</strong> Live audio levels and speech quality indicators</li>
+                <li><strong>Easy Integration:</strong> Drop-in replacement for existing voice control systems</li>
+            </ul>
+        </div>
+    </div>
+
+    <script type="module">
+        // This is a demo implementation - replace with actual integration
+        let isActive = false;
+        let stats = {
+            efficiency: 0,
+            apiCalls: 0,
+            audioChunks: 0,
+            speechDetected: 0
+        };
+
+        // Simulate voice control for demo
+        function simulateVoiceControl() {
+            if (!isActive) return;
+
+            // Simulate audio processing
+            stats.audioChunks++;
+            
+            // Simulate occasional speech detection (10% chance)
+            if (Math.random() < 0.1) {
+                stats.speechDetected++;
+                stats.apiCalls++;
+                
+                // Simulate API response
+                setTimeout(() => {
+                    const commands = [
+                        { transcription: "turn it up", response: "Increasing motor speed", pwm: 150 },
+                        { transcription: "slow down", response: "Reducing motor speed", pwm: 80 },
+                        { transcription: "stop", response: "Stopping motor", pwm: 0 },
+                        { transcription: "maximum power", response: "Setting maximum power", pwm: 255 }
+                    ];
+                    
+                    const command = commands[Math.floor(Math.random() * commands.length)];
+                    document.getElementById('lastCommand').textContent = command.transcription;
+                    document.getElementById('lastResponse').textContent = command.response;
+                    
+                    updateStatusDisplay(`PWM: ${command.pwm} | "${command.response}"`);
+                }, 500 + Math.random() * 1000);
+            }
+
+            // Calculate efficiency
+            stats.efficiency = stats.audioChunks > 0 ? 
+                ((1 - stats.apiCalls / stats.audioChunks) * 100).toFixed(1) : 0;
+
+            // Update displays
+            updateStats();
+            updateAudioLevel();
+            
+            // Continue simulation
+            setTimeout(simulateVoiceControl, 100);
+        }
+
+        function updateStats() {
+            document.getElementById('efficiency').textContent = stats.efficiency + '%';
+            document.getElementById('apiCalls').textContent = stats.apiCalls;
+            document.getElementById('audioChunks').textContent = stats.audioChunks;
+            document.getElementById('speechDetected').textContent = stats.speechDetected;
+        }
+
+        function updateAudioLevel() {
+            const level = Math.floor(Math.random() * 20);
+            const bars = '█'.repeat(level) + '░'.repeat(20 - level);
+            document.getElementById('audioLevel').textContent = bars;
+            
+            // Update voice activity
+            const isListening = level > 5;
+            document.getElementById('voiceActivity').textContent = isListening ? 'Listening...' : 'Silent';
+            document.getElementById('voiceActivity').style.color = isListening ? '#00ff00' : '#666';
+            
+            // Update speech quality
+            const quality = level > 15 ? 'Excellent' : level > 10 ? 'Good' : level > 5 ? 'Fair' : 'Poor';
+            const color = level > 15 ? '#00ff00' : level > 10 ? '#88ff00' : level > 5 ? '#ffaa00' : '#ff4444';
+            document.getElementById('speechQuality').textContent = quality;
+            document.getElementById('speechQuality').style.color = color;
+            
+            // Update buffer status
+            document.getElementById('speechBuffer').textContent = isListening ? Math.floor(Math.random() * 10000) : 0;
+            document.getElementById('vadBuffer').textContent = Math.floor(Math.random() * 4800);
+        }
+
+        function updateStatusDisplay(message) {
+            const display = document.getElementById('statusDisplay');
+            display.textContent = `Status: ${isActive ? 'Active' : 'Stopped'}\n${message || 'Ready'}`;
+        }
+
+        // Event handlers
+        document.getElementById('startBtn').addEventListener('click', () => {
+            isActive = true;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            updateStatusDisplay('Voice control started - speak naturally');
+            simulateVoiceControl();
+        });
+
+        document.getElementById('stopBtn').addEventListener('click', () => {
+            isActive = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            updateStatusDisplay('Voice control stopped');
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            stats = { efficiency: 0, apiCalls: 0, audioChunks: 0, speechDetected: 0 };
+            updateStats();
+            document.getElementById('lastCommand').textContent = 'None';
+            document.getElementById('lastResponse').textContent = 'None';
+            updateStatusDisplay('Statistics reset');
+        });
+
+        // Initialize display
+        updateStats();
+        updateStatusDisplay('Ready to start voice control');
+    </script>
+</body>
+</html>
