@@ -156,6 +156,7 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
                     <div>RMS Energy: <span id="rms-energy">0.000</span> | ZCR: <span id="zcr-rate">0.000</span></div>
                     <div>Speech Buffer: <span id="speech-buffer-size">0</span> samples | VAD Buffer: <span id="vad-buffer-size">0</span> samples</div>
                     <div>Audio Level: <span id="audio-level" style="color: #00ff00;">████████████████████</span></div>
+                    <div>Speech Quality: <span id="speech-quality" style="color: #00ff00;">Excellent</span> | Voice Frames: <span id="voice-frames">0</span></div>
                 </div>
             </div>
         </div>
@@ -266,9 +267,9 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
                 this.isProcessing = false;
                 this.currentPwm = 100;
                 
-                // Ring buffers for efficient memory usage
-                this.vadBuffer = new RingBuffer(1600); // 100ms for VAD analysis
-                this.speechBuffer = new RingBuffer(16000 * 10); // 10 seconds max speech
+                // Ring buffers for efficient memory usage (increased for longer speech)
+                this.vadBuffer = new RingBuffer(4800); // 300ms for VAD analysis (better context)
+                this.speechBuffer = new RingBuffer(16000 * 30); // 30 seconds max speech (much longer)
                 
                 // VAD state
                 this.consecutiveVoiceFrames = 0;
@@ -287,13 +288,13 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
                 this.mediaStream = null;
                 this.processor = null;
                 
-                // Optimized thresholds (more sensitive for testing)
-                this.VAD_ENERGY_THRESHOLD = 0.005; // Lower threshold for easier detection
-                this.VAD_ZCR_THRESHOLD = 0.05; // Lower threshold for easier detection
-                this.VAD_VOICE_FRAMES = 2; // Faster voice detection
-                this.VAD_SILENCE_FRAMES = 10; // Shorter silence for faster response
-                this.MIN_SPEECH_DURATION = 8000; // 500ms minimum (in samples)
-                this.MAX_SPEECH_DURATION = 80000; // 5 seconds maximum
+                // Optimized thresholds for best accuracy
+                this.VAD_ENERGY_THRESHOLD = 0.008; // Balanced threshold - not too sensitive to noise
+                this.VAD_ZCR_THRESHOLD = 0.08; // Balanced ZCR threshold
+                this.VAD_VOICE_FRAMES = 3; // 3 consecutive frames to confirm voice (reduce false positives)
+                this.VAD_SILENCE_FRAMES = 20; // 20 frames of silence to end speech (1.25 seconds)
+                this.MIN_SPEECH_DURATION = 6400; // 400ms minimum (in samples) - shorter for quick commands
+                this.MAX_SPEECH_DURATION = 320000; // 20 seconds maximum (much longer for complex speech)
             }
 
             async start() {
@@ -431,17 +432,28 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
                 const zcr = this.calculateZeroCrossingRate(audioData);
                 this.lastZeroCrossings = zcr;
                 
-                // Combined VAD decision
+                // Advanced VAD decision with adaptive thresholds
                 const energyActive = rms > this.VAD_ENERGY_THRESHOLD;
-                const zcrActive = zcr > this.VAD_ZCR_THRESHOLD;
+                const zcrActive = zcr > this.VAD_ZCR_THRESHOLD && zcr < 0.5; // ZCR too high = noise
+                
+                // Adaptive threshold based on recent energy history
+                if (!this.energyHistory) this.energyHistory = [];
+                this.energyHistory.push(rms);
+                if (this.energyHistory.length > 100) this.energyHistory.shift();
+                
+                const avgEnergy = this.energyHistory.reduce((a, b) => a + b, 0) / this.energyHistory.length;
+                const adaptiveThreshold = Math.max(this.VAD_ENERGY_THRESHOLD, avgEnergy * 2);
+                const adaptiveEnergyActive = rms > adaptiveThreshold;
+                
+                // Combined decision: energy must be active, ZCR should be reasonable
+                const voiceDetected = energyActive && (zcrActive || rms > adaptiveThreshold * 1.5);
                 
                 // Debug logging (every 50 chunks to avoid spam)
                 if (this.totalChunks % 50 === 0) {
-                    console.log(`[VAD Debug] RMS: ${rms.toFixed(4)} (>${this.VAD_ENERGY_THRESHOLD}=${energyActive}) | ZCR: ${zcr.toFixed(4)} (>${this.VAD_ZCR_THRESHOLD}=${zcrActive})`);
+                    console.log(`[VAD] RMS: ${rms.toFixed(4)} (>${this.VAD_ENERGY_THRESHOLD}=${energyActive}, adaptive>${adaptiveThreshold.toFixed(4)}=${adaptiveEnergyActive}) | ZCR: ${zcr.toFixed(4)} (${this.VAD_ZCR_THRESHOLD}-0.5=${zcrActive}) | Voice: ${voiceDetected}`);
                 }
                 
-                // Voice is active if energy indicates speech (simplified for testing)
-                return energyActive; // Simplified: only use energy threshold for now
+                return voiceDetected;
             }
 
             calculateRMS(audioData) {
@@ -465,20 +477,21 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
             checkSpeechBufferLimits() {
                 const speechDuration = Date.now() - this.voiceStartTime;
                 const bufferSize = this.speechBuffer.count;
+                const maxDurationMs = this.MAX_SPEECH_DURATION / 16000 * 1000;
                 
-                // Send if max duration reached or buffer is full
-                if (speechDuration >= (this.MAX_SPEECH_DURATION / 16000 * 1000) || 
-                    bufferSize >= this.speechBuffer.capacity * 0.9) {
+                // Send if max duration reached or buffer is 85% full (leave room for post-speech)
+                if (speechDuration >= maxDurationMs || bufferSize >= this.speechBuffer.capacity * 0.85) {
                     
-                    log("📦 Buffer limit reached - sending speech chunk", 'warning');
+                    log(`📦 Buffer limit reached - sending speech chunk (${(speechDuration/1000).toFixed(1)}s / ${(maxDurationMs/1000).toFixed(1)}s max, ${bufferSize} samples)`, 'warning');
                     this.processSpeech(false); // Not final
                     
-                    // Keep some overlap for continuity
-                    const overlapSize = Math.min(3200, bufferSize * 0.1); // 200ms overlap
+                    // Keep larger overlap for continuity with longer speech
+                    const overlapSize = Math.min(8000, bufferSize * 0.15); // 500ms overlap or 15% of buffer
                     const overlapData = this.speechBuffer.readLast(overlapSize);
                     this.speechBuffer.reset();
                     if (overlapData.length > 0) {
                         this.speechBuffer.push(overlapData);
+                        log(`🔄 Kept ${overlapSize} samples (${(overlapSize/16000*1000).toFixed(0)}ms) for continuity`, 'info');
                     }
                 }
             }
@@ -493,12 +506,12 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
                 // Smart buffering: Include pre-speech context for natural start
                 this.speechBuffer.reset();
                 
-                // Add recent VAD buffer content as pre-speech context (last 200ms)
-                const preSpeechSamples = Math.min(3200, this.vadBuffer.count); // 200ms at 16kHz
+                // Add recent VAD buffer content as pre-speech context (last 300ms for better quality)
+                const preSpeechSamples = Math.min(4800, this.vadBuffer.count); // 300ms at 16kHz
                 if (preSpeechSamples > 0) {
                     const preSpeechData = this.vadBuffer.readLast(preSpeechSamples);
                     this.speechBuffer.push(preSpeechData);
-                    log(`🎙️ Voice start - added ${preSpeechSamples} pre-speech samples`, 'info');
+                    log(`🎙️ Voice start - added ${preSpeechSamples} pre-speech samples (${(preSpeechSamples/16000*1000).toFixed(0)}ms)`, 'info');
                 }
                 
                 this.updateVADStatus('Listening...', true, false);
@@ -514,12 +527,12 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
                     this.isListening = false;
                     const speechDuration = Date.now() - this.voiceStartTime;
                     
-                    // Add recent VAD buffer as post-speech context
-                    const postSpeechSamples = Math.min(1600, this.vadBuffer.count); // 100ms
+                    // Add recent VAD buffer as post-speech context (200ms for natural ending)
+                    const postSpeechSamples = Math.min(3200, this.vadBuffer.count); // 200ms
                     if (postSpeechSamples > 0) {
                         const postSpeechData = this.vadBuffer.readLast(postSpeechSamples);
                         this.speechBuffer.push(postSpeechData);
-                        log(`🔇 Voice end - added ${postSpeechSamples} post-speech samples`, 'info');
+                        log(`🔇 Voice end - added ${postSpeechSamples} post-speech samples (${(postSpeechSamples/16000*1000).toFixed(0)}ms)`, 'info');
                     }
                     
                     log(`🔇 Speech duration: ${speechDuration}ms, Buffer: ${this.speechBuffer.count} samples`);
@@ -663,13 +676,46 @@ Ready to test real API...\n\nClick "Test Real API" to start testing with direct 
                 document.getElementById('speech-buffer-size').textContent = this.speechBuffer.count;
                 document.getElementById('vad-buffer-size').textContent = this.vadBuffer.count;
                 
-                // Update audio level meter
+                // Update speech quality indicator
+                const qualityElement = document.getElementById('speech-quality');
+                const voiceFramesElement = document.getElementById('voice-frames');
+                if (qualityElement && voiceFramesElement) {
+                    voiceFramesElement.textContent = this.consecutiveVoiceFrames;
+                    
+                    if (this.lastRMS > 0.02) {
+                        qualityElement.textContent = 'Excellent';
+                        qualityElement.style.color = '#00ff00';
+                    } else if (this.lastRMS > 0.01) {
+                        qualityElement.textContent = 'Good';
+                        qualityElement.style.color = '#88ff00';
+                    } else if (this.lastRMS > 0.005) {
+                        qualityElement.textContent = 'Fair';
+                        qualityElement.style.color = '#ffaa00';
+                    } else {
+                        qualityElement.textContent = 'Poor';
+                        qualityElement.style.color = '#ff4444';
+                    }
+                }
+                
+                // Update audio level meter with better scaling
                 const levelMeter = document.getElementById('audio-level');
                 if (levelMeter) {
-                    const level = Math.min(20, Math.floor(this.lastRMS * 1000)); // Scale to 0-20
+                    // Logarithmic scaling for better visual representation
+                    const dbLevel = 20 * Math.log10(Math.max(0.001, this.lastRMS)); // Convert to dB
+                    const normalizedLevel = Math.max(0, Math.min(20, (dbLevel + 60) / 3)); // Scale -60dB to 0dB -> 0 to 20
+                    const level = Math.floor(normalizedLevel);
+                    
                     const bars = '█'.repeat(level) + '░'.repeat(20 - level);
                     levelMeter.textContent = bars;
-                    levelMeter.style.color = level > 5 ? '#00ff00' : '#666';
+                    
+                    // Color coding: red=low, yellow=medium, green=good
+                    if (level < 3) {
+                        levelMeter.style.color = '#ff4444'; // Red - too quiet
+                    } else if (level < 8) {
+                        levelMeter.style.color = '#ffaa00'; // Orange - moderate
+                    } else {
+                        levelMeter.style.color = '#00ff00'; // Green - good level
+                    }
                 }
                 
                 // Color coding for efficiency
