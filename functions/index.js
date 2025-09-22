@@ -405,7 +405,7 @@ exports.directAudioToPWM = onRequest(
         cors: {
             origin: true,
             methods: ["POST", "OPTIONS"],
-            allowedHeaders: ["Content-Type", "Authorization"]
+            allowedHeaders: ["Content-Type", "Authorization", "X-Processing-Mode", "X-Speech-Duration", "X-Priority"]
         },
         maxInstances: 10,
         timeoutSeconds: 60,
@@ -417,7 +417,7 @@ exports.directAudioToPWM = onRequest(
             if (req.method === 'OPTIONS') {
                 res.set('Access-Control-Allow-Origin', '*');
                 res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-                res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+                res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Processing-Mode, X-Speech-Duration, X-Priority');
                 res.status(204).send('');
                 return;
             }
@@ -425,7 +425,7 @@ exports.directAudioToPWM = onRequest(
             // Set CORS headers for actual request
             res.set('Access-Control-Allow-Origin', '*');
             res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-            res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+            res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Processing-Mode, X-Speech-Duration, X-Priority');
 
             logger.log('Direct Audio-to-PWM request received', {
                 method: req.method,
