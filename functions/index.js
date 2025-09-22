@@ -556,6 +556,7 @@ Examples:
 - "turn it on" → {"intentDetected": true, "transcription": "turn it on", "pwm": 150, "response": "Turning the motor on"}
 - "make it stronger" → {"intentDetected": true, "transcription": "make it stronger", "pwm": ${currentPwm} + 50, "response": "Increasing motor intensity"}
 - "what's the weather" → {"intentDetected": false, "transcription": "what's the weather", "pwm": ${currentPwm}, "response": "I'm a motor control assistant. I can help you control the motor device."}`;
+            }
 
             // Send audio directly to Gemini
             const result = await model.generateContent([
