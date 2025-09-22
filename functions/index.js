@@ -588,14 +588,8 @@ Examples:
                     region: 'europe-west1'
                 });
                 
-                return res.status(200).json({
-                    success: false,
-                    error: 'Failed to parse AI response',
-                    transcription: 'Audio processed but response format invalid',
-                    newPwmValue: currentPwm,
-                    msgHis: msgHis,
-                    details: parseError.message
-                });
+                // Don't return here - throw error to be caught by outer catch block
+                throw new Error(`Failed to parse AI response: ${parseError.message}`);
             }
 
             // Validate and process response
