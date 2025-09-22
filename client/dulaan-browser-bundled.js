@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-22T12:47:26.783Z
+ * Generated on: 2025-09-22T13:15:05.733Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -2419,12 +2419,8 @@ class OptimizedAIVoiceControl {
                 // Update motor with new PWM value
                 this.updateMotorPWM(response.newPwmValue);
                 
-                // Update conversation history
-                this.apiService.updateConversationHistory(
-                    response.transcription || "Voice command",
-                    response.response || "Motor updated",
-                    response.newPwmValue
-                );
+                // Update conversation state (handled automatically by API service)
+                // The updateConversationState method is called internally by the API service
                 
                 console.log(`[Response] PWM: ${response.newPwmValue}, Processing: ${processingTime}ms`);
             }

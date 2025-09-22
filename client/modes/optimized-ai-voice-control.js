@@ -189,12 +189,8 @@ class OptimizedAIVoiceControl {
                 // Update motor with new PWM value
                 this.updateMotorPWM(response.newPwmValue);
                 
-                // Update conversation history
-                this.apiService.updateConversationHistory(
-                    response.transcription || "Voice command",
-                    response.response || "Motor updated",
-                    response.newPwmValue
-                );
+                // Update conversation state (handled automatically by API service)
+                // The updateConversationState method is called internally by the API service
                 
                 console.log(`[Response] PWM: ${response.newPwmValue}, Processing: ${processingTime}ms`);
             }
