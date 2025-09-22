@@ -287,24 +287,29 @@ const processChunk = (base64Chunk) => {
     // 更新状态
     window.AUDIO_STATE.lastChunkSize = pcmChunk.length;
     const isSilent = detectSilence(pcmChunk, window.AUDIO_STATE.SILENCE_THRESHOLD, window.AUDIO_STATE.ZERO_CROSSING);
-    // 语音活动检测
+    // 语音活动检测 with buffer reset on speech start
     if (!isSilent) {
         window.AUDIO_STATE.silenceCounter = 0;
-        console.log(
-            `变了=====================================`,
-            `能量: ${window.AUDIO_STATE.lastRMS.toFixed(4)}`,
-            `过零: ${window.AUDIO_STATE.lastZeroCrossings}`
-        );
+        if (!window.AUDIO_STATE.isSpeaking) {
+            console.log(
+                `变了=====================================`,
+                `能量: ${window.AUDIO_STATE.lastRMS.toFixed(4)}`,
+                `过零: ${window.AUDIO_STATE.lastZeroCrossings}`
+            );
+            // Reset buffer when speech starts to capture complete speech from beginning
+            window.AUDIO_STATE.ringBuffer.reset();
+            console.log('[缓冲区重置] 开始新语音的完整捕获');
+        }
         window.AUDIO_STATE.isSpeaking = true;
     } else if (window.AUDIO_STATE.isSpeaking) {
         window.AUDIO_STATE.silenceCounter++;
     }
 
-    // 写入环形缓冲区 (original logic - only package on silence, not overflow)
+    // 写入环形缓冲区 - buffer reset now happens on speech start, not overflow
     const written = window.AUDIO_STATE.ringBuffer.push(pcmChunk);
     if (written < pcmChunk.length) {
-        console.warn("[警告] 缓冲区溢出，丢弃", pcmChunk.length - written, "采样点");
-        window.AUDIO_STATE.ringBuffer.reset();
+        // Buffer overflow during speech - continue without reset to avoid losing current speech
+        console.warn("[警告] 语音期间缓冲区溢出，继续不重置以保留语音数据");
     }
 
     // 静音超时触发分段

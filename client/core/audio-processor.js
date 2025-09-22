@@ -183,7 +183,7 @@ class AudioProcessor {
                 this.audioState.ZERO_CROSSING
             );
 
-            // Speech activity detection (matches stream.js logic)
+            // Speech activity detection with buffer reset on speech start
             if (!isSilent) {
                 this.audioState.silenceCounter = 0;
                 if (!this.audioState.isSpeaking) {
@@ -191,17 +191,20 @@ class AudioProcessor {
                         `[Speech Detected] Energy: ${this.audioState.lastRMS.toFixed(4)}, ` +
                         `Zero crossings: ${this.audioState.lastZeroCrossings}`
                     );
+                    // Reset buffer when speech starts to capture complete speech from beginning
+                    this.audioState.ringBuffer.reset();
+                    console.log("[Buffer Reset] Starting fresh capture for new speech");
                 }
                 this.audioState.isSpeaking = true;
             } else if (this.audioState.isSpeaking) {
                 this.audioState.silenceCounter++;
             }
 
-            // Write to ring buffer (original logic - only package on silence, not overflow)
+            // Write to ring buffer - buffer reset now happens on speech start, not overflow
             const written = this.audioState.ringBuffer.push(pcmData);
             if (written < pcmData.length) {
-                console.warn("Buffer overflow, discarding", pcmData.length - written, "samples");
-                this.audioState.ringBuffer.reset();
+                // Buffer overflow during speech - continue without reset to avoid losing current speech
+                console.warn("Buffer overflow during speech, continuing without reset to preserve speech data");
             }
 
             // Silence timeout triggers speech packaging (matches stream.js)
