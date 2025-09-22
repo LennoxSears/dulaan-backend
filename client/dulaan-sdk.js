@@ -5,43 +5,37 @@
 
 // Import all modules
 import { motorController } from './core/motor-controller.js';
-import { audioProcessor } from './core/audio-processor.js';
-import { apiService } from './services/api-service.js';
 import { consentService } from './services/consent-service.js';
 import { remoteService } from './services/remote-service.js';
 import * as audioUtils from './utils/audio-utils.js';
 
-// Import control modes
-import { AIVoiceControl } from './modes/ai-voice-control.js';
-import { StreamingAIVoiceControl } from './modes/streaming-ai-voice-control.js';
+// Import control modes (optimized as primary)
 import { OptimizedAIVoiceControl } from './modes/optimized-ai-voice-control.js';
 import { AmbientControl } from './modes/ambient-control.js';
 import { TouchControl } from './modes/touch-control.js';
 
-// Import optimized components
+// Import optimized components (now primary)
 import { OptimizedStreamingProcessor } from './core/optimized-streaming-processor.js';
 import { OptimizedApiService } from './services/optimized-api-service.js';
 
 class DulaanSDK {
     constructor() {
-        // Core components
+        // Core components (optimized as primary)
         this.motor = motorController;
-        this.audio = audioProcessor;
-        this.api = apiService;
+        this.audio = OptimizedStreamingProcessor; // Use optimized processor as primary
+        this.api = OptimizedApiService; // Use optimized API as primary
         this.consent = consentService;
         this.remote = remoteService;
         this.utils = audioUtils;
         
-        // Control modes
+        // Control modes (optimized as primary)
         this.modes = {
-            ai: new AIVoiceControl(this),
-            streamingAI: new StreamingAIVoiceControl(this),
-            optimizedAI: new OptimizedAIVoiceControl(this), // NEW: 90%+ efficiency VAD mode
+            ai: new OptimizedAIVoiceControl(this), // Primary optimized mode
             ambient: new AmbientControl(this),
             touch: new TouchControl(this)
         };
         
-        // Optimized components (direct access)
+        // Direct access to optimized components
         this.optimized = {
             processor: OptimizedStreamingProcessor,
             apiService: OptimizedApiService,
