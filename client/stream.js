@@ -53,14 +53,14 @@ class RingBuffer {
 
 // ===== 2. 全局状态配置 =====
 window.AUDIO_STATE = {
-    ringBuffer: new RingBuffer(480000 * 2), // 16000Hz * 30秒
+    ringBuffer: new RingBuffer(480000 * 3), // 16000Hz * 45秒 (larger buffer)
     abiBuffer: new RingBuffer(1600),
     isSpeaking: false,
     silenceCounter: 0,
-    SILENCE_THRESHOLD: 0.05,
-    ZERO_CROSSING: 0.1,
-    SILENCE_TIMEOUT: 12,  // 1.2s to prevent splitting commands with natural pauses
-    MIN_SPEECH_DURATION: 3,  // 300ms minimum to filter noise but allow short commands
+    SILENCE_THRESHOLD: 0.03,  // Lower threshold to be less sensitive to quiet parts
+    ZERO_CROSSING: 0.08,     // Lower zero crossing to be less sensitive
+    SILENCE_TIMEOUT: 25,     // 2.5s to ensure complete sentences are captured
+    MIN_SPEECH_DURATION: 5,  // 500ms minimum to ensure we capture full words
     lastChunkSize: 0,
     lastRMS: 0,
     lastZeroCrossings: 0
