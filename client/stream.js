@@ -57,10 +57,10 @@ window.AUDIO_STATE = {
     abiBuffer: new RingBuffer(1600),
     isSpeaking: false,
     silenceCounter: 0,
-    SILENCE_THRESHOLD: 0.01,  // Very low threshold for normal speaking volume
-    ZERO_CROSSING: 0.05,     // Lower zero crossing for better sensitivity
-    SILENCE_TIMEOUT: 30,     // 3s optimal balance for complete sentences
-    MIN_SPEECH_DURATION: 3,  // 300ms minimum (back to reasonable value)
+    SILENCE_THRESHOLD: 0.05,
+    ZERO_CROSSING: 0.1,
+    SILENCE_TIMEOUT: 25,
+    MIN_SPEECH_DURATION: 10,
     lastChunkSize: 0,
     lastRMS: 0,
     lastZeroCrossings: 0
