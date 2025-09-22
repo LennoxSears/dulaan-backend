@@ -305,11 +305,20 @@ const processChunk = (base64Chunk) => {
         window.AUDIO_STATE.silenceCounter++;
     }
 
-    // 写入环形缓冲区 - buffer reset now happens on speech start, not overflow
+    // 写入环形缓冲区 with smart overflow handling
     const written = window.AUDIO_STATE.ringBuffer.push(pcmChunk);
     if (written < pcmChunk.length) {
-        // Buffer overflow during speech - continue without reset to avoid losing current speech
-        console.warn("[警告] 语音期间缓冲区溢出，继续不重置以保留语音数据");
+        // Buffer overflow detected - handle based on speaking state
+        if (window.AUDIO_STATE.isSpeaking) {
+            // Speaking + Buffer Full = Package current speech and reset
+            console.log("[缓冲区溢出] 由于缓冲区满，打包当前语音段");
+            packageSpeechSegment();
+            // packageSpeechSegment() will reset the buffer after packaging
+        } else {
+            // Not Speaking + Buffer Full = Just reset (silence data not valuable)
+            console.log("[缓冲区溢出] 静音期间重置缓冲区");
+            window.AUDIO_STATE.ringBuffer.reset();
+        }
     }
 
     // 静音超时触发分段

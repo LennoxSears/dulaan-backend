@@ -200,11 +200,20 @@ class AudioProcessor {
                 this.audioState.silenceCounter++;
             }
 
-            // Write to ring buffer - buffer reset now happens on speech start, not overflow
+            // Write to ring buffer with smart overflow handling
             const written = this.audioState.ringBuffer.push(pcmData);
             if (written < pcmData.length) {
-                // Buffer overflow during speech - continue without reset to avoid losing current speech
-                console.warn("Buffer overflow during speech, continuing without reset to preserve speech data");
+                // Buffer overflow detected - handle based on speaking state
+                if (this.audioState.isSpeaking) {
+                    // Speaking + Buffer Full = Package current speech and reset
+                    console.log("[Buffer Overflow] Packaging current speech segment due to buffer full");
+                    this.triggerSpeechPackaging();
+                    // triggerSpeechPackaging() will reset the buffer after packaging
+                } else {
+                    // Not Speaking + Buffer Full = Just reset (silence data not valuable)
+                    console.log("[Buffer Overflow] Resetting buffer during silence");
+                    this.audioState.ringBuffer.reset();
+                }
             }
 
             // Silence timeout triggers speech packaging (matches stream.js)
