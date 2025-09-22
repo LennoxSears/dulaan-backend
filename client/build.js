@@ -14,17 +14,17 @@ const FILES_TO_BUNDLE = [
     'utils/constants.js',
     'utils/audio-utils.js',
     
-    // 2. Core components (optimized VAD)
+    // 2. Core components
     'core/motor-controller.js',
-    'core/optimized-streaming-processor.js',
+    'core/streaming-processor.js',
     
-    // 3. Services (optimized API)
-    'services/optimized-api-service.js',
+    // 3. Services
+    'services/api-service.js',
     'services/consent-service.js',
     'services/remote-service.js',
     
-    // 4. Control modes (optimized voice control)
-    'modes/optimized-ai-voice-control.js',
+    // 4. Control modes
+    'modes/ai-voice-control.js',
     'modes/ambient-control.js',
     'modes/touch-control.js',
     
