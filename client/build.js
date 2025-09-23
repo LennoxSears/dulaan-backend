@@ -28,8 +28,7 @@ const FILES_TO_BUNDLE = [
     'modes/ambient-control.js',
     'modes/touch-control.js',
     
-    // 5. High-level modules
-    'remote-control.js',
+
     
     // 6. Main SDK (last)
     'dulaan-sdk.js'
@@ -146,15 +145,12 @@ ${FILES_TO_BUNDLE.map(f => ` * - ${f}`).join('\n')}
         ApiService: typeof ApiService !== 'undefined' ? ApiService : null,
         ConsentService: typeof ConsentService !== 'undefined' ? ConsentService : null,
         RemoteService: typeof RemoteService !== 'undefined' ? RemoteService : null,
-        RemoteControl: typeof RemoteControl !== 'undefined' ? RemoteControl : null,
+
         AIVoiceControl: typeof AIVoiceControl !== 'undefined' ? AIVoiceControl : null,
         AmbientControl: typeof AmbientControl !== 'undefined' ? AmbientControl : null,
         TouchControl: typeof TouchControl !== 'undefined' ? TouchControl : null,
         RingBuffer: typeof RingBuffer !== 'undefined' ? RingBuffer : null,
-        UTILS: typeof UTILS !== 'undefined' ? UTILS : null,
-        REMOTE_CONFIG: typeof REMOTE_CONFIG !== 'undefined' ? REMOTE_CONFIG : null,
-        AUDIO_CONFIG: typeof AUDIO_CONFIG !== 'undefined' ? AUDIO_CONFIG : null,
-        PWM_CONFIG: typeof PWM_CONFIG !== 'undefined' ? PWM_CONFIG : null
+        UTILS: typeof UTILS !== 'undefined' ? UTILS : null
     };
 
     console.log('🚀 Dulaan Browser Bundle loaded successfully');
