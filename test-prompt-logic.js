@@ -5,7 +5,7 @@
 
 // Simulate the updated prompt logic
 function testPromptLogic() {
-    console.log('🧪 Testing Simplified Prompt Logic - Human Commands Only\n');
+    console.log('🧪 Testing Refined Prompt Logic - Human Voice Only with Original Intent Detection\n');
     
     // Test scenarios
     const testCases = [
@@ -50,6 +50,14 @@ function testPromptLogic() {
             currentPwm: 75
         },
         {
+            name: 'Human Indirect Intent: "I want it to go faster"',
+            audioType: 'human_speech',
+            transcription: 'I want it to go faster',
+            expectedIntentDetected: true,
+            expectedPwmChange: true,
+            currentPwm: 100
+        },
+        {
             name: 'Unclear Audio',
             audioType: 'unclear',
             transcription: 'unclear audio',
@@ -89,11 +97,12 @@ function testPromptLogic() {
     });
     
     console.log('\n📊 Summary:');
-    console.log('The simplified prompt should now:');
-    console.log('✅ Only respond to clear human voice commands');
-    console.log('✅ Keep current PWM for any non-human audio');
-    console.log('✅ Maintain PWM for non-motor human commands');
-    console.log('✅ Focus on human motor control intent only');
+    console.log('The refined prompt should now:');
+    console.log('✅ Only respond to human voice (ignore motor sounds, noise)');
+    console.log('✅ Detect motor control intent in natural human speech');
+    console.log('✅ Handle indirect commands like "I want it to go faster"');
+    console.log('✅ Keep current PWM for non-motor human commands');
+    console.log('✅ Maintain original intent detection logic');
 }
 
 function simulateAIResponse(testCase) {
@@ -142,7 +151,10 @@ function isMotorControlCommand(transcription) {
         'turn it off', 'turn off', 'stop', 'power off',
         'make it stronger', 'increase', 'higher', 'more power',
         'make it weaker', 'decrease', 'lower', 'less power',
-        'set to', 'change to', 'adjust'
+        'set to', 'change to', 'adjust',
+        // Add indirect intent phrases
+        'go faster', 'want it to go', 'more intense', 'speed up',
+        'slow down', 'less intense', 'turn down', 'turn up'
     ];
     
     return motorKeywords.some(keyword => 
@@ -159,10 +171,12 @@ function calculateNewPwm(transcription, currentPwm) {
     if (lower.includes('turn it off') || lower.includes('turn off') || lower.includes('stop')) {
         return 0;
     }
-    if (lower.includes('stronger') || lower.includes('increase') || lower.includes('higher')) {
+    if (lower.includes('stronger') || lower.includes('increase') || lower.includes('higher') || 
+        lower.includes('go faster') || lower.includes('more intense') || lower.includes('speed up')) {
         return Math.min(255, currentPwm + 50);
     }
-    if (lower.includes('weaker') || lower.includes('decrease') || lower.includes('lower')) {
+    if (lower.includes('weaker') || lower.includes('decrease') || lower.includes('lower') ||
+        lower.includes('slow down') || lower.includes('less intense')) {
         return Math.max(0, currentPwm - 50);
     }
     
