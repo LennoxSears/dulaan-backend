@@ -153,8 +153,17 @@ class RemoteService {
      */
     sendControlCommand(mode, value, additionalData = {}) {
         if (!this.isRemote || !this.hostId) {
-            console.warn('Not connected as remote user');
+            console.warn('[REMOTE] Not connected as remote user');
             return false;
+        }
+
+        // Validate motor commands
+        if (mode === 'motor') {
+            const pwm = Math.max(0, Math.min(255, Math.round(value)));
+            if (pwm !== value) {
+                console.log(`[REMOTE] Motor PWM value adjusted: ${value} → ${pwm}`);
+                value = pwm;
+            }
         }
 
         const command = {
@@ -166,13 +175,19 @@ class RemoteService {
         };
 
         const conn = this.connections.get(this.hostId);
-        if (conn) {
-            conn.send(command);
-            console.log(`Sent control command: ${mode} = ${value}`);
-            return true;
+        if (conn && conn.open) {
+            try {
+                conn.send(command);
+                console.log(`[REMOTE] ✅ Sent control command: ${mode} = ${value}`);
+                return true;
+            } catch (error) {
+                console.error('[REMOTE] ❌ Failed to send command:', error);
+                return false;
+            }
+        } else {
+            console.warn('[REMOTE] ❌ No active connection to host');
+            return false;
         }
-
-        return false;
     }
 
     /**

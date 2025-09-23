@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-23T07:48:12.634Z
+ * Generated on: 2025-09-23T07:55:24.486Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -386,6 +386,10 @@ class MotorController {
         this.onScanResult = null;
         this.onDisconnect = null;
         
+        // Remote control integration
+        this.remoteService = null;
+        this.remotePwm = 0; // PWM value when acting as remote
+        
         // BLE service and characteristic UUIDs
         this.SERVICE_UUID = "0000FFE0-0000-1000-8000-00805F9B34FB";
         this.CHARACTERISTIC_UUID = "0000FFE1-0000-1000-8000-00805F9B34FB";
@@ -577,8 +581,50 @@ class MotorController {
 
     /**
      * Write PWM value to motor (0-255)
+     * Automatically routes to remote host if connected as remote user
      */
     async write(pwmValue) {
+        // Validate PWM value first
+        const pwm = Math.max(0, Math.min(255, Math.round(pwmValue)));
+        
+        // Check if we're connected as remote to another host
+        if (this.remoteService && this.remoteService.isRemote) {
+            console.log(`[MOTOR WRITE] 🔄 Routing PWM ${pwm} to remote host`);
+            return this.writeToRemoteHost(pwm);
+        }
+        
+        // Normal local BLE write
+        return this.writeToLocalBLE(pwm);
+    }
+
+    /**
+     * Write PWM value to remote host (when acting as remote)
+     */
+    async writeToRemoteHost(pwmValue) {
+        try {
+            const success = this.remoteService.sendControlCommand('motor', pwmValue, {
+                timestamp: Date.now(),
+                source: 'motor_controller'
+            });
+            
+            if (success) {
+                this.remotePwm = pwmValue;
+                console.log(`[MOTOR WRITE] ✅ Remote PWM command sent: ${pwmValue}`);
+                return true;
+            } else {
+                console.warn('[MOTOR WRITE] ❌ Failed to send remote PWM command');
+                return false;
+            }
+        } catch (error) {
+            console.error('[MOTOR WRITE] ❌ Error sending remote PWM command:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Write PWM value to local BLE device
+     */
+    async writeToLocalBLE(pwmValue) {
         //console.log(`[MOTOR WRITE] Attempting to write PWM: ${pwmValue}`);
         //console.log(`[MOTOR WRITE] Connection status: ${this.isConnected}, Device: ${this.deviceAddress}`);
         
@@ -588,19 +634,15 @@ class MotorController {
         }
 
         try {
-            // Validate PWM value
-            const pwm = Math.max(0, Math.min(255, Math.round(pwmValue)));
-            //console.log(`[MOTOR WRITE] Validated PWM: ${pwm} (from ${pwmValue})`);
-            
             // Convert to hex string
-            const hexValue = this.decimalToHexString(pwm);
+            const hexValue = this.decimalToHexString(pwmValue);
             //console.log(`[MOTOR WRITE] Hex value: ${hexValue}`);
             
             // Write to BLE characteristic
             const BleClient = getBleClient();
             if (!BleClient) {
                 console.warn('[MOTOR WRITE] ⚠️ BleClient not available - PWM value stored but not transmitted');
-                this.currentPwm = pwm;
+                this.currentPwm = pwmValue;
                 return true;
             }
             
@@ -612,8 +654,8 @@ class MotorController {
                 hexStringToDataView(hexValue)
             );
             
-            this.currentPwm = pwm;
-            //console.log(`[MOTOR WRITE] ✅ Motor PWM successfully set to: ${pwm}`);
+            this.currentPwm = pwmValue;
+            //console.log(`[MOTOR WRITE] ✅ Motor PWM successfully set to: ${pwmValue}`);
             return true;
         } catch (error) {
             console.error('[MOTOR WRITE] ❌ Failed to write PWM value:', error);
@@ -624,9 +666,12 @@ class MotorController {
 
 
     /**
-     * Get current PWM value
+     * Get current PWM value (local or remote depending on mode)
      */
     getCurrentPwm() {
+        if (this.remoteService && this.remoteService.isRemote) {
+            return this.remotePwm;
+        }
         return this.currentPwm;
     }
 
@@ -699,6 +744,34 @@ class MotorController {
      */
     getTargetDeviceName() {
         return this.TARGET_DEVICE_NAME;
+    }
+
+    /**
+     * Set remote service for remote control integration
+     */
+    setRemoteService(remoteService) {
+        this.remoteService = remoteService;
+        console.log('[MOTOR CONTROLLER] Remote service integration enabled');
+    }
+
+    /**
+     * Get remote control status
+     */
+    getRemoteStatus() {
+        if (!this.remoteService) {
+            return { enabled: false };
+        }
+        
+        return {
+            enabled: true,
+            isRemote: this.remoteService.isRemote,
+            isHost: this.remoteService.isHost,
+            isControlledByRemote: this.remoteService.isControlledByRemote,
+            hostId: this.remoteService.hostId,
+            currentPwm: this.getCurrentPwm(),
+            localPwm: this.currentPwm,
+            remotePwm: this.remotePwm
+        };
     }
 }
 
@@ -1855,8 +1928,17 @@ class RemoteService {
      */
     sendControlCommand(mode, value, additionalData = {}) {
         if (!this.isRemote || !this.hostId) {
-            console.warn('Not connected as remote user');
+            console.warn('[REMOTE] Not connected as remote user');
             return false;
+        }
+
+        // Validate motor commands
+        if (mode === 'motor') {
+            const pwm = Math.max(0, Math.min(255, Math.round(value)));
+            if (pwm !== value) {
+                console.log(`[REMOTE] Motor PWM value adjusted: ${value} → ${pwm}`);
+                value = pwm;
+            }
         }
 
         const command = {
@@ -1868,13 +1950,19 @@ class RemoteService {
         };
 
         const conn = this.connections.get(this.hostId);
-        if (conn) {
-            conn.send(command);
-            console.log(`Sent control command: ${mode} = ${value}`);
-            return true;
+        if (conn && conn.open) {
+            try {
+                conn.send(command);
+                console.log(`[REMOTE] ✅ Sent control command: ${mode} = ${value}`);
+                return true;
+            } catch (error) {
+                console.error('[REMOTE] ❌ Failed to send command:', error);
+                return false;
+            }
+        } else {
+            console.warn('[REMOTE] ❌ No active connection to host');
+            return false;
         }
-
-        return false;
     }
 
     /**
@@ -3037,6 +3125,9 @@ class DulaanSDK {
             // Initialize motor controller
             await this.motor.initialize();
             
+            // Inject remote service into motor controller for remote control integration
+            this.motor.setRemoteService(this.remote);
+            
             // Auto-connect to motor if configured
             if (this.config.motor.autoConnect && this.config.motor.deviceAddress) {
                 await this.motor.connect(this.config.motor.deviceAddress);
@@ -3261,9 +3352,34 @@ class DulaanSDK {
      */
     handleRemoteCommand(data, userId) {
         if (data.type === 'control_command') {
-            if (typeof data.value === 'number' && data.value >= 0 && data.value <= 255) {
-                this.setPower(data.value);
-                console.log(`Remote command from ${userId}: ${data.mode} = ${data.value}`);
+            console.log(`[SDK] Received remote command from ${userId}: ${data.mode} = ${data.value}`);
+            
+            // Handle different command types
+            switch (data.mode) {
+                case 'motor':
+                    // Direct motor PWM command
+                    if (typeof data.value === 'number' && data.value >= 0 && data.value <= 255) {
+                        this.setPower(data.value);
+                        console.log(`[SDK] ✅ Motor PWM set to ${data.value} via remote command`);
+                    } else {
+                        console.warn(`[SDK] ❌ Invalid motor PWM value: ${data.value}`);
+                    }
+                    break;
+                    
+                case 'heartbeat':
+                    // Heartbeat to maintain connection
+                    console.log(`[SDK] 💓 Heartbeat from ${userId}`);
+                    break;
+                    
+                default:
+                    // Legacy support - treat as direct PWM value
+                    if (typeof data.value === 'number' && data.value >= 0 && data.value <= 255) {
+                        this.setPower(data.value);
+                        console.log(`[SDK] ✅ Legacy PWM command: ${data.value}`);
+                    } else {
+                        console.warn(`[SDK] ❌ Unknown command mode: ${data.mode}`);
+                    }
+                    break;
             }
         }
     }
@@ -3294,7 +3410,22 @@ class DulaanSDK {
             currentMode: this.currentMode,
             motorConnected: this.motor.isMotorConnected(),
             remoteStatus: this.remote.getStatus(),
+            motorRemoteStatus: this.motor.getRemoteStatus(),
             consentStatus: this.consent.getConsentSummary()
+        };
+    }
+
+    /**
+     * Get comprehensive remote control status
+     */
+    getRemoteControlStatus() {
+        const remoteStatus = this.remote.getStatus();
+        const motorStatus = this.motor.getRemoteStatus();
+        
+        return {
+            ...remoteStatus,
+            motor: motorStatus,
+            isRemoteControlActive: remoteStatus.isRemote || remoteStatus.isControlledByRemote
         };
     }
 

@@ -39,6 +39,10 @@ class MotorController {
         this.onScanResult = null;
         this.onDisconnect = null;
         
+        // Remote control integration
+        this.remoteService = null;
+        this.remotePwm = 0; // PWM value when acting as remote
+        
         // BLE service and characteristic UUIDs
         this.SERVICE_UUID = "0000FFE0-0000-1000-8000-00805F9B34FB";
         this.CHARACTERISTIC_UUID = "0000FFE1-0000-1000-8000-00805F9B34FB";
@@ -230,8 +234,50 @@ class MotorController {
 
     /**
      * Write PWM value to motor (0-255)
+     * Automatically routes to remote host if connected as remote user
      */
     async write(pwmValue) {
+        // Validate PWM value first
+        const pwm = Math.max(0, Math.min(255, Math.round(pwmValue)));
+        
+        // Check if we're connected as remote to another host
+        if (this.remoteService && this.remoteService.isRemote) {
+            console.log(`[MOTOR WRITE] 🔄 Routing PWM ${pwm} to remote host`);
+            return this.writeToRemoteHost(pwm);
+        }
+        
+        // Normal local BLE write
+        return this.writeToLocalBLE(pwm);
+    }
+
+    /**
+     * Write PWM value to remote host (when acting as remote)
+     */
+    async writeToRemoteHost(pwmValue) {
+        try {
+            const success = this.remoteService.sendControlCommand('motor', pwmValue, {
+                timestamp: Date.now(),
+                source: 'motor_controller'
+            });
+            
+            if (success) {
+                this.remotePwm = pwmValue;
+                console.log(`[MOTOR WRITE] ✅ Remote PWM command sent: ${pwmValue}`);
+                return true;
+            } else {
+                console.warn('[MOTOR WRITE] ❌ Failed to send remote PWM command');
+                return false;
+            }
+        } catch (error) {
+            console.error('[MOTOR WRITE] ❌ Error sending remote PWM command:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Write PWM value to local BLE device
+     */
+    async writeToLocalBLE(pwmValue) {
         //console.log(`[MOTOR WRITE] Attempting to write PWM: ${pwmValue}`);
         //console.log(`[MOTOR WRITE] Connection status: ${this.isConnected}, Device: ${this.deviceAddress}`);
         
@@ -241,19 +287,15 @@ class MotorController {
         }
 
         try {
-            // Validate PWM value
-            const pwm = Math.max(0, Math.min(255, Math.round(pwmValue)));
-            //console.log(`[MOTOR WRITE] Validated PWM: ${pwm} (from ${pwmValue})`);
-            
             // Convert to hex string
-            const hexValue = this.decimalToHexString(pwm);
+            const hexValue = this.decimalToHexString(pwmValue);
             //console.log(`[MOTOR WRITE] Hex value: ${hexValue}`);
             
             // Write to BLE characteristic
             const BleClient = getBleClient();
             if (!BleClient) {
                 console.warn('[MOTOR WRITE] ⚠️ BleClient not available - PWM value stored but not transmitted');
-                this.currentPwm = pwm;
+                this.currentPwm = pwmValue;
                 return true;
             }
             
@@ -265,8 +307,8 @@ class MotorController {
                 hexStringToDataView(hexValue)
             );
             
-            this.currentPwm = pwm;
-            //console.log(`[MOTOR WRITE] ✅ Motor PWM successfully set to: ${pwm}`);
+            this.currentPwm = pwmValue;
+            //console.log(`[MOTOR WRITE] ✅ Motor PWM successfully set to: ${pwmValue}`);
             return true;
         } catch (error) {
             console.error('[MOTOR WRITE] ❌ Failed to write PWM value:', error);
@@ -277,9 +319,12 @@ class MotorController {
 
 
     /**
-     * Get current PWM value
+     * Get current PWM value (local or remote depending on mode)
      */
     getCurrentPwm() {
+        if (this.remoteService && this.remoteService.isRemote) {
+            return this.remotePwm;
+        }
         return this.currentPwm;
     }
 
@@ -352,6 +397,34 @@ class MotorController {
      */
     getTargetDeviceName() {
         return this.TARGET_DEVICE_NAME;
+    }
+
+    /**
+     * Set remote service for remote control integration
+     */
+    setRemoteService(remoteService) {
+        this.remoteService = remoteService;
+        console.log('[MOTOR CONTROLLER] Remote service integration enabled');
+    }
+
+    /**
+     * Get remote control status
+     */
+    getRemoteStatus() {
+        if (!this.remoteService) {
+            return { enabled: false };
+        }
+        
+        return {
+            enabled: true,
+            isRemote: this.remoteService.isRemote,
+            isHost: this.remoteService.isHost,
+            isControlledByRemote: this.remoteService.isControlledByRemote,
+            hostId: this.remoteService.hostId,
+            currentPwm: this.getCurrentPwm(),
+            localPwm: this.currentPwm,
+            remotePwm: this.remotePwm
+        };
     }
 }
 

@@ -111,6 +111,9 @@ class DulaanSDK {
             // Initialize motor controller
             await this.motor.initialize();
             
+            // Inject remote service into motor controller for remote control integration
+            this.motor.setRemoteService(this.remote);
+            
             // Auto-connect to motor if configured
             if (this.config.motor.autoConnect && this.config.motor.deviceAddress) {
                 await this.motor.connect(this.config.motor.deviceAddress);
@@ -335,9 +338,34 @@ class DulaanSDK {
      */
     handleRemoteCommand(data, userId) {
         if (data.type === 'control_command') {
-            if (typeof data.value === 'number' && data.value >= 0 && data.value <= 255) {
-                this.setPower(data.value);
-                console.log(`Remote command from ${userId}: ${data.mode} = ${data.value}`);
+            console.log(`[SDK] Received remote command from ${userId}: ${data.mode} = ${data.value}`);
+            
+            // Handle different command types
+            switch (data.mode) {
+                case 'motor':
+                    // Direct motor PWM command
+                    if (typeof data.value === 'number' && data.value >= 0 && data.value <= 255) {
+                        this.setPower(data.value);
+                        console.log(`[SDK] ✅ Motor PWM set to ${data.value} via remote command`);
+                    } else {
+                        console.warn(`[SDK] ❌ Invalid motor PWM value: ${data.value}`);
+                    }
+                    break;
+                    
+                case 'heartbeat':
+                    // Heartbeat to maintain connection
+                    console.log(`[SDK] 💓 Heartbeat from ${userId}`);
+                    break;
+                    
+                default:
+                    // Legacy support - treat as direct PWM value
+                    if (typeof data.value === 'number' && data.value >= 0 && data.value <= 255) {
+                        this.setPower(data.value);
+                        console.log(`[SDK] ✅ Legacy PWM command: ${data.value}`);
+                    } else {
+                        console.warn(`[SDK] ❌ Unknown command mode: ${data.mode}`);
+                    }
+                    break;
             }
         }
     }
@@ -368,7 +396,22 @@ class DulaanSDK {
             currentMode: this.currentMode,
             motorConnected: this.motor.isMotorConnected(),
             remoteStatus: this.remote.getStatus(),
+            motorRemoteStatus: this.motor.getRemoteStatus(),
             consentStatus: this.consent.getConsentSummary()
+        };
+    }
+
+    /**
+     * Get comprehensive remote control status
+     */
+    getRemoteControlStatus() {
+        const remoteStatus = this.remote.getStatus();
+        const motorStatus = this.motor.getRemoteStatus();
+        
+        return {
+            ...remoteStatus,
+            motor: motorStatus,
+            isRemoteControlActive: remoteStatus.isRemote || remoteStatus.isControlledByRemote
         };
     }
 
