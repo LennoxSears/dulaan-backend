@@ -38,6 +38,7 @@ class StreamingProcessor {
         this.apiCalls = 0;
         this.lastRMS = 0;
         this.lastZeroCrossings = 0;
+        this.lastApiCall = 0; // Initialize to 0 to allow first API call
         
         // VAD thresholds (from working implementation)
         this.VAD_ENERGY_THRESHOLD = 0.008; // Balanced threshold

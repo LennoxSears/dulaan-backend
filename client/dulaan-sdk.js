@@ -153,6 +153,18 @@ class DulaanSDK {
     /**
      * Motor Control API
      */
+    async scan(timeout) {
+        return await this.motor.scan(timeout);
+    }
+
+    async stopScan() {
+        return await this.motor.stopScan();
+    }
+
+    async scanAndConnect(timeout) {
+        return await this.motor.scanAndConnect(timeout);
+    }
+
     async connect(deviceAddress) {
         return await this.motor.connect(deviceAddress);
     }
@@ -171,6 +183,18 @@ class DulaanSDK {
 
     isConnected() {
         return this.motor.isMotorConnected();
+    }
+
+    getDeviceAddress() {
+        return this.motor.getDeviceAddress();
+    }
+
+    getScanResults() {
+        return this.motor.getScanResults();
+    }
+
+    isScanning() {
+        return this.motor.isScanningActive();
     }
 
     /**

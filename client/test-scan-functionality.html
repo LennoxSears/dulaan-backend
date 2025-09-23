@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Functionality Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.4;
+        }
+        .test-output {
+            background: #000;
+            border: 1px solid #333;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .button {
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #555;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin: 10px 5px;
+            border-radius: 3px;
+        }
+        .button:hover {
+            background: #555;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff4444; }
+        .warning { color: #ffaa00; }
+        .info { color: #4488ff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Scan Functionality Test</h1>
+        
+        <button class="button" onclick="testMotorControllerScan()">Test MotorController Scan</button>
+        <button class="button" onclick="testSDKScanMethods()">Test SDK Scan Methods</button>
+        <button class="button" onclick="testScanStopLogic()">Test Scan Stop Logic</button>
+        <button class="button" onclick="clearOutput()">Clear Output</button>
+        
+        <div id="output" class="test-output">Ready to test scan functionality...\n</div>
+    </div>
+
+    <script src="dulaan-browser-bundled.js"></script>
+    <script>
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = 'Output cleared...\n';
+        }
+
+        function testMotorControllerScan() {
+            log('Testing MotorController scan functionality...', 'info');
+            
+            try {
+                if (typeof window.MotorController !== 'undefined') {
+                    const motor = new window.MotorController();
+                    log(`✅ MotorController created`, 'success');
+                    
+                    // Check if scan methods exist
+                    if (typeof motor.scan === 'function') {
+                        log('✅ scan() method available', 'success');
+                    } else {
+                        log('❌ scan() method not available', 'error');
+                    }
+                    
+                    if (typeof motor.stopScan === 'function') {
+                        log('✅ stopScan() method available', 'success');
+                    } else {
+                        log('❌ stopScan() method not available', 'error');
+                    }
+                    
+                    if (typeof motor.scanAndConnect === 'function') {
+                        log('✅ scanAndConnect() method available', 'success');
+                    } else {
+                        log('❌ scanAndConnect() method not available', 'error');
+                    }
+                    
+                    // Check initial state
+                    log(`Initial scanning state: ${motor.isScanningActive()}`, 'info');
+                    log(`Target device name: ${motor.getTargetDeviceName()}`, 'info');
+                    log(`Scan timeout: ${motor.SCAN_TIMEOUT}ms`, 'info');
+                    
+                } else {
+                    log('❌ MotorController class not available', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Test error: ${error.message}`, 'error');
+            }
+        }
+
+        function testSDKScanMethods() {
+            log('Testing SDK scan methods...', 'info');
+            
+            try {
+                if (window.dulaanSDK) {
+                    log(`✅ SDK instance available`, 'success');
+                    
+                    // Check if scan methods are exposed
+                    if (typeof window.dulaanSDK.scan === 'function') {
+                        log('✅ SDK.scan() method available', 'success');
+                    } else {
+                        log('❌ SDK.scan() method not available', 'error');
+                    }
+                    
+                    if (typeof window.dulaanSDK.stopScan === 'function') {
+                        log('✅ SDK.stopScan() method available', 'success');
+                    } else {
+                        log('❌ SDK.stopScan() method not available', 'error');
+                    }
+                    
+                    if (typeof window.dulaanSDK.scanAndConnect === 'function') {
+                        log('✅ SDK.scanAndConnect() method available', 'success');
+                    } else {
+                        log('❌ SDK.scanAndConnect() method not available', 'error');
+                    }
+                    
+                    if (typeof window.dulaanSDK.getScanResults === 'function') {
+                        log('✅ SDK.getScanResults() method available', 'success');
+                    } else {
+                        log('❌ SDK.getScanResults() method not available', 'error');
+                    }
+                    
+                    if (typeof window.dulaanSDK.isScanning === 'function') {
+                        log('✅ SDK.isScanning() method available', 'success');
+                    } else {
+                        log('❌ SDK.isScanning() method not available', 'error');
+                    }
+                    
+                    if (typeof window.dulaanSDK.getDeviceAddress === 'function') {
+                        log('✅ SDK.getDeviceAddress() method available', 'success');
+                    } else {
+                        log('❌ SDK.getDeviceAddress() method not available', 'error');
+                    }
+                    
+                    // Test current state
+                    log(`Current scanning state: ${window.dulaanSDK.isScanning()}`, 'info');
+                    log(`Current device address: ${window.dulaanSDK.getDeviceAddress() || 'None'}`, 'info');
+                    log(`Scan results: ${JSON.stringify(window.dulaanSDK.getScanResults())}`, 'info');
+                    
+                } else {
+                    log('❌ SDK instance not available', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ SDK test error: ${error.message}`, 'error');
+            }
+        }
+
+        function testScanStopLogic() {
+            log('Testing scan stop logic...', 'info');
+            
+            try {
+                if (typeof window.MotorController !== 'undefined') {
+                    const motor = new window.MotorController();
+                    
+                    // Mock BleClient for testing
+                    window.BleClient = {
+                        initialize: async () => {
+                            log('Mock BleClient initialized', 'info');
+                        },
+                        requestLEScan: async (options, callback) => {
+                            log('Mock scan started', 'info');
+                            
+                            // Simulate finding target device after 1 second
+                            setTimeout(() => {
+                                log('Simulating target device found...', 'info');
+                                callback({
+                                    device: {
+                                        name: motor.TARGET_DEVICE_NAME,
+                                        deviceId: 'mock-device-123'
+                                    }
+                                });
+                            }, 1000);
+                            
+                            // Simulate other devices
+                            setTimeout(() => {
+                                if (motor.isScanningActive()) {
+                                    log('Simulating other device (should be ignored)...', 'warning');
+                                    callback({
+                                        device: {
+                                            name: 'Other-Device',
+                                            deviceId: 'other-device-456'
+                                        }
+                                    });
+                                }
+                            }, 2000);
+                        },
+                        stopLEScan: async () => {
+                            log('Mock scan stopped', 'success');
+                        }
+                    };
+                    
+                    // Test scan with mock
+                    log('Starting mock scan test...', 'info');
+                    motor.scan(5000).then((result) => {
+                        log(`Scan completed with result: ${result}`, result ? 'success' : 'error');
+                        log(`Device found: ${motor.getDeviceAddress()}`, 'info');
+                        log(`Scan results: ${motor.getScanResults().length} devices`, 'info');
+                        log(`Still scanning: ${motor.isScanningActive()}`, motor.isScanningActive() ? 'warning' : 'success');
+                    });
+                    
+                } else {
+                    log('❌ MotorController class not available', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Scan stop test error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run tests on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testMotorControllerScan();
+                setTimeout(() => testSDKScanMethods(), 200);
+            }, 100);
+        });
+    </script>
+</body>
+</html>

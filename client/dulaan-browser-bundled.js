@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-22T15:08:43.621Z
+ * Generated on: 2025-09-23T02:52:33.463Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -625,7 +625,7 @@ class MotorController {
             
             console.log('Starting BLE scan for motor devices...');
             
-            await BleClient.requestLEScan({}, (result) => {
+            await BleClient.requestLEScan({}, async (result) => {
                 console.log('Scan result:', JSON.stringify(result));
                 
                 // Filter for target device name (matches plugin.js)
@@ -633,6 +633,10 @@ class MotorController {
                     console.log('Found target device:', result.device.deviceId);
                     this.deviceAddress = result.device.deviceId;
                     this.scanResults.push(result.device);
+                    
+                    // Stop scan immediately when target device is found
+                    console.log('Target device found, stopping scan...');
+                    await this.stopScan();
                     
                     // Trigger callback if set
                     if (this.onScanResult) {
@@ -920,7 +924,7 @@ class StreamingProcessor {
         this.isActive = false;
         this.isListening = false;
         this.isProcessing = false;
-        this.currentPwm = 100;
+        this.currentPwm = 0;
         
         // Ring buffers for efficient memory usage
         this.vadBuffer = new RingBufferClass(4800); // 300ms for VAD analysis
@@ -937,6 +941,7 @@ class StreamingProcessor {
         this.apiCalls = 0;
         this.lastRMS = 0;
         this.lastZeroCrossings = 0;
+        this.lastApiCall = 0; // Initialize to 0 to allow first API call
         
         // VAD thresholds (from working implementation)
         this.VAD_ENERGY_THRESHOLD = 0.008; // Balanced threshold
@@ -1339,7 +1344,7 @@ class ApiService {
         // Conversation state
         this.conversationState = {
             history: [],
-            currentPwm: 100, // Motor starts at 100
+            currentPwm: 0, // Motor starts at 100
             isProcessing: false,
             lastResponse: 0,
             totalApiCalls: 0,
@@ -1503,7 +1508,7 @@ class ApiService {
                 body: JSON.stringify({
                     msgHis: [],
                     audioData: testAudio,
-                    currentPwm: 100
+                    currentPwm: 0
                 })
             });
 
@@ -1577,7 +1582,7 @@ class ApiService {
      */
     reset() {
         this.conversationState.history = [];
-        this.conversationState.currentPwm = 100;
+        this.conversationState.currentPwm = 0;
         this.conversationState.isProcessing = false;
         this.conversationState.totalApiCalls = 0;
         this.conversationState.totalProcessingTime = 0;
@@ -3476,6 +3481,18 @@ class DulaanSDK {
     /**
      * Motor Control API
      */
+    async scan(timeout) {
+        return await this.motor.scan(timeout);
+    }
+
+    async stopScan() {
+        return await this.motor.stopScan();
+    }
+
+    async scanAndConnect(timeout) {
+        return await this.motor.scanAndConnect(timeout);
+    }
+
     async connect(deviceAddress) {
         return await this.motor.connect(deviceAddress);
     }
@@ -3494,6 +3511,18 @@ class DulaanSDK {
 
     isConnected() {
         return this.motor.isMotorConnected();
+    }
+
+    getDeviceAddress() {
+        return this.motor.getDeviceAddress();
+    }
+
+    getScanResults() {
+        return this.motor.getScanResults();
+    }
+
+    isScanning() {
+        return this.motor.isScanningActive();
     }
 
     /**

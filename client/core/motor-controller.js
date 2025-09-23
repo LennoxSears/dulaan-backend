@@ -90,7 +90,7 @@ class MotorController {
             
             console.log('Starting BLE scan for motor devices...');
             
-            await BleClient.requestLEScan({}, (result) => {
+            await BleClient.requestLEScan({}, async (result) => {
                 console.log('Scan result:', JSON.stringify(result));
                 
                 // Filter for target device name (matches plugin.js)
@@ -98,6 +98,10 @@ class MotorController {
                     console.log('Found target device:', result.device.deviceId);
                     this.deviceAddress = result.device.deviceId;
                     this.scanResults.push(result.device);
+                    
+                    // Stop scan immediately when target device is found
+                    console.log('Target device found, stopping scan...');
+                    await this.stopScan();
                     
                     // Trigger callback if set
                     if (this.onScanResult) {
