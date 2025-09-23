@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-23T07:12:45.064Z
+ * Generated on: 2025-09-23T07:25:09.753Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -3520,13 +3520,7 @@ class DulaanSDK {
                      (typeof window !== 'undefined' && window.motorController) ? window.motorController : 
                      new MotorController();
         
-        // Create core instances with safety checks
-        try {
-            this.audio = new StreamingProcessor(); // Create instance of streaming processor
-        } catch (error) {
-            console.error('Failed to create StreamingProcessor:', error);
-            this.audio = null;
-        }
+        // Core instances with safety checks
         
         try {
             this.api = new ApiService(); // Create instance of API service
@@ -3550,7 +3544,6 @@ class DulaanSDK {
         
         try {
             this.modes.ai = new AIVoiceControl({
-                processor: this.audio,
                 apiService: this.api,
                 motorController: this.motor
             }); // Primary AI voice control mode
@@ -3575,7 +3568,6 @@ class DulaanSDK {
         
         // Direct access to core components
         this.core = {
-            processor: StreamingProcessor,
             apiService: ApiService,
             voiceControl: AIVoiceControl
         };
@@ -3620,13 +3612,7 @@ class DulaanSDK {
                 await this.motor.connect(this.config.motor.deviceAddress);
             }
             
-            // Configure audio processor
-            if (this.audio.setMaxEnergy) {
-                this.audio.setMaxEnergy(this.config.audio.maxEnergy);
-            } else {
-                // StreamingProcessor uses internal VAD parameters
-                console.log('Using VAD with internal energy thresholds');
-            }
+            // Audio configuration is handled by individual modes
             
             // Set up remote service callbacks
             this.remote.setEventCallbacks({
@@ -3779,30 +3765,33 @@ class DulaanSDK {
     }
 
     /**
-     * Audio API
+     * Audio API - Delegated to active mode
      */
     setAudioSensitivity(energy) {
-        if (this.audio.setMaxEnergy) {
-            this.audio.setMaxEnergy(energy);
-        } else {
-            console.log('StreamingProcessor uses internal VAD thresholds');
-        }
         this.config.audio.maxEnergy = energy;
+        
+        // Update active mode if it supports audio sensitivity
+        if (this.currentMode && this.modes[this.currentMode]) {
+            const mode = this.modes[this.currentMode];
+            if (mode.setMaxEnergy) {
+                mode.setMaxEnergy(energy);
+            }
+        }
     }
 
     getAudioSensitivity() {
-        if (this.audio.getMaxEnergy) {
-            return this.audio.getMaxEnergy();
-        }
         return this.config.audio.maxEnergy;
     }
 
     getAudioState() {
-        if (this.audio.getAudioState) {
-            return this.audio.getAudioState();
+        // Get audio state from active mode
+        if (this.currentMode && this.modes[this.currentMode]) {
+            const mode = this.modes[this.currentMode];
+            if (mode.getAudioState) {
+                return mode.getAudioState();
+            }
         }
-        // Return processor state
-        return this.audio.audioState || {};
+        return {};
     }
 
     /**
@@ -3813,11 +3802,7 @@ class DulaanSDK {
         
         // Apply configuration changes
         if (newConfig.audio?.maxEnergy) {
-            if (this.audio.setMaxEnergy) {
-                this.audio.setMaxEnergy(newConfig.audio.maxEnergy);
-            } else {
-                console.log('StreamingProcessor uses internal VAD thresholds');
-            }
+            this.setAudioSensitivity(newConfig.audio.maxEnergy);
         }
         
         if (newConfig.api?.geminiApiKey) {
