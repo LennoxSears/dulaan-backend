@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ambient Mode Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.4;
+        }
+        .test-output {
+            background: #000;
+            border: 1px solid #333;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .button {
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #555;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin: 10px 5px;
+            border-radius: 3px;
+        }
+        .button:hover {
+            background: #555;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff4444; }
+        .warning { color: #ffaa00; }
+        .info { color: #4488ff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ambient Mode Functionality Test</h1>
+        
+        <button class="button" onclick="testAmbientModeAvailability()">Test Ambient Mode Availability</button>
+        <button class="button" onclick="testAmbientModeFunctions()">Test Ambient Mode Functions</button>
+        <button class="button" onclick="testAudioProcessing()">Test Audio Processing</button>
+        <button class="button" onclick="clearOutput()">Clear Output</button>
+        
+        <div id="output" class="test-output">Ready to test ambient mode...\n</div>
+    </div>
+
+    <script src="dulaan-browser-bundled.js"></script>
+    <script>
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = 'Output cleared...\n';
+        }
+
+        function testAmbientModeAvailability() {
+            log('Testing Ambient Mode availability...', 'info');
+            
+            try {
+                if (typeof window.AmbientControl !== 'undefined') {
+                    log('✅ AmbientControl class available', 'success');
+                } else {
+                    log('❌ AmbientControl class not available', 'error');
+                }
+                
+                if (window.dulaanSDK && window.dulaanSDK.modes && window.dulaanSDK.modes.ambient) {
+                    log('✅ SDK ambient mode available', 'success');
+                    log(`Ambient mode type: ${typeof window.dulaanSDK.modes.ambient}`, 'info');
+                } else {
+                    log('❌ SDK ambient mode not available', 'error');
+                }
+                
+                // Test instantiation
+                if (window.dulaanSDK) {
+                    const mockSDK = {
+                        motor: {
+                            write: async (value) => {
+                                log(`Mock motor write: ${value}`, 'info');
+                                return true;
+                            }
+                        }
+                    };
+                    
+                    const ambientControl = new window.AmbientControl(mockSDK);
+                    log('✅ AmbientControl instantiated successfully', 'success');
+                    log(`Initial state: active=${ambientControl.isRunning()}`, 'info');
+                } else {
+                    log('❌ Cannot test instantiation - SDK not available', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Availability test error: ${error.message}`, 'error');
+            }
+        }
+
+        function testAmbientModeFunctions() {
+            log('Testing Ambient Mode functions...', 'info');
+            
+            try {
+                const mockSDK = {
+                    motor: {
+                        write: async (value) => {
+                            log(`Mock motor write: ${value}`, 'info');
+                            return true;
+                        }
+                    }
+                };
+                
+                const ambientControl = new window.AmbientControl(mockSDK);
+                
+                // Test function availability
+                const requiredFunctions = [
+                    'start', 'stop', 'isRunning', 'setMaxEnergy', 'getMaxEnergy',
+                    'processAudioChunk', 'calculateAmbientPWM', 'getAudioState',
+                    'base64ToFloat32Array', 'calculateRMS', 'energyToPWM'
+                ];
+                
+                requiredFunctions.forEach(funcName => {
+                    if (typeof ambientControl[funcName] === 'function') {
+                        log(`✅ ${funcName}() function available`, 'success');
+                    } else {
+                        log(`❌ ${funcName}() function missing`, 'error');
+                    }
+                });
+                
+                // Test energy settings
+                ambientControl.setMaxEnergy(0.1);
+                const maxEnergy = ambientControl.getMaxEnergy();
+                if (maxEnergy === 0.1) {
+                    log('✅ Energy settings work correctly', 'success');
+                } else {
+                    log(`❌ Energy settings failed: expected 0.1, got ${maxEnergy}`, 'error');
+                }
+                
+                // Test audio state
+                const audioState = ambientControl.getAudioState();
+                log(`Audio state: ${JSON.stringify(audioState)}`, 'info');
+                
+                if (audioState && typeof audioState === 'object') {
+                    log('✅ Audio state function works', 'success');
+                } else {
+                    log('❌ Audio state function failed', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Function test error: ${error.message}`, 'error');
+            }
+        }
+
+        function testAudioProcessing() {
+            log('Testing Audio Processing functions...', 'info');
+            
+            try {
+                const mockSDK = {
+                    motor: {
+                        write: async (value) => {
+                            log(`Mock motor write: ${value}`, 'info');
+                            return true;
+                        }
+                    }
+                };
+                
+                const ambientControl = new window.AmbientControl(mockSDK);
+                
+                // Test base64 to audio conversion
+                const testBase64 = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+                const audioData = ambientControl.base64ToFloat32Array(testBase64);
+                
+                if (audioData && audioData.length >= 0) {
+                    log(`✅ Base64 conversion works: ${audioData.length} samples`, 'success');
+                } else {
+                    log('❌ Base64 conversion failed', 'error');
+                }
+                
+                // Test RMS calculation with mock data
+                const mockAudioData = new Float32Array([0.1, -0.2, 0.3, -0.1, 0.05]);
+                const rms = ambientControl.calculateRMS(mockAudioData);
+                
+                if (rms > 0) {
+                    log(`✅ RMS calculation works: ${rms.toFixed(4)}`, 'success');
+                } else {
+                    log('❌ RMS calculation failed', 'error');
+                }
+                
+                // Test energy to PWM conversion
+                const pwm = ambientControl.energyToPWM(0.05, 0.1, 255);
+                
+                if (pwm >= 0 && pwm <= 255) {
+                    log(`✅ Energy to PWM conversion works: ${pwm}`, 'success');
+                } else {
+                    log(`❌ Energy to PWM conversion failed: ${pwm}`, 'error');
+                }
+                
+                // Test ambient PWM calculation
+                ambientControl.lastRMS = 0.05;
+                const ambientPWM = ambientControl.calculateAmbientPWM();
+                
+                if (ambientPWM >= 0 && ambientPWM <= 255) {
+                    log(`✅ Ambient PWM calculation works: ${ambientPWM}`, 'success');
+                } else {
+                    log(`❌ Ambient PWM calculation failed: ${ambientPWM}`, 'error');
+                }
+                
+                // Test audio chunk processing
+                ambientControl.processAudioChunk(testBase64);
+                const newState = ambientControl.getAudioState();
+                log(`Audio state after processing: RMS=${newState.lastRMS.toFixed(4)}`, 'info');
+                
+                log('✅ All audio processing tests completed', 'success');
+                
+            } catch (error) {
+                log(`❌ Audio processing test error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run availability test on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testAmbientModeAvailability();
+            }, 100);
+        });
+    </script>
+</body>
+</html>

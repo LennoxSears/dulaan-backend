@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-23T04:10:10.368Z
+ * Generated on: 2025-09-23T07:12:45.064Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -1008,6 +1008,8 @@ class StreamingProcessor {
                 
                 // Voice end detection
                 if (this.isVoiceActive && this.consecutiveSilenceFrames >= this.VAD_SILENCE_FRAMES) {
+                    this.isVoiceActive = false;
+                    this.isListening = false;
                     console.log(`[VAD] 🔇 Voice END detected (${this.consecutiveSilenceFrames} consecutive silence frames)`);
                     this.handleVoiceEnd();
                 }
@@ -1129,8 +1131,6 @@ class StreamingProcessor {
         const postSpeechDelay = 100;
         
         setTimeout(async () => {
-            this.isVoiceActive = false;
-            this.isListening = false;
             const speechDuration = Date.now() - this.voiceStartTime;
             
             // Add recent VAD buffer as post-speech context (200ms for natural ending)
@@ -2704,6 +2704,15 @@ class AmbientControl {
         this.sdk = sdk;
         this.isActive = false;
         this.pwmInterval = null;
+        
+        // Audio processing state
+        this.maxEnergy = 0.075; // Default max energy threshold
+        this.audioBuffer = null;
+        this.lastRMS = 0;
+        this.lastPwmValue = 0;
+        
+        // Initialize audio buffer (1 second at 16kHz)
+        this.initializeAudioBuffer();
     }
 
     async start() {
@@ -2767,10 +2776,10 @@ class AmbientControl {
 
     async processAmbientAudio(base64Chunk) {
         try {
-            // Only save audio data to buffer - no instant PWM writing (matches stream.js)
-            this.sdk.audio.processAbiChunk(base64Chunk);
+            // Process audio chunk locally (no sdk.audio dependency)
+            this.processAudioChunk(base64Chunk);
         } catch (error) {
-            //console.error('Ambient processing error:', error);
+            console.error('Ambient processing error:', error);
         }
     }
 
@@ -2778,14 +2787,15 @@ class AmbientControl {
         // Write PWM every 100ms based on accumulated audio data (matches stream.js)
         this.pwmInterval = setInterval(async () => {
             try {
-                const pwmValue = this.sdk.audio.calculateAmbientPWM(this.getMaxEnergy());
+                const pwmValue = this.calculateAmbientPWM();
                 
                 if (pwmValue > 0) {
                     await this.sdk.motor.write(pwmValue);
+                    this.lastPwmValue = pwmValue;
                     
                     // Trigger event for UI updates
                     this.onAmbientUpdate({
-                        energy: this.sdk.audio.getAudioState().lastRMS,
+                        energy: this.lastRMS,
                         pwmValue: pwmValue
                     });
                 }
@@ -2810,15 +2820,172 @@ class AmbientControl {
     }
 
     setMaxEnergy(energy) {
-        this.sdk.audio.setMaxEnergy(energy);
+        this.maxEnergy = energy;
     }
 
     getMaxEnergy() {
-        return this.sdk.audio.getMaxEnergy();
+        return this.maxEnergy;
     }
 
     isRunning() {
         return this.isActive;
+    }
+
+    // ===== MISSING FUNCTIONS IMPLEMENTATION =====
+
+    /**
+     * Initialize audio buffer for ambient processing
+     */
+    initializeAudioBuffer() {
+        try {
+            // Get RingBuffer class - use global if available (for bundled version)
+            const RingBufferClass = (typeof RingBuffer !== 'undefined') ? RingBuffer :
+                                    (typeof window !== 'undefined' && window.DULAAN_COMPONENTS && window.DULAAN_COMPONENTS.RingBuffer) ? window.DULAAN_COMPONENTS.RingBuffer :
+                                    null;
+            
+            if (RingBufferClass) {
+                // Create buffer for 1 second of audio at 16kHz
+                this.audioBuffer = new RingBufferClass(16000);
+            } else {
+                console.warn('RingBuffer not available for ambient control');
+            }
+        } catch (error) {
+            console.error('Failed to initialize audio buffer:', error);
+        }
+    }
+
+    /**
+     * Process audio chunk for ambient control
+     */
+    processAudioChunk(base64Chunk) {
+        try {
+            // Convert base64 to audio data
+            const audioData = this.base64ToFloat32Array(base64Chunk);
+            
+            if (audioData && audioData.length > 0) {
+                // Add to buffer
+                if (this.audioBuffer) {
+                    this.audioBuffer.push(audioData);
+                }
+                
+                // Calculate RMS energy
+                this.lastRMS = this.calculateRMS(audioData);
+            }
+        } catch (error) {
+            console.error('Error processing audio chunk:', error);
+        }
+    }
+
+    /**
+     * Calculate ambient PWM value based on current audio energy
+     */
+    calculateAmbientPWM() {
+        try {
+            if (this.lastRMS > 0) {
+                // Use energyToPWM function from audio-utils
+                return this.energyToPWM(this.lastRMS, this.maxEnergy, 255);
+            }
+            return 0;
+        } catch (error) {
+            console.error('Error calculating ambient PWM:', error);
+            return 0;
+        }
+    }
+
+    /**
+     * Get current audio state
+     */
+    getAudioState() {
+        return {
+            lastRMS: this.lastRMS,
+            maxEnergy: this.maxEnergy,
+            bufferSize: this.audioBuffer ? this.audioBuffer.count : 0,
+            lastPwmValue: this.lastPwmValue,
+            isActive: this.isActive
+        };
+    }
+
+    // ===== AUDIO UTILITY FUNCTIONS =====
+
+    /**
+     * Convert base64 to Float32Array (local implementation)
+     */
+    base64ToFloat32Array(base64) {
+        try {
+            // Use global function if available
+            if (typeof base64ToFloat32Array !== 'undefined') {
+                return base64ToFloat32Array(base64);
+            }
+            
+            // Fallback implementation
+            const pureBase64 = base64.includes(',') ? base64.split(',')[1] : base64;
+            const binary = atob(pureBase64);
+            const bytes = new Uint8Array(binary.length);
+            
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+
+            const view = new DataView(bytes.buffer);
+            const floats = new Float32Array(bytes.length / 4);
+            
+            for (let i = 0; i < floats.length; i++) {
+                floats[i] = view.getFloat32(i * 4, true);
+            }
+            
+            return floats;
+        } catch (e) {
+            console.error("Base64 to Float32Array conversion failed:", e);
+            return new Float32Array(0);
+        }
+    }
+
+    /**
+     * Calculate RMS energy (local implementation)
+     */
+    calculateRMS(audioData) {
+        try {
+            // Use global function if available
+            if (typeof calculateRMS !== 'undefined') {
+                return calculateRMS(audioData);
+            }
+            
+            // Fallback implementation
+            if (!audioData || audioData.length === 0) return 0;
+            
+            let sum = 0;
+            for (let i = 0; i < audioData.length; i++) {
+                sum += audioData[i] * audioData[i];
+            }
+            
+            return Math.sqrt(sum / audioData.length);
+        } catch (error) {
+            console.error('Error calculating RMS:', error);
+            return 0;
+        }
+    }
+
+    /**
+     * Convert energy to PWM value (local implementation)
+     */
+    energyToPWM(energy, maxEnergy = 0.075, maxPWM = 255) {
+        try {
+            // Use global function if available
+            if (typeof energyToPWM !== 'undefined') {
+                return energyToPWM(energy, maxEnergy, maxPWM);
+            }
+            
+            // Fallback implementation
+            if (energy <= 0) return 0;
+            
+            const normalizedEnergy = Math.min(energy / maxEnergy, 1.0);
+            const pwmValue = Math.round(normalizedEnergy * maxPWM);
+            
+            return Math.max(0, Math.min(maxPWM, pwmValue));
+        } catch (error) {
+            console.error('Error converting energy to PWM:', error);
+            return 0;
+        }
     }
 }
 
