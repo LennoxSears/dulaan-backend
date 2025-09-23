@@ -224,7 +224,7 @@ class DulaanSDK {
      * Remote Control API
      */
     generateId() {
-        return UTILS.generateShortId();
+        return this.remote.generateShortId();
     }
 
     async startHost() {

@@ -206,7 +206,6 @@ class AIVoiceControl {
 
         try {
             // Process audio chunk through processor
-            //console.log(`[AUDIO CHUNK] Processing chunk: ${base64Chunk.length} chars`);
             const result = this.processor.processAudioChunk(base64Chunk);
             
             if (result) {
@@ -214,7 +213,6 @@ class AIVoiceControl {
                 this.state.lastInteractionTime = Date.now();
                 
                 // Log voice activity for debugging
-                //console.log(`[VAD] Voice: ${result.isVoiceActive}, Energy: ${result.energy?.toFixed(4)}, ZCR: ${result.zeroCrossings?.toFixed(4)}`);
                 
                 // Update listening state based on voice activity
                 if (result.isVoiceActive !== this.state.isListening) {
