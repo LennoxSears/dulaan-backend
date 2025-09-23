@@ -242,7 +242,7 @@ class MotorController {
         
         // Check if we're connected as remote to another host
         if (this.remoteService && this.remoteService.isRemote) {
-            console.log(`[MOTOR WRITE] 🔄 Routing PWM ${pwm} to remote host`);
+            //console.log(`[MOTOR WRITE] 🔄 Routing PWM ${pwm} to remote host`);
             return this.writeToRemoteHost(pwm);
         }
         
@@ -262,7 +262,7 @@ class MotorController {
             
             if (success) {
                 this.remotePwm = pwmValue;
-                console.log(`[MOTOR WRITE] ✅ Remote PWM command sent: ${pwmValue}`);
+                //console.log(`[MOTOR WRITE] ✅ Remote PWM command sent: ${pwmValue}`);
                 return true;
             } else {
                 console.warn('[MOTOR WRITE] ❌ Failed to send remote PWM command');
