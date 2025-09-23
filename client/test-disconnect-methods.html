@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disconnect Methods Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.4;
+        }
+        .test-output {
+            background: #000;
+            border: 1px solid #333;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .button {
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #555;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin: 10px 5px;
+            border-radius: 3px;
+        }
+        .button:hover {
+            background: #555;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff4444; }
+        .warning { color: #ffaa00; }
+        .info { color: #4488ff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Disconnect Methods Test</h1>
+        
+        <button class="button" onclick="testDisconnectMethods()">Test Disconnect Methods</button>
+        <button class="button" onclick="testMethodAvailability()">Test Method Availability</button>
+        <button class="button" onclick="clearOutput()">Clear Output</button>
+        
+        <div id="output" class="test-output">Ready to test disconnect methods...\n</div>
+    </div>
+
+    <script src="dulaan-browser-bundled.js"></script>
+    <script>
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = 'Output cleared...\n';
+        }
+
+        function testMethodAvailability() {
+            log('Testing disconnect method availability...', 'info');
+            
+            try {
+                if (window.dulaanSDK) {
+                    log(`✅ SDK instance available`, 'success');
+                    
+                    // Check if all disconnect methods exist
+                    if (typeof window.dulaanSDK.disconnect === 'function') {
+                        log('✅ disconnect() method available (general)', 'success');
+                    } else {
+                        log('❌ disconnect() method not available', 'error');
+                    }
+                    
+                    if (typeof window.dulaanSDK.disconnectMotor === 'function') {
+                        log('✅ disconnectMotor() method available (motor-specific)', 'success');
+                    } else {
+                        log('❌ disconnectMotor() method not available', 'error');
+                    }
+                    
+                    if (typeof window.dulaanSDK.disconnectRemote === 'function') {
+                        log('✅ disconnectRemote() method available (remote-specific)', 'success');
+                    } else {
+                        log('❌ disconnectRemote() method not available', 'error');
+                    }
+                    
+                    // Check method signatures
+                    log(`disconnect method length: ${window.dulaanSDK.disconnect.length} (should be 0)`, 'info');
+                    log(`disconnectMotor method length: ${window.dulaanSDK.disconnectMotor.length} (should be 0)`, 'info');
+                    log(`disconnectRemote method length: ${window.dulaanSDK.disconnectRemote.length} (should be 0)`, 'info');
+                    
+                } else {
+                    log('❌ SDK instance not available', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Method availability test error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDisconnectMethods() {
+            log('Testing disconnect method functionality...', 'info');
+            
+            try {
+                if (window.dulaanSDK) {
+                    // Test disconnectMotor
+                    log('Testing disconnectMotor()...', 'info');
+                    try {
+                        const motorResult = await window.dulaanSDK.disconnectMotor();
+                        log(`✅ disconnectMotor() executed successfully`, 'success');
+                        log(`Motor connection status: ${window.dulaanSDK.isConnected()}`, 'info');
+                    } catch (error) {
+                        log(`⚠️ disconnectMotor() error (expected if not connected): ${error.message}`, 'warning');
+                    }
+                    
+                    // Test disconnectRemote
+                    log('Testing disconnectRemote()...', 'info');
+                    try {
+                        window.dulaanSDK.disconnectRemote();
+                        log(`✅ disconnectRemote() executed successfully`, 'success');
+                        log(`Remote status: ${JSON.stringify(window.dulaanSDK.getStatus())}`, 'info');
+                    } catch (error) {
+                        log(`⚠️ disconnectRemote() error: ${error.message}`, 'warning');
+                    }
+                    
+                    // Test general disconnect
+                    log('Testing general disconnect()...', 'info');
+                    try {
+                        await window.dulaanSDK.disconnect();
+                        log(`✅ disconnect() executed successfully (should disconnect both)`, 'success');
+                        log(`Motor connected: ${window.dulaanSDK.isConnected()}`, 'info');
+                        log(`Remote status: ${JSON.stringify(window.dulaanSDK.getStatus())}`, 'info');
+                    } catch (error) {
+                        log(`⚠️ disconnect() error: ${error.message}`, 'warning');
+                    }
+                    
+                    log('All disconnect methods tested', 'success');
+                    
+                } else {
+                    log('❌ SDK instance not available', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Disconnect test error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run tests on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testMethodAvailability();
+            }, 100);
+        });
+    </script>
+</body>
+</html>

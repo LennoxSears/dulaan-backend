@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-23T02:52:33.463Z
+ * Generated on: 2025-09-23T03:16:43.981Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -3497,8 +3497,14 @@ class DulaanSDK {
         return await this.motor.connect(deviceAddress);
     }
 
-    async disconnect() {
+    async disconnectMotor() {
         return await this.motor.disconnect();
+    }
+
+    async disconnect() {
+        // Disconnect both motor and remote for convenience
+        await this.disconnectMotor();
+        this.disconnectRemote();
     }
 
     async setPower(pwmValue) {
@@ -3574,7 +3580,7 @@ class DulaanSDK {
         return this.remote.sendControlCommand(mode, value, data);
     }
 
-    disconnect() {
+    disconnectRemote() {
         this.remote.disconnect();
     }
 
