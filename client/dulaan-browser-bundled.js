@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-23T08:55:20.912Z
+ * Generated on: 2025-09-23T12:39:13.294Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -1397,6 +1397,7 @@ class ConsentService {
             consent: 'dulaan_consent_given',
             timestamp: 'dulaan_consent_timestamp'
         };
+        localStorage.clear();
     }
 
     /**
