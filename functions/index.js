@@ -509,11 +509,17 @@ Streaming mode: Chunk ${chunkIndex || chunkIndexHeader || 0}
 Previous conversation:
 ${conversationHistory || 'No previous conversation'}
 
-Instructions for streaming:
-1. Listen to this audio chunk and provide partial understanding
-2. If you detect clear motor control intent, respond immediately with PWM changes
-3. For partial/unclear audio, provide partial transcription and keep current PWM
-4. Be responsive - users expect real-time feedback
+CRITICAL INSTRUCTIONS FOR STREAMING:
+1. ONLY respond to HUMAN VOICE commands - ignore all non-human sounds
+2. If you detect motor sounds, mechanical noise, buzzing, humming, or any non-human audio, set intentDetected to FALSE and keep current PWM
+3. Only change PWM values when you clearly hear a human speaking motor control commands
+4. For partial/unclear audio or motor sounds, keep current PWM value
+
+Audio Analysis Steps:
+1. First, determine if the audio contains human speech or just motor/mechanical sounds
+2. If it's motor sounds, noise, or unclear audio → intentDetected: false, keep current PWM
+3. If it's human speech → analyze for motor control intent
+4. Only change PWM for clear human motor control commands
 
 Respond in this exact JSON format:
 {
@@ -523,11 +529,12 @@ Respond in this exact JSON format:
   "pwm": number (0-255),
   "response": "brief response for partial chunks",
   "confidence": number (0-1),
-  "isPartial": true
+  "isPartial": true,
+  "audioType": "human_speech" or "motor_sound" or "background_noise" or "unclear"
 }`;
             } else {
                 // Regular mode or final streaming chunk
-                prompt = `You are a motor control assistant. Listen to the audio and determine if the user wants to control a motor device.
+                prompt = `You are a motor control assistant. Listen to the audio and determine if a HUMAN USER wants to control a motor device.
 
 Current motor PWM value: ${currentPwm} (0-255 scale, where 0=off, 255=maximum)
 ${isImmediate ? 'IMMEDIATE MODE: Respond quickly for urgent control.' : ''}
@@ -536,26 +543,33 @@ ${isStreaming ? 'STREAMING MODE: This is the final chunk of a streaming conversa
 Previous conversation:
 ${conversationHistory || 'No previous conversation'}
 
-Instructions:
-1. Listen to the audio and understand what the user is saying
-2. Determine if they want to control the motor (turn on/off, increase/decrease intensity, set specific level)
-3. If motor control is intended, calculate the appropriate PWM value (0-255)
-4. If no motor control is intended, keep the current PWM value
-5. ${isImmediate ? 'Prioritize speed and immediate motor control.' : 'Provide natural conversational responses.'}
+CRITICAL INSTRUCTIONS:
+1. ONLY respond to HUMAN VOICE commands - ignore all non-human sounds
+2. If you detect motor sounds, mechanical noise, buzzing, humming, or any non-human audio, set intentDetected to FALSE and keep current PWM
+3. Only change PWM values when you clearly hear a human speaking motor control commands
+4. If the audio contains only motor sounds, background noise, or unclear audio, maintain the current PWM value
+
+Audio Analysis Steps:
+1. First, determine if the audio contains human speech or just motor/mechanical sounds
+2. If it's motor sounds, noise, or unclear audio → intentDetected: false, keep current PWM
+3. If it's human speech → analyze for motor control intent
+4. Only change PWM for clear human motor control commands
 
 Respond in this exact JSON format:
 {
   "intentDetected": true/false,
-  "transcription": "what the user said",
+  "transcription": "what you heard (human speech or 'motor sound' or 'background noise')",
   "pwm": number (0-255),
   "response": "your response to the user",
-  "confidence": number (0-1)
+  "confidence": number (0-1),
+  "audioType": "human_speech" or "motor_sound" or "background_noise" or "unclear"
 }
 
 Examples:
-- "turn it on" → {"intentDetected": true, "transcription": "turn it on", "pwm": 150, "response": "Turning the motor on"}
-- "make it stronger" → {"intentDetected": true, "transcription": "make it stronger", "pwm": ${currentPwm} + 50, "response": "Increasing motor intensity"}
-- "what's the weather" → {"intentDetected": false, "transcription": "what's the weather", "pwm": ${currentPwm}, "response": "I'm a motor control assistant. I can help you control the motor device."}`;
+- Human says "turn it on" → {"intentDetected": true, "transcription": "turn it on", "pwm": 150, "response": "Turning the motor on", "confidence": 0.9, "audioType": "human_speech"}
+- Motor buzzing sound → {"intentDetected": false, "transcription": "motor sound", "pwm": ${currentPwm}, "response": "I hear the motor running", "confidence": 0.8, "audioType": "motor_sound"}
+- Background noise → {"intentDetected": false, "transcription": "background noise", "pwm": ${currentPwm}, "response": "I didn't hear a clear command", "confidence": 0.3, "audioType": "background_noise"}
+- Human says "what's the weather" → {"intentDetected": false, "transcription": "what's the weather", "pwm": ${currentPwm}, "response": "I'm a motor control assistant. I can help you control the motor device.", "confidence": 0.9, "audioType": "human_speech"}`;
             }
 
             // Send audio directly to Gemini
