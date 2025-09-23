@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-23T03:16:43.981Z
+ * Generated on: 2025-09-23T03:27:58.985Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -3735,8 +3735,8 @@ class DulaanSDK {
             console.log('🔍 Checking available classes before DulaanSDK creation:', {
                 DulaanSDK: typeof DulaanSDK,
                 MotorController: typeof MotorController,
-                OptimizedStreamingProcessor: typeof OptimizedStreamingProcessor,
-                OptimizedApiService: typeof OptimizedApiService,
+                StreamingProcessor: typeof StreamingProcessor,
+                ApiService: typeof ApiService,
                 ConsentService: typeof ConsentService,
                 RemoteService: typeof RemoteService,
                 RingBuffer: typeof RingBuffer
@@ -3765,12 +3765,12 @@ class DulaanSDK {
     // Export individual components for advanced usage
     window.DULAAN_COMPONENTS = {
         MotorController: typeof MotorController !== 'undefined' ? MotorController : null,
-        OptimizedStreamingProcessor: typeof OptimizedStreamingProcessor !== 'undefined' ? OptimizedStreamingProcessor : null,
-        OptimizedApiService: typeof OptimizedApiService !== 'undefined' ? OptimizedApiService : null,
+        StreamingProcessor: typeof StreamingProcessor !== 'undefined' ? StreamingProcessor : null,
+        ApiService: typeof ApiService !== 'undefined' ? ApiService : null,
         ConsentService: typeof ConsentService !== 'undefined' ? ConsentService : null,
         RemoteService: typeof RemoteService !== 'undefined' ? RemoteService : null,
         RemoteControl: typeof RemoteControl !== 'undefined' ? RemoteControl : null,
-        OptimizedAIVoiceControl: typeof OptimizedAIVoiceControl !== 'undefined' ? OptimizedAIVoiceControl : null,
+        AIVoiceControl: typeof AIVoiceControl !== 'undefined' ? AIVoiceControl : null,
         AmbientControl: typeof AmbientControl !== 'undefined' ? AmbientControl : null,
         TouchControl: typeof TouchControl !== 'undefined' ? TouchControl : null,
         RingBuffer: typeof RingBuffer !== 'undefined' ? RingBuffer : null,
