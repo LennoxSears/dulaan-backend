@@ -7,7 +7,7 @@
 import { motorController } from './core/motor-controller.js';
 import { consentService } from './services/consent-service.js';
 import { remoteService } from './services/remote-service.js';
-import * as audioUtils from './utils/audio-utils.js';
+
 
 // Import control modes
 import { AIVoiceControl } from './modes/ai-voice-control.js';
@@ -41,7 +41,7 @@ class DulaanSDK {
                       (typeof window !== 'undefined' && window.remoteService) ? window.remoteService :
                       new RemoteService();
         
-        this.utils = (typeof window !== 'undefined' && window.audioUtils) || {};
+
         
         // Control modes - with safe instantiation
         this.modes = {};
