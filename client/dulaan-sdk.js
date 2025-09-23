@@ -169,8 +169,14 @@ class DulaanSDK {
         return await this.motor.connect(deviceAddress);
     }
 
-    async disconnect() {
+    async disconnectMotor() {
         return await this.motor.disconnect();
+    }
+
+    async disconnect() {
+        // Disconnect both motor and remote for convenience
+        await this.disconnectMotor();
+        this.disconnectRemote();
     }
 
     async setPower(pwmValue) {
@@ -246,7 +252,7 @@ class DulaanSDK {
         return this.remote.sendControlCommand(mode, value, data);
     }
 
-    disconnect() {
+    disconnectRemote() {
         this.remote.disconnect();
     }
 
