@@ -105,6 +105,8 @@ class StreamingProcessor {
                 
                 // Voice end detection
                 if (this.isVoiceActive && this.consecutiveSilenceFrames >= this.VAD_SILENCE_FRAMES) {
+                    this.isVoiceActive = false;
+                    this.isListening = false;
                     console.log(`[VAD] 🔇 Voice END detected (${this.consecutiveSilenceFrames} consecutive silence frames)`);
                     this.handleVoiceEnd();
                 }
@@ -226,8 +228,6 @@ class StreamingProcessor {
         const postSpeechDelay = 100;
         
         setTimeout(async () => {
-            this.isVoiceActive = false;
-            this.isListening = false;
             const speechDuration = Date.now() - this.voiceStartTime;
             
             // Add recent VAD buffer as post-speech context (200ms for natural ending)
