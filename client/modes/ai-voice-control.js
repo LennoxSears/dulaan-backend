@@ -129,7 +129,7 @@ class AIVoiceControl {
         
         // Stop audio processing
         await this.stopAudioProcessing();
-        await this.sdk.motor.write(0);
+        await this.motorController.write(0);
         
         console.log("🔇 Voice control stopped");
     }
@@ -384,7 +384,7 @@ class AIVoiceControl {
             console.log(`[MOTOR UPDATE] PWM changed from ${oldPwm} to ${newPwm}`);
             
             // Send to motor controller if available
-            if (this.motorController && this.motorController.isConnected) {
+            if (this.motorController) {
                 console.log(`[MOTOR UPDATE] Motor controller connected, sending PWM command...`);
                 try {
                     await this.motorController.write(newPwm);
