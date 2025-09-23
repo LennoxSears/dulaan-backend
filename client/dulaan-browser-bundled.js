@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-23T08:55:20.912Z
+ * Generated on: 2025-09-23T12:56:20.198Z
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
@@ -1486,11 +1486,14 @@ class ConsentService {
         try {
             const deviceId = await this.getDeviceId();
             
+            // Format payload to match server expectations
             const consentPayload = {
                 deviceId: deviceId,
+                consent: consentData, // Nest consent data under 'consent' property
                 timestamp: new Date().toISOString(),
                 userAgent: navigator.userAgent,
-                ...consentData
+                consentSource: 'web',
+                consentVersion: '1.0'
             };
 
             const response = await fetch(this.apiUrl, {
@@ -1502,7 +1505,15 @@ class ConsentService {
             });
 
             if (!response.ok) {
-                throw new Error(`Consent storage failed: ${response.status}`);
+                // Try to get error details from response
+                let errorDetails = `HTTP ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorDetails = errorData.error || errorData.message || errorDetails;
+                } catch (e) {
+                    // If we can't parse the error response, use the status
+                }
+                throw new Error(`Consent storage failed: ${errorDetails}`);
             }
 
             const result = await response.json();
@@ -1570,7 +1581,6 @@ class ConsentService {
                 dataProcessing: false,
                 analytics: false,
                 remoteControl: false,
-                purpose: 'revoked',
                 consentGiven: false,
                 revoked: true
             };
