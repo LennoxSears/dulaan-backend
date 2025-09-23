@@ -509,7 +509,7 @@ Streaming mode: Chunk ${chunkIndex || chunkIndexHeader || 0}
 Previous conversation:
 ${conversationHistory || 'No previous conversation'}
 
-IMPORTANT: Only react to clear human voice commands. If you don't hear a human speaking a motor control command, keep the current PWM value unchanged.
+IMPORTANT: Only react to human voice commands. If you don't hear a human speaking a motor control command, keep the current PWM value unchanged.
 
 Instructions for streaming:
 1. Listen for human voice giving motor control commands
