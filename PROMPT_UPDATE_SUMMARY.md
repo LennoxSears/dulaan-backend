@@ -1,4 +1,4 @@
-# Motor Sound Handling - Prompt Update Summary
+# Simplified Human Command Focus - Prompt Update Summary
 
 ## Problem Identified
 When motor sounds are transferred to the API, the AI transcribes them as "motor sound" but still sets a new PWM value. This causes unwanted motor behavior changes when the system should only react to human commands.
@@ -8,11 +8,11 @@ The original prompt focused on detecting "motor control intent" but didn't expli
 
 ## Solution Implemented
 
-### Updated Prompt Logic
-1. **Human Voice Detection First**: The AI must first determine if the audio contains human speech
-2. **Explicit Non-Human Exclusion**: Clear instructions to ignore motor sounds, mechanical noise, buzzing, humming
-3. **PWM Preservation**: When non-human audio is detected, maintain the current PWM value
-4. **Audio Type Classification**: Added `audioType` field to response for better debugging
+### Simplified Prompt Logic
+1. **Human Command Focus**: Emphasize only reacting to clear human voice commands
+2. **Simple Rule**: If not a clear human motor command, keep current PWM unchanged
+3. **Clean Instructions**: Removed technical details and specific sound mentions
+4. **Streamlined Response**: Simplified JSON response format
 
 ### Key Changes in `/functions/index.js`
 
@@ -27,21 +27,17 @@ Instructions:
 
 #### After:
 ```javascript
-CRITICAL INSTRUCTIONS:
-1. ONLY respond to HUMAN VOICE commands - ignore all non-human sounds
-2. If you detect motor sounds, mechanical noise, buzzing, humming, or any non-human audio, set intentDetected to FALSE and keep current PWM
-3. Only change PWM values when you clearly hear a human speaking motor control commands
-4. If the audio contains only motor sounds, background noise, or unclear audio, maintain the current PWM value
+IMPORTANT: Only react to clear human voice commands. If you don't hear a human speaking a motor control command, keep the current PWM value unchanged.
 
-Audio Analysis Steps:
-1. First, determine if the audio contains human speech or just motor/mechanical sounds
-2. If it's motor sounds, noise, or unclear audio → intentDetected: false, keep current PWM
-3. If it's human speech → analyze for motor control intent
-4. Only change PWM for clear human motor control commands
+Instructions:
+1. Listen for human voice giving motor control commands
+2. If you hear a clear human command to control the motor, set intentDetected to true and adjust PWM
+3. If you don't hear a clear human motor command, set intentDetected to false and keep current PWM
+4. Only change PWM values for actual human motor control requests
 ```
 
-### Enhanced Response Format
-Added `audioType` field to help with debugging and monitoring:
+### Simplified Response Format
+Clean, focused JSON response:
 
 ```javascript
 {
@@ -49,8 +45,7 @@ Added `audioType` field to help with debugging and monitoring:
   "transcription": "what you heard",
   "pwm": number (0-255),
   "response": "your response",
-  "confidence": number (0-1),
-  "audioType": "human_speech" or "motor_sound" or "background_noise" or "unclear"
+  "confidence": number (0-1)
 }
 ```
 
@@ -76,10 +71,10 @@ The updated prompt has been implemented in both:
 - Streaming mode
 
 ## Benefits
-1. **Prevents Unwanted Motor Changes**: Motor sounds no longer trigger PWM changes
-2. **Better Audio Classification**: Clear distinction between human and non-human audio
+1. **Prevents Unwanted Motor Changes**: Non-human audio no longer triggers PWM changes
+2. **Simplified Logic**: Clear, easy-to-understand instructions for the AI
 3. **Improved Reliability**: System only responds to actual human commands
-4. **Enhanced Debugging**: `audioType` field helps identify audio classification issues
+4. **Cleaner Implementation**: Removed technical complexity and specific sound mentions
 5. **Maintains Functionality**: All existing human voice commands continue to work
 
 ## Files Modified

@@ -5,7 +5,7 @@
 
 // Simulate the updated prompt logic
 function testPromptLogic() {
-    console.log('🧪 Testing Updated Prompt Logic for Motor Sound Handling\n');
+    console.log('🧪 Testing Simplified Prompt Logic - Human Commands Only\n');
     
     // Test scenarios
     const testCases = [
@@ -89,32 +89,19 @@ function testPromptLogic() {
     });
     
     console.log('\n📊 Summary:');
-    console.log('The updated prompt should now:');
-    console.log('✅ Ignore motor sounds and keep current PWM');
-    console.log('✅ Only respond to human voice commands');
-    console.log('✅ Distinguish between human speech and mechanical noise');
+    console.log('The simplified prompt should now:');
+    console.log('✅ Only respond to clear human voice commands');
+    console.log('✅ Keep current PWM for any non-human audio');
     console.log('✅ Maintain PWM for non-motor human commands');
-    console.log('✅ Handle unclear audio by keeping current PWM');
+    console.log('✅ Focus on human motor control intent only');
 }
 
 function simulateAIResponse(testCase) {
-    // Simulate how the AI should respond based on the updated prompt
+    // Simulate how the AI should respond based on the simplified prompt
     const { audioType, transcription, currentPwm } = testCase;
     
-    // Based on the new prompt logic:
-    // 1. If motor sound, background noise, or unclear → intentDetected: false, keep PWM
-    // 2. If human speech → check for motor control intent
-    
-    if (audioType === 'motor_sound' || audioType === 'background_noise' || audioType === 'unclear') {
-        return {
-            intentDetected: false,
-            transcription: transcription,
-            pwm: currentPwm, // Keep current PWM
-            response: getResponseForNonHuman(audioType),
-            confidence: audioType === 'motor_sound' ? 0.8 : 0.3,
-            audioType: audioType
-        };
-    }
+    // Simplified logic: Only respond to clear human motor commands
+    // Everything else keeps current PWM
     
     if (audioType === 'human_speech') {
         // Check if it's a motor control command
@@ -126,8 +113,7 @@ function simulateAIResponse(testCase) {
                 transcription: transcription,
                 pwm: calculateNewPwm(transcription, currentPwm),
                 response: getMotorControlResponse(transcription),
-                confidence: 0.9,
-                audioType: audioType
+                confidence: 0.9
             };
         } else {
             return {
@@ -135,20 +121,18 @@ function simulateAIResponse(testCase) {
                 transcription: transcription,
                 pwm: currentPwm, // Keep current PWM for non-motor commands
                 response: "I'm a motor control assistant. I can help you control the motor device.",
-                confidence: 0.9,
-                audioType: audioType
+                confidence: 0.9
             };
         }
     }
     
-    // Fallback
+    // For any non-human audio, keep current PWM
     return {
         intentDetected: false,
         transcription: transcription,
-        pwm: currentPwm,
-        response: "I didn't understand that clearly.",
-        confidence: 0.1,
-        audioType: 'unclear'
+        pwm: currentPwm, // Keep current PWM
+        response: getResponseForNonHuman(audioType),
+        confidence: audioType === 'motor_sound' ? 0.8 : 0.3
     };
 }
 
