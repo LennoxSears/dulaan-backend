@@ -45,7 +45,7 @@ class StreamingProcessor {
         this.VAD_ZCR_THRESHOLD = 0.08; // Balanced ZCR threshold
         this.VAD_VOICE_FRAMES = 3; // 3 consecutive frames to confirm voice
         this.VAD_SILENCE_FRAMES = 20; // 20 frames of silence to end speech
-        this.MIN_SPEECH_DURATION = 500; // 400ms minimum (in samples)
+        this.MIN_SPEECH_DURATION = 500; // 500ms minimum (in samples)
         this.MAX_SPEECH_DURATION = 320000; // 20 seconds maximum
         
         // Energy history for adaptive thresholds
