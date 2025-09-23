@@ -224,9 +224,8 @@ class DulaanSDK {
         return UTILS.generateShortId();
     }
 
-    async startHost(hostId) {
-        const id = hostId || this.generateId();
-        await this.remote.initializeAsHost(id);
+    async startHost() {
+        const id = await this.remote.initializeAsHost(id);
         return id;
     }
 
