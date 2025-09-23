@@ -112,8 +112,8 @@ ${FILES_TO_BUNDLE.map(f => ` * - ${f}`).join('\n')}
             console.log('🔍 Checking available classes before DulaanSDK creation:', {
                 DulaanSDK: typeof DulaanSDK,
                 MotorController: typeof MotorController,
-                OptimizedStreamingProcessor: typeof OptimizedStreamingProcessor,
-                OptimizedApiService: typeof OptimizedApiService,
+                StreamingProcessor: typeof StreamingProcessor,
+                ApiService: typeof ApiService,
                 ConsentService: typeof ConsentService,
                 RemoteService: typeof RemoteService,
                 RingBuffer: typeof RingBuffer
@@ -142,12 +142,12 @@ ${FILES_TO_BUNDLE.map(f => ` * - ${f}`).join('\n')}
     // Export individual components for advanced usage
     window.DULAAN_COMPONENTS = {
         MotorController: typeof MotorController !== 'undefined' ? MotorController : null,
-        OptimizedStreamingProcessor: typeof OptimizedStreamingProcessor !== 'undefined' ? OptimizedStreamingProcessor : null,
-        OptimizedApiService: typeof OptimizedApiService !== 'undefined' ? OptimizedApiService : null,
+        StreamingProcessor: typeof StreamingProcessor !== 'undefined' ? StreamingProcessor : null,
+        ApiService: typeof ApiService !== 'undefined' ? ApiService : null,
         ConsentService: typeof ConsentService !== 'undefined' ? ConsentService : null,
         RemoteService: typeof RemoteService !== 'undefined' ? RemoteService : null,
         RemoteControl: typeof RemoteControl !== 'undefined' ? RemoteControl : null,
-        OptimizedAIVoiceControl: typeof OptimizedAIVoiceControl !== 'undefined' ? OptimizedAIVoiceControl : null,
+        AIVoiceControl: typeof AIVoiceControl !== 'undefined' ? AIVoiceControl : null,
         AmbientControl: typeof AmbientControl !== 'undefined' ? AmbientControl : null,
         TouchControl: typeof TouchControl !== 'undefined' ? TouchControl : null,
         RingBuffer: typeof RingBuffer !== 'undefined' ? RingBuffer : null,
