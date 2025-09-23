@@ -221,6 +221,7 @@ class DulaanSDK {
             await this.modes[this.currentMode].stop();
             this.currentMode = null;
         }
+        this.motor.write(0)
     }
 
     getCurrentMode() {

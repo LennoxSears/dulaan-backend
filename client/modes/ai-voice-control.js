@@ -129,6 +129,7 @@ class AIVoiceControl {
         
         // Stop audio processing
         await this.stopAudioProcessing();
+        await this.sdk.motor.write(0);
         
         console.log("🔇 Voice control stopped");
     }

@@ -93,6 +93,9 @@ export class TouchControl {
     }
 
     stopPwmWriting() {
+        if(window && window.touchValue) {
+            window.touchValue = 0
+        }
         if (this.pwmInterval) {
             clearInterval(this.pwmInterval);
             this.pwmInterval = null;
