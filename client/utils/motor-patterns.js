@@ -23,7 +23,7 @@ export const RELAXING_PATTERNS = {
     gentle_waves: {
         id: "gentle_waves",
         name: "Gentle Waves",
-        description: "柔和波浪，放松",
+        description: "Gentle waves, relaxing",
         category: "relaxing",
         duration: 10000,
         loop: true,
@@ -45,7 +45,7 @@ export const RELAXING_PATTERNS = {
     meditation_flow: {
         id: "meditation_flow",
         name: "Meditation Flow",
-        description: "冥想流，稳定宁静",
+        description: "Meditation flow, stable and peaceful",
         category: "relaxing",
         duration: 10000,
         loop: true,
@@ -67,7 +67,7 @@ export const RELAXING_PATTERNS = {
     twilight_drift: {
         id: "twilight_drift",
         name: "Twilight Drift",
-        description: "黄昏漂流，放松收尾",
+        description: "Twilight drift, relaxing wind-down",
         category: "relaxing",
         duration: 10000,
         loop: true,
@@ -89,7 +89,7 @@ export const RELAXING_PATTERNS = {
     ocean_breeze: {
         id: "ocean_breeze",
         name: "Ocean Breeze",
-        description: "海风拂面，轻盈",
+        description: "Ocean breeze on face, light and airy",
         category: "relaxing",
         duration: 10000,
         loop: true,
@@ -114,7 +114,7 @@ export const ENERGIZING_PATTERNS = {
     power_pulse: {
         id: "power_pulse",
         name: "Power Pulse",
-        description: "强力脉冲，能量提升",
+        description: "Powerful pulse, energy boost",
         category: "energizing",
         duration: 10000,
         loop: true,
@@ -136,7 +136,7 @@ export const ENERGIZING_PATTERNS = {
     sunrise_awakening: {
         id: "sunrise_awakening",
         name: "Sunrise Awakening",
-        description: "日出苏醒，渐强",
+        description: "Sunrise awakening, gradually strengthening",
         category: "energizing",
         duration: 10000,
         loop: true,
@@ -158,7 +158,7 @@ export const ENERGIZING_PATTERNS = {
     focus_booster: {
         id: "focus_booster",
         name: "Focus Booster",
-        description: "专注提升，稳定集中",
+        description: "Focus enhancement, stable concentration",
         category: "energizing",
         duration: 10000,
         loop: true,
@@ -183,7 +183,7 @@ export const DYNAMIC_PATTERNS = {
     rhythmic_dance: {
         id: "rhythmic_dance",
         name: "Rhythmic Dance",
-        description: "律动舞蹈，活泼",
+        description: "Rhythmic dance, lively",
         category: "dynamic",
         duration: 10000,
         loop: true,
@@ -205,7 +205,7 @@ export const DYNAMIC_PATTERNS = {
     storm_rush: {
         id: "storm_rush",
         name: "Storm Rush",
-        description: "暴风骤雨，强烈爆发",
+        description: "Storm and rain, intense burst",
         category: "dynamic",
         duration: 10000,
         loop: true,
@@ -227,7 +227,7 @@ export const DYNAMIC_PATTERNS = {
     tech_pulse: {
         id: "tech_pulse",
         name: "Tech Pulse",
-        description: "科技节奏，现代感",
+        description: "Tech rhythm, modern feel",
         category: "dynamic",
         duration: 10000,
         loop: true,
