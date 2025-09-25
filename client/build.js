@@ -37,6 +37,12 @@ const FILES_TO_BUNDLE = [
     'dulaan-sdk.js'
 ];
 
+// Mock files to include when --mock flag is used
+const MOCK_FILES = [
+    'mocks/mock-ble.js',
+    'mocks/mock-voice-recorder.js'
+];
+
 /**
  * Convert ES6 module to browser-compatible code
  */
@@ -64,17 +70,26 @@ function convertModuleToBrowser(content, filename) {
 /**
  * Create the browser bundle
  */
-function createBundle() {
-    console.log('🔨 Building Dulaan Browser Bundle...');
+function createBundle(useMocks = false) {
+    const buildType = useMocks ? 'Mock' : 'Production';
+    console.log(`🔨 Building Dulaan Browser Bundle (${buildType})...`);
+    
+    // Determine which files to bundle
+    const filesToBundle = [...FILES_TO_BUNDLE];
+    if (useMocks) {
+        // Add mock files at the beginning (before other files)
+        filesToBundle.unshift(...MOCK_FILES);
+    }
     
     let bundleContent = `/**
  * Dulaan Browser Bundle - Auto-generated from modular sources
  * Generated on: ${new Date().toISOString()}
+ * Build type: ${buildType}
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
  * 
  * Source files:
-${FILES_TO_BUNDLE.map(f => ` * - ${f}`).join('\n')}
+${filesToBundle.map(f => ` * - ${f}`).join('\n')}
  */
 
 (function(window) {
@@ -83,7 +98,7 @@ ${FILES_TO_BUNDLE.map(f => ` * - ${f}`).join('\n')}
 `;
 
     // Process each file
-    for (const filePath of FILES_TO_BUNDLE) {
+    for (const filePath of filesToBundle) {
         const fullPath = path.join(__dirname, filePath);
         
         if (!fs.existsSync(fullPath)) {
@@ -160,12 +175,14 @@ ${FILES_TO_BUNDLE.map(f => ` * - ${f}`).join('\n')}
 
     console.log('🚀 Dulaan Browser Bundle loaded successfully');
     console.log('📦 Available components:', Object.keys(window.DULAAN_COMPONENTS));
+    ${useMocks ? `console.log('🧪 Mock mode enabled - BLE and VoiceRecorder are simulated');` : ''}
 
 })(window);
 `;
 
     // Write the bundle
-    const outputPath = path.join(__dirname, 'dulaan-browser-bundled.js');
+    const filename = useMocks ? 'dulaan-browser-bundled-mock.js' : 'dulaan-browser-bundled.js';
+    const outputPath = path.join(__dirname, filename);
     fs.writeFileSync(outputPath, bundleContent);
     
     console.log(`✅ Bundle created: ${outputPath}`);
@@ -236,21 +253,34 @@ function deployBundle() {
 // Main execution
 if (require.main === module) {
     try {
-        const bundlePath = createBundle();
-        updateHtmlFiles();
+        // Check for mock flag
+        const useMocks = process.argv.includes('--mock');
         
-        // Auto-deploy if --deploy flag is passed
-        if (process.argv.includes('--deploy')) {
+        const bundlePath = createBundle(useMocks);
+        
+        // Only update HTML files for normal builds
+        if (!useMocks) {
+            updateHtmlFiles();
+        }
+        
+        // Auto-deploy if --deploy flag is passed (only for normal builds)
+        if (process.argv.includes('--deploy') && !useMocks) {
             deployBundle();
         }
         
         console.log('\n🎉 Build completed successfully!');
         
-        if (!process.argv.includes('--deploy')) {
+        if (useMocks) {
+            console.log('\n🧪 Mock build created for testing:');
+            console.log('- BLE operations will be simulated');
+            console.log('- Voice recording will generate mock audio');
+            console.log('- Perfect for development and testing without hardware');
+        } else if (!process.argv.includes('--deploy')) {
             console.log('\n📋 Next steps:');
             console.log('1. Test the new bundle in your HTML files');
             console.log('2. Run "node build.js --deploy" to replace main bundle');
             console.log('3. Continue developing in the modular files');
+            console.log('4. Use "node build.js --mock" to create a mock version for testing');
         }
         
     } catch (error) {
