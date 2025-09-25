@@ -161,15 +161,10 @@ class MotorPatternLibrary {
         this.isPlaying = false;
         this.isPaused = false;
         
-        // Clear playback interval
+        // Clear playback interval immediately
         if (this.playbackInterval) {
             clearInterval(this.playbackInterval);
             this.playbackInterval = null;
-        }
-
-        // Set motor to 0
-        if (this.motorController) {
-            await this.motorController.write(0);
         }
 
         const stoppedPattern = this.currentPattern;
@@ -177,13 +172,20 @@ class MotorPatternLibrary {
 
         console.log(`[Pattern Library] Stopped pattern playback`);
 
-        // Trigger callbacks
+        // Trigger callbacks immediately
         if (this.onPatternEnd) {
             this.onPatternEnd(stoppedPattern);
         }
 
         if (this.onPlaybackStateChange) {
             this.onPlaybackStateChange({ isPlaying: false, isPaused: false, pattern: null });
+        }
+
+        // Set motor to 0 without blocking (fire and forget)
+        if (this.motorController) {
+            this.motorController.write(0).catch(error => {
+                console.warn('[Pattern Library] Failed to stop motor:', error);
+            });
         }
 
         return true;
