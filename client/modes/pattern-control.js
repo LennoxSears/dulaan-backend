@@ -268,29 +268,7 @@ export class PatternControl {
     /**
      * Quick play methods for common patterns
      */
-    async playGentleWave(options = {}) {
-        return await this.playPattern('gentle_wave', options);
-    }
 
-    async playSteadyBeat(options = {}) {
-        return await this.playPattern('steady_beat', options);
-    }
-
-    async playRapidFire(options = {}) {
-        return await this.playPattern('rapid_fire', options);
-    }
-
-    async playBreathing(options = {}) {
-        return await this.playPattern('breathing', options);
-    }
-
-    async playHeartbeat(options = {}) {
-        return await this.playPattern('user_heartbeat', options);
-    }
-
-    async playRandomWalk(options = {}) {
-        return await this.playPattern('random_walk', options);
-    }
 
     /**
      * Pattern queue functionality
