@@ -26,9 +26,8 @@ export class PatternControl {
         this.maxLoops = -1;
         this.playbackSpeed = 1.0;
         
-        // Legacy state for compatibility
+        // Current pattern ID for compatibility
         this.currentPatternId = null;
-        this.playbackOptions = {};
         
         // Event callbacks
         this.onPatternStart = null;
@@ -162,7 +161,6 @@ export class PatternControl {
         // Set up new pattern
         this.currentPattern = { ...pattern };
         this.currentPatternId = patternId;
-        this.playbackOptions = { ...options };
         this.maxLoops = options.loops !== undefined ? options.loops : (pattern.loop ? -1 : 1);
         this.playbackSpeed = options.speed || 1.0;
 
@@ -482,62 +480,8 @@ export class PatternControl {
         this.onPlaybackStateChange = callbacks.onPlaybackStateChange || null;
     }
 
-    /**
-     * Handle pattern start event
-     */
-    handlePatternStart(pattern) {
-        console.log(`[Pattern Control] Pattern started: ${pattern.name}`);
-        
-        if (this.onPatternStart) {
-            this.onPatternStart(pattern);
-        }
-    }
 
-    /**
-     * Handle pattern end event
-     */
-    handlePatternEnd(pattern) {
-        console.log(`[Pattern Control] Pattern ended: ${pattern?.name || 'Unknown'}`);
-        
-        this.currentPatternId = null;
-        
-        if (this.onPatternEnd) {
-            this.onPatternEnd(pattern);
-        }
-    }
 
-    /**
-     * Handle pattern loop event
-     */
-    handlePatternLoop(pattern, loop) {
-        console.log(`[Pattern Control] Pattern loop ${loop + 1}: ${pattern.name}`);
-        
-        if (this.onPatternLoop) {
-            this.onPatternLoop(pattern, loop);
-        }
-    }
-
-    /**
-     * Handle frame update event
-     */
-    handleFrameUpdate(status) {
-        if (this.onFrameUpdate) {
-            this.onFrameUpdate(status);
-        }
-    }
-
-    /**
-     * Handle playback state change event
-     */
-    handlePlaybackStateChange(state) {
-        if (this.onPlaybackStateChange) {
-            this.onPlaybackStateChange(state);
-        }
-    }
-
-    /**
-     * Quick play methods for common patterns
-     */
 
 
     /**
