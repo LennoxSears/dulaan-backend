@@ -18,294 +18,260 @@
  * }
  */
 
-// Gentle patterns - soft, slow, relaxing
-export const GENTLE_PATTERNS = {
-    gentle_wave: {
-        id: "gentle_wave",
-        name: "Gentle Wave",
-        description: "Smooth wave-like pattern with gradual intensity changes",
-        category: "gentle",
-        duration: 8000,
+// Relaxing patterns - gentle, calming, peaceful
+export const RELAXING_PATTERNS = {
+    gentle_waves: {
+        id: "gentle_waves",
+        name: "Gentle Waves",
+        description: "柔和波浪，放松",
+        category: "relaxing",
+        duration: 10000,
         loop: true,
         frames: [
-            { time: 0, pwm: 0 },
-            { time: 1000, pwm: 50 },
-            { time: 2000, pwm: 100 },
-            { time: 3000, pwm: 150 },
-            { time: 4000, pwm: 200 },
-            { time: 5000, pwm: 150 },
-            { time: 6000, pwm: 100 },
-            { time: 7000, pwm: 50 },
-            { time: 8000, pwm: 0 }
+            { time: 0, pwm: Math.round(20 * 2.55) },      // 51
+            { time: 1000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 2000, pwm: Math.round(60 * 2.55) },   // 153
+            { time: 3000, pwm: Math.round(80 * 2.55) },   // 204
+            { time: 4000, pwm: Math.round(60 * 2.55) },   // 153
+            { time: 5000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 6000, pwm: Math.round(20 * 2.55) },   // 51
+            { time: 7000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 8000, pwm: Math.round(60 * 2.55) },   // 153
+            { time: 9000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 10000, pwm: Math.round(40 * 2.55) }   // 102
         ]
     },
 
-    soft_pulse: {
-        id: "soft_pulse",
-        name: "Soft Pulse",
-        description: "Gentle pulsing pattern with soft peaks",
-        category: "gentle",
-        duration: 4000,
+    meditation_flow: {
+        id: "meditation_flow",
+        name: "Meditation Flow",
+        description: "冥想流，稳定宁静",
+        category: "relaxing",
+        duration: 10000,
         loop: true,
         frames: [
-            { time: 0, pwm: 0 },
-            { time: 500, pwm: 80 },
-            { time: 1000, pwm: 0 },
-            { time: 1500, pwm: 80 },
-            { time: 2000, pwm: 0 },
-            { time: 2500, pwm: 80 },
-            { time: 3000, pwm: 0 },
-            { time: 3500, pwm: 80 },
-            { time: 4000, pwm: 0 }
+            { time: 0, pwm: Math.round(40 * 2.55) },      // 102
+            { time: 1000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 2000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 3000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 4000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 5000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 6000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 7000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 8000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 9000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 10000, pwm: Math.round(40 * 2.55) }   // 102
         ]
     },
 
-    breathing: {
-        id: "breathing",
-        name: "Breathing",
-        description: "Mimics natural breathing rhythm",
-        category: "gentle",
-        duration: 6000,
+    twilight_drift: {
+        id: "twilight_drift",
+        name: "Twilight Drift",
+        description: "黄昏漂流，放松收尾",
+        category: "relaxing",
+        duration: 10000,
         loop: true,
         frames: [
-            { time: 0, pwm: 0 },
-            { time: 1500, pwm: 120 },    // Inhale
-            { time: 3000, pwm: 120 },    // Hold
-            { time: 4500, pwm: 0 },      // Exhale
-            { time: 6000, pwm: 0 }       // Rest
+            { time: 0, pwm: Math.round(60 * 2.55) },      // 153
+            { time: 1000, pwm: Math.round(50 * 2.55) },   // 128
+            { time: 2000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 3000, pwm: Math.round(30 * 2.55) },   // 77
+            { time: 4000, pwm: Math.round(20 * 2.55) },   // 51
+            { time: 5000, pwm: Math.round(10 * 2.55) },   // 26
+            { time: 6000, pwm: 0 },                       // 0
+            { time: 7000, pwm: Math.round(10 * 2.55) },   // 26
+            { time: 8000, pwm: 0 },                       // 0
+            { time: 9000, pwm: 0 },                       // 0
+            { time: 10000, pwm: 0 }                       // 0
+        ]
+    },
+
+    ocean_breeze: {
+        id: "ocean_breeze",
+        name: "Ocean Breeze",
+        description: "海风拂面，轻盈",
+        category: "relaxing",
+        duration: 10000,
+        loop: true,
+        frames: [
+            { time: 0, pwm: Math.round(30 * 2.55) },      // 77
+            { time: 1000, pwm: Math.round(50 * 2.55) },   // 128
+            { time: 2000, pwm: Math.round(20 * 2.55) },   // 51
+            { time: 3000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 4000, pwm: Math.round(30 * 2.55) },   // 77
+            { time: 5000, pwm: Math.round(50 * 2.55) },   // 128
+            { time: 6000, pwm: Math.round(20 * 2.55) },   // 51
+            { time: 7000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 8000, pwm: Math.round(30 * 2.55) },   // 77
+            { time: 9000, pwm: Math.round(20 * 2.55) },   // 51
+            { time: 10000, pwm: Math.round(20 * 2.55) }   // 51
         ]
     }
 };
 
-// Rhythmic patterns - beat-based, musical
-export const RHYTHMIC_PATTERNS = {
-    steady_beat: {
-        id: "steady_beat",
-        name: "Steady Beat",
-        description: "Consistent rhythmic pulses like a heartbeat",
-        category: "rhythmic",
-        duration: 2000,
+// Energizing patterns - boosting, awakening, focusing
+export const ENERGIZING_PATTERNS = {
+    power_pulse: {
+        id: "power_pulse",
+        name: "Power Pulse",
+        description: "强力脉冲，能量提升",
+        category: "energizing",
+        duration: 10000,
         loop: true,
         frames: [
-            { time: 0, pwm: 0 },
-            { time: 100, pwm: 180 },
-            { time: 300, pwm: 0 },
-            { time: 1000, pwm: 0 },
-            { time: 1100, pwm: 180 },
-            { time: 1300, pwm: 0 },
-            { time: 2000, pwm: 0 }
+            { time: 0, pwm: Math.round(90 * 2.55) },      // 230
+            { time: 1000, pwm: Math.round(90 * 2.55) },   // 230
+            { time: 2000, pwm: Math.round(90 * 2.55) },   // 230
+            { time: 3000, pwm: Math.round(90 * 2.55) },   // 230
+            { time: 4000, pwm: Math.round(90 * 2.55) },   // 230
+            { time: 5000, pwm: Math.round(90 * 2.55) },   // 230
+            { time: 6000, pwm: Math.round(90 * 2.55) },   // 230
+            { time: 7000, pwm: Math.round(90 * 2.55) },   // 230
+            { time: 8000, pwm: Math.round(90 * 2.55) },   // 230
+            { time: 9000, pwm: Math.round(90 * 2.55) },   // 230
+            { time: 10000, pwm: Math.round(90 * 2.55) }   // 230
         ]
     },
 
-    double_tap: {
-        id: "double_tap",
-        name: "Double Tap",
-        description: "Two quick pulses followed by a pause",
-        category: "rhythmic",
-        duration: 3000,
+    sunrise_awakening: {
+        id: "sunrise_awakening",
+        name: "Sunrise Awakening",
+        description: "日出苏醒，渐强",
+        category: "energizing",
+        duration: 10000,
         loop: true,
         frames: [
-            { time: 0, pwm: 0 },
-            { time: 100, pwm: 200 },
-            { time: 200, pwm: 0 },
-            { time: 400, pwm: 200 },
-            { time: 500, pwm: 0 },
-            { time: 3000, pwm: 0 }
+            { time: 0, pwm: Math.round(10 * 2.55) },      // 26
+            { time: 1000, pwm: Math.round(20 * 2.55) },   // 51
+            { time: 2000, pwm: Math.round(30 * 2.55) },   // 77
+            { time: 3000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 4000, pwm: Math.round(50 * 2.55) },   // 128
+            { time: 5000, pwm: Math.round(60 * 2.55) },   // 153
+            { time: 6000, pwm: Math.round(70 * 2.55) },   // 179
+            { time: 7000, pwm: Math.round(80 * 2.55) },   // 204
+            { time: 8000, pwm: Math.round(90 * 2.55) },   // 230
+            { time: 9000, pwm: Math.round(100 * 2.55) },  // 255
+            { time: 10000, pwm: Math.round(100 * 2.55) }  // 255
         ]
     },
 
-    waltz: {
-        id: "waltz",
-        name: "Waltz",
-        description: "Three-beat pattern like a waltz rhythm",
-        category: "rhythmic",
-        duration: 3000,
+    focus_booster: {
+        id: "focus_booster",
+        name: "Focus Booster",
+        description: "专注提升，稳定集中",
+        category: "energizing",
+        duration: 10000,
         loop: true,
         frames: [
-            { time: 0, pwm: 0 },
-            { time: 100, pwm: 220 },     // Strong beat
-            { time: 300, pwm: 0 },
-            { time: 1000, pwm: 150 },    // Weak beat
-            { time: 1200, pwm: 0 },
-            { time: 2000, pwm: 150 },    // Weak beat
-            { time: 2200, pwm: 0 },
-            { time: 3000, pwm: 0 }
+            { time: 0, pwm: Math.round(70 * 2.55) },      // 179
+            { time: 1000, pwm: Math.round(70 * 2.55) },   // 179
+            { time: 2000, pwm: Math.round(70 * 2.55) },   // 179
+            { time: 3000, pwm: Math.round(70 * 2.55) },   // 179
+            { time: 4000, pwm: Math.round(70 * 2.55) },   // 179
+            { time: 5000, pwm: Math.round(70 * 2.55) },   // 179
+            { time: 6000, pwm: Math.round(70 * 2.55) },   // 179
+            { time: 7000, pwm: Math.round(70 * 2.55) },   // 179
+            { time: 8000, pwm: Math.round(70 * 2.55) },   // 179
+            { time: 9000, pwm: Math.round(70 * 2.55) },   // 179
+            { time: 10000, pwm: Math.round(70 * 2.55) }   // 179
         ]
     }
 };
 
-// Intense patterns - strong, fast, energetic
-export const INTENSE_PATTERNS = {
-    rapid_fire: {
-        id: "rapid_fire",
-        name: "Rapid Fire",
-        description: "Quick successive pulses with high intensity",
-        category: "intense",
-        duration: 2000,
+// Dynamic patterns - rhythmic, lively, alternating
+export const DYNAMIC_PATTERNS = {
+    rhythmic_dance: {
+        id: "rhythmic_dance",
+        name: "Rhythmic Dance",
+        description: "律动舞蹈，活泼",
+        category: "dynamic",
+        duration: 10000,
         loop: true,
         frames: [
-            { time: 0, pwm: 0 },
-            { time: 100, pwm: 255 },
-            { time: 150, pwm: 0 },
-            { time: 250, pwm: 255 },
-            { time: 300, pwm: 0 },
-            { time: 400, pwm: 255 },
-            { time: 450, pwm: 0 },
-            { time: 550, pwm: 255 },
-            { time: 600, pwm: 0 },
-            { time: 2000, pwm: 0 }
+            { time: 0, pwm: Math.round(80 * 2.55) },      // 204
+            { time: 1000, pwm: Math.round(20 * 2.55) },   // 51
+            { time: 2000, pwm: Math.round(80 * 2.55) },   // 204
+            { time: 3000, pwm: Math.round(20 * 2.55) },   // 51
+            { time: 4000, pwm: Math.round(60 * 2.55) },   // 153
+            { time: 5000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 6000, pwm: Math.round(60 * 2.55) },   // 153
+            { time: 7000, pwm: Math.round(40 * 2.55) },   // 102
+            { time: 8000, pwm: Math.round(80 * 2.55) },   // 204
+            { time: 9000, pwm: Math.round(20 * 2.55) },   // 51
+            { time: 10000, pwm: Math.round(20 * 2.55) }   // 51
         ]
     },
 
-    power_surge: {
-        id: "power_surge",
-        name: "Power Surge",
-        description: "Intense build-up to maximum power",
-        category: "intense",
-        duration: 5000,
+    storm_rush: {
+        id: "storm_rush",
+        name: "Storm Rush",
+        description: "暴风骤雨，强烈爆发",
+        category: "dynamic",
+        duration: 10000,
         loop: true,
         frames: [
-            { time: 0, pwm: 0 },
-            { time: 500, pwm: 100 },
-            { time: 1000, pwm: 150 },
-            { time: 1500, pwm: 200 },
-            { time: 2000, pwm: 255 },
-            { time: 3000, pwm: 255 },
-            { time: 3500, pwm: 200 },
-            { time: 4000, pwm: 100 },
-            { time: 4500, pwm: 50 },
-            { time: 5000, pwm: 0 }
+            { time: 0, pwm: Math.round(100 * 2.55) },     // 255
+            { time: 1000, pwm: 0 },                       // 0
+            { time: 2000, pwm: Math.round(100 * 2.55) },  // 255
+            { time: 3000, pwm: 0 },                       // 0
+            { time: 4000, pwm: Math.round(80 * 2.55) },   // 204
+            { time: 5000, pwm: 0 },                       // 0
+            { time: 6000, pwm: Math.round(100 * 2.55) },  // 255
+            { time: 7000, pwm: 0 },                       // 0
+            { time: 8000, pwm: Math.round(100 * 2.55) },  // 255
+            { time: 9000, pwm: 0 },                       // 0
+            { time: 10000, pwm: 0 }                       // 0
         ]
     },
 
-    earthquake: {
-        id: "earthquake",
-        name: "Earthquake",
-        description: "Chaotic, unpredictable vibrations",
-        category: "intense",
-        duration: 4000,
+    tech_pulse: {
+        id: "tech_pulse",
+        name: "Tech Pulse",
+        description: "科技节奏，现代感",
+        category: "dynamic",
+        duration: 10000,
         loop: true,
         frames: [
-            { time: 0, pwm: 0 },
-            { time: 200, pwm: 180 },
-            { time: 350, pwm: 220 },
-            { time: 500, pwm: 100 },
-            { time: 700, pwm: 255 },
-            { time: 900, pwm: 50 },
-            { time: 1100, pwm: 200 },
-            { time: 1300, pwm: 150 },
-            { time: 1500, pwm: 240 },
-            { time: 1700, pwm: 80 },
-            { time: 1900, pwm: 190 },
-            { time: 2100, pwm: 255 },
-            { time: 2300, pwm: 120 },
-            { time: 2500, pwm: 200 },
-            { time: 2700, pwm: 60 },
-            { time: 2900, pwm: 180 },
-            { time: 3100, pwm: 100 },
-            { time: 3300, pwm: 50 },
-            { time: 3500, pwm: 20 },
-            { time: 4000, pwm: 0 }
+            { time: 0, pwm: Math.round(90 * 2.55) },      // 230
+            { time: 1000, pwm: 0 },                       // 0
+            { time: 2000, pwm: Math.round(90 * 2.55) },   // 230
+            { time: 3000, pwm: 0 },                       // 0
+            { time: 4000, pwm: Math.round(70 * 2.55) },   // 179
+            { time: 5000, pwm: 0 },                       // 0
+            { time: 6000, pwm: Math.round(90 * 2.55) },   // 230
+            { time: 7000, pwm: 0 },                       // 0
+            { time: 8000, pwm: Math.round(90 * 2.55) },   // 230
+            { time: 9000, pwm: 0 },                       // 0
+            { time: 10000, pwm: 0 }                       // 0
         ]
     }
 };
 
-// Special patterns - unique behaviors
-export const SPECIAL_PATTERNS = {
-    random_walk: {
-        id: "random_walk",
-        name: "Random Walk",
-        description: "Randomly generated pattern (regenerated each loop)",
-        category: "special",
-        duration: 5000,
-        loop: true,
-        frames: [] // Will be generated dynamically
-    },
-
-    user_heartbeat: {
-        id: "user_heartbeat",
-        name: "User Heartbeat",
-        description: "Simulates human heartbeat rhythm",
-        category: "special",
-        duration: 3000,
-        loop: true,
-        frames: [
-            { time: 0, pwm: 0 },
-            { time: 100, pwm: 200 },     // Lub
-            { time: 200, pwm: 0 },
-            { time: 300, pwm: 150 },     // Dub
-            { time: 400, pwm: 0 },
-            { time: 3000, pwm: 0 }       // Rest period
-        ]
-    },
-
-    morse_sos: {
-        id: "morse_sos",
-        name: "Morse SOS",
-        description: "SOS signal in Morse code (... --- ...)",
-        category: "special",
-        duration: 6000,
-        loop: true,
-        frames: [
-            // S (...)
-            { time: 0, pwm: 0 },
-            { time: 100, pwm: 150 },     // .
-            { time: 200, pwm: 0 },
-            { time: 300, pwm: 150 },     // .
-            { time: 400, pwm: 0 },
-            { time: 500, pwm: 150 },     // .
-            { time: 600, pwm: 0 },
-            
-            // O (---)
-            { time: 800, pwm: 150 },     // -
-            { time: 1100, pwm: 0 },
-            { time: 1200, pwm: 150 },    // -
-            { time: 1500, pwm: 0 },
-            { time: 1600, pwm: 150 },    // -
-            { time: 1900, pwm: 0 },
-            
-            // S (...)
-            { time: 2100, pwm: 150 },    // .
-            { time: 2200, pwm: 0 },
-            { time: 2300, pwm: 150 },    // .
-            { time: 2400, pwm: 0 },
-            { time: 2500, pwm: 150 },    // .
-            { time: 2600, pwm: 0 },
-            
-            { time: 6000, pwm: 0 }       // Long pause
-        ]
-    }
-};
+// Remove special patterns - replaced with user-defined patterns
 
 // Combine all patterns into a single library
 export const MOTOR_PATTERN_LIBRARY = {
-    ...GENTLE_PATTERNS,
-    ...RHYTHMIC_PATTERNS,
-    ...INTENSE_PATTERNS,
-    ...SPECIAL_PATTERNS
+    ...RELAXING_PATTERNS,
+    ...ENERGIZING_PATTERNS,
+    ...DYNAMIC_PATTERNS
 };
 
 // Pattern categories for organization
 export const PATTERN_CATEGORIES = {
-    gentle: {
-        name: "Gentle",
-        description: "Soft, slow, relaxing patterns",
-        patterns: Object.keys(GENTLE_PATTERNS)
+    relaxing: {
+        name: "Relaxing",
+        description: "Gentle, calming, peaceful patterns",
+        patterns: Object.keys(RELAXING_PATTERNS)
     },
-    rhythmic: {
-        name: "Rhythmic", 
-        description: "Beat-based, musical patterns",
-        patterns: Object.keys(RHYTHMIC_PATTERNS)
+    energizing: {
+        name: "Energizing", 
+        description: "Boosting, awakening, focusing patterns",
+        patterns: Object.keys(ENERGIZING_PATTERNS)
     },
-    intense: {
-        name: "Intense",
-        description: "Strong, fast, energetic patterns", 
-        patterns: Object.keys(INTENSE_PATTERNS)
-    },
-    special: {
-        name: "Special",
-        description: "Unique behaviors and effects",
-        patterns: Object.keys(SPECIAL_PATTERNS)
+    dynamic: {
+        name: "Dynamic",
+        description: "Rhythmic, lively, alternating patterns", 
+        patterns: Object.keys(DYNAMIC_PATTERNS)
     }
 };
 
