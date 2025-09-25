@@ -10,6 +10,12 @@ class MockVoiceRecorder {
         this.streamInterval = null;
         this.chunkCounter = 0;
         
+        // Error simulation flags for testing edge cases
+        this.simulatePermissionDenied = false;
+        this.simulateStartError = false;
+        this.simulateStopError = false;
+        this.simulateChunkError = false;
+        
         console.log('[MOCK VOICE] MockVoiceRecorder initialized');
     }
 
@@ -19,6 +25,13 @@ class MockVoiceRecorder {
     async requestAudioRecordingPermission() {
         console.log('[MOCK VOICE] Requesting audio permission...');
         await this.delay(300);
+        
+        // Simulate permission denied for testing
+        if (this.simulatePermissionDenied) {
+            const result = { value: false };
+            console.log('[MOCK VOICE] ❌ Audio permission denied (simulated)');
+            return result;
+        }
         
         // Simulate permission granted
         const result = { value: true };
@@ -62,6 +75,13 @@ class MockVoiceRecorder {
         console.log('[MOCK VOICE] Starting audio streaming...');
         await this.delay(200);
         
+        // Simulate start error for testing
+        if (this.simulateStartError) {
+            const error = new Error('Failed to start audio streaming (simulated)');
+            console.error('[MOCK VOICE] ❌ Start streaming error:', error.message);
+            throw error;
+        }
+        
         this.isStreaming = true;
         this.chunkCounter = 0;
         
@@ -84,6 +104,13 @@ class MockVoiceRecorder {
 
         console.log('[MOCK VOICE] Stopping audio streaming...');
         
+        // Simulate stop error for testing
+        if (this.simulateStopError) {
+            const error = new Error('Failed to stop audio streaming (simulated)');
+            console.error('[MOCK VOICE] ❌ Stop streaming error:', error.message);
+            throw error;
+        }
+        
         this.isStreaming = false;
         if (this.streamInterval) {
             clearInterval(this.streamInterval);
@@ -101,6 +128,12 @@ class MockVoiceRecorder {
         if (!this.isStreaming) return;
 
         this.chunkCounter++;
+        
+        // Simulate chunk error for testing
+        if (this.simulateChunkError && this.chunkCounter % 10 === 0) {
+            console.error('[MOCK VOICE] ❌ Simulated chunk processing error');
+            return; // Skip this chunk
+        }
         
         // Generate mock audio data (simulates real audio patterns)
         const mockAudioData = this.generateMockAudioData();
@@ -202,8 +235,44 @@ class MockVoiceRecorder {
             isStreaming: this.isStreaming,
             chunkCounter: this.chunkCounter,
             listenerCount: this.listeners.size,
-            listeners: Array.from(this.listeners.keys())
+            listeners: Array.from(this.listeners.keys()),
+            errorSimulation: {
+                permissionDenied: this.simulatePermissionDenied,
+                startError: this.simulateStartError,
+                stopError: this.simulateStopError,
+                chunkError: this.simulateChunkError
+            }
         };
+    }
+
+    /**
+     * Control error simulation for testing
+     */
+    setErrorSimulation(errorType, enabled = true) {
+        switch (errorType) {
+            case 'permission':
+                this.simulatePermissionDenied = enabled;
+                break;
+            case 'start':
+                this.simulateStartError = enabled;
+                break;
+            case 'stop':
+                this.simulateStopError = enabled;
+                break;
+            case 'chunk':
+                this.simulateChunkError = enabled;
+                break;
+            case 'all':
+                this.simulatePermissionDenied = enabled;
+                this.simulateStartError = enabled;
+                this.simulateStopError = enabled;
+                this.simulateChunkError = enabled;
+                break;
+            default:
+                console.warn('[MOCK VOICE] Unknown error type:', errorType);
+                return;
+        }
+        console.log(`[MOCK VOICE] Error simulation ${errorType}: ${enabled ? 'enabled' : 'disabled'}`);
     }
 
     /**

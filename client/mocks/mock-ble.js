@@ -11,20 +11,28 @@ class MockBleClient {
         this.scanCallback = null;
         this.disconnectCallbacks = new Map();
         
-        // Mock device data
+        // Mock device data - using actual target device name
         this.mockDevices = [
             {
                 device: {
                     deviceId: 'MOCK_DEVICE_001',
-                    name: 'Dulaan Motor',
+                    name: 'XKL-Q086-BT',
                     rssi: -45
                 }
             },
             {
                 device: {
                     deviceId: 'MOCK_DEVICE_002', 
-                    name: 'Dulaan Motor',
+                    name: 'XKL-Q086-BT',
                     rssi: -67
+                }
+            },
+            // Add some non-target devices for realistic scanning
+            {
+                device: {
+                    deviceId: 'OTHER_DEVICE_001',
+                    name: 'Random BLE Device',
+                    rssi: -78
                 }
             }
         ];
@@ -54,20 +62,27 @@ class MockBleClient {
         this.isScanning = true;
         this.scanCallback = callback;
 
-        // Simulate finding devices over time
+        // Simulate finding devices over time (more realistic timing)
         setTimeout(() => {
             if (this.isScanning && this.scanCallback) {
-                console.log('[MOCK BLE] Found device 1');
-                this.scanCallback(this.mockDevices[0]);
+                console.log('[MOCK BLE] Found non-target device');
+                this.scanCallback(this.mockDevices[2]); // Non-target device first
             }
-        }, 500);
+        }, 300);
 
         setTimeout(() => {
             if (this.isScanning && this.scanCallback) {
-                console.log('[MOCK BLE] Found device 2');
-                this.scanCallback(this.mockDevices[1]);
+                console.log('[MOCK BLE] Found target device 1');
+                this.scanCallback(this.mockDevices[0]); // First target device
             }
-        }, 1200);
+        }, 800);
+
+        setTimeout(() => {
+            if (this.isScanning && this.scanCallback) {
+                console.log('[MOCK BLE] Found target device 2');
+                this.scanCallback(this.mockDevices[1]); // Second target device
+            }
+        }, 1500);
     }
 
     /**
