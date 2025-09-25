@@ -13,6 +13,7 @@ import { remoteService } from './services/remote-service.js';
 import { AIVoiceControl } from './modes/ai-voice-control.js';
 import { AmbientControl } from './modes/ambient-control.js';
 import { TouchControl } from './modes/touch-control.js';
+import { PatternControl } from './modes/pattern-control.js';
 
 // Import core components
 import { ApiService } from './services/api-service.js';
@@ -77,10 +78,18 @@ class DulaanSDK {
             this.modes.touch = null;
         }
         
+        try {
+            this.modes.pattern = new PatternControl(this);
+        } catch (error) {
+            console.warn('Failed to create PatternControl:', error);
+            this.modes.pattern = null;
+        }
+        
         // Direct access to core components
         this.core = {
             apiService: ApiService,
-            voiceControl: AIVoiceControl
+            voiceControl: AIVoiceControl,
+            patternControl: PatternControl
         };
         
         // State
@@ -420,6 +429,130 @@ class DulaanSDK {
             motor: motorStatus,
             isRemoteControlActive: remoteStatus.isRemote || remoteStatus.isControlledByRemote
         };
+    }
+
+    /**
+     * Pattern Control API
+     */
+    async playPattern(patternId, options = {}) {
+        if (!this.modes.pattern) {
+            throw new Error('Pattern control mode not available');
+        }
+        
+        // Start pattern mode if not active
+        if (!this.modes.pattern.isRunning()) {
+            await this.startMode('pattern');
+        }
+        
+        return await this.modes.pattern.playPattern(patternId, options);
+    }
+
+    async stopPattern() {
+        if (this.modes.pattern) {
+            return await this.modes.pattern.stopPattern();
+        }
+        return false;
+    }
+
+    pausePattern() {
+        if (this.modes.pattern) {
+            return this.modes.pattern.pausePattern();
+        }
+        return false;
+    }
+
+    resumePattern() {
+        if (this.modes.pattern) {
+            return this.modes.pattern.resumePattern();
+        }
+        return false;
+    }
+
+    setPatternSpeed(speed) {
+        if (this.modes.pattern) {
+            return this.modes.pattern.setPlaybackSpeed(speed);
+        }
+        return false;
+    }
+
+    getAllPatterns() {
+        if (this.modes.pattern) {
+            return this.modes.pattern.getAllPatterns();
+        }
+        return [];
+    }
+
+    getPatternsByCategory(category) {
+        if (this.modes.pattern) {
+            return this.modes.pattern.getPatternsByCategory(category);
+        }
+        return [];
+    }
+
+    getPattern(patternId) {
+        if (this.modes.pattern) {
+            return this.modes.pattern.getPattern(patternId);
+        }
+        return null;
+    }
+
+    addCustomPattern(pattern) {
+        if (this.modes.pattern) {
+            return this.modes.pattern.addCustomPattern(pattern);
+        }
+        return false;
+    }
+
+    getPatternStatus() {
+        if (this.modes.pattern) {
+            return this.modes.pattern.getPlaybackStatus();
+        }
+        return { isPlaying: false, isPaused: false, pattern: null };
+    }
+
+    getPatternLibraryStats() {
+        if (this.modes.pattern) {
+            return this.modes.pattern.getLibraryStats();
+        }
+        return { totalPatterns: 0, categories: {}, isPlaying: false };
+    }
+
+    async playPatternSequence(patternIds, options = {}) {
+        if (!this.modes.pattern) {
+            throw new Error('Pattern control mode not available');
+        }
+        
+        // Start pattern mode if not active
+        if (!this.modes.pattern.isRunning()) {
+            await this.startMode('pattern');
+        }
+        
+        return await this.modes.pattern.playPatternSequence(patternIds, options);
+    }
+
+    // Quick pattern methods
+    async playGentleWave(options = {}) {
+        return await this.playPattern('gentle_wave', options);
+    }
+
+    async playSteadyBeat(options = {}) {
+        return await this.playPattern('steady_beat', options);
+    }
+
+    async playRapidFire(options = {}) {
+        return await this.playPattern('rapid_fire', options);
+    }
+
+    async playBreathing(options = {}) {
+        return await this.playPattern('breathing', options);
+    }
+
+    async playHeartbeat(options = {}) {
+        return await this.playPattern('user_heartbeat', options);
+    }
+
+    async playRandomWalk(options = {}) {
+        return await this.playPattern('random_walk', options);
     }
 
 

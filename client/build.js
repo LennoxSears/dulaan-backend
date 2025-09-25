@@ -13,6 +13,7 @@ const FILES_TO_BUNDLE = [
     // 1. Constants and utilities first
     'utils/constants.js',
     'utils/audio-utils.js',
+    'utils/motor-patterns.js',
     
     // 2. Core components
     'core/motor-controller.js',
@@ -22,11 +23,13 @@ const FILES_TO_BUNDLE = [
     'services/api-service.js',
     'services/consent-service.js',
     'services/remote-service.js',
+    'services/motor-pattern-library.js',
     
     // 4. Control modes
     'modes/ai-voice-control.js',
     'modes/ambient-control.js',
     'modes/touch-control.js',
+    'modes/pattern-control.js',
     
 
     
@@ -149,6 +152,8 @@ ${FILES_TO_BUNDLE.map(f => ` * - ${f}`).join('\n')}
         AIVoiceControl: typeof AIVoiceControl !== 'undefined' ? AIVoiceControl : null,
         AmbientControl: typeof AmbientControl !== 'undefined' ? AmbientControl : null,
         TouchControl: typeof TouchControl !== 'undefined' ? TouchControl : null,
+        PatternControl: typeof PatternControl !== 'undefined' ? PatternControl : null,
+        MotorPatternLibrary: typeof MotorPatternLibrary !== 'undefined' ? MotorPatternLibrary : null,
         RingBuffer: typeof RingBuffer !== 'undefined' ? RingBuffer : null,
         UTILS: typeof UTILS !== 'undefined' ? UTILS : null
     };
