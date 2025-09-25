@@ -45,6 +45,13 @@ class DulaanSDK {
         
         // Control modes - with safe instantiation
         this.modes = {};
+        this.userConsent = {
+            age_confirm : false,
+            ble_confirm : true,
+            privacy_confirm : false,
+            audio_confirm : true,
+            terms_confirm : false
+        }
         
         try {
             this.modes.ai = new AIVoiceControl({

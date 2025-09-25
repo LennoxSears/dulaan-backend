@@ -206,8 +206,8 @@ exports.storeUserConsent = onRequest(
 
             // Validate consent structure (basic validation) - updated for thumbmarkjs integration
             const validConsentFields = [
-                'analytics', 'marketing', 'functional', 'necessary',
-                'dataProcessing', 'cookies', 'thirdParty', 'remoteControl'
+                'age_confirm', 'ble_confirm', 'privacy_confirm', 'audio_confirm',
+                'terms_confirm'
             ];
 
             const hasValidConsentField = Object.keys(consent).some(key => 
