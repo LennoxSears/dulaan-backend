@@ -7,8 +7,10 @@
  * Pattern data structure:
  * {
  *   id: string,           // Unique identifier
- *   name: string,         // Display name
- *   description: string,  // Pattern description
+ *   name: string,         // Display name (English)
+ *   name_sp: string,      // Display name (Spanish)
+ *   description: string,  // Pattern description (English)
+ *   description_sp: string, // Pattern description (Spanish)
  *   category: string,     // Pattern category
  *   duration: number,     // Total duration in milliseconds
  *   loop: boolean,        // Whether to loop the pattern
@@ -23,7 +25,9 @@ export const RELAXING_PATTERNS = {
     gentle_waves: {
         id: "gentle_waves",
         name: "Gentle Waves",
+        name_sp: "Ondas Suaves",
         description: "Gentle waves, relaxing",
+        description_sp: "Ondas suaves, relajantes",
         category: "relaxing",
         duration: 10000,
         loop: true,
@@ -45,7 +49,9 @@ export const RELAXING_PATTERNS = {
     meditation_flow: {
         id: "meditation_flow",
         name: "Meditation Flow",
+        name_sp: "Flujo de Meditación",
         description: "Meditation flow, stable and peaceful",
+        description_sp: "Flujo de meditación, estable y pacífico",
         category: "relaxing",
         duration: 10000,
         loop: true,
@@ -67,7 +73,9 @@ export const RELAXING_PATTERNS = {
     twilight_drift: {
         id: "twilight_drift",
         name: "Twilight Drift",
+        name_sp: "Deriva del Crepúsculo",
         description: "Twilight drift, relaxing wind-down",
+        description_sp: "Deriva del crepúsculo, relajación gradual",
         category: "relaxing",
         duration: 10000,
         loop: true,
@@ -89,7 +97,9 @@ export const RELAXING_PATTERNS = {
     ocean_breeze: {
         id: "ocean_breeze",
         name: "Ocean Breeze",
+        name_sp: "Brisa del Océano",
         description: "Ocean breeze on face, light and airy",
+        description_sp: "Brisa del océano en el rostro, ligera y aireada",
         category: "relaxing",
         duration: 10000,
         loop: true,
@@ -114,7 +124,9 @@ export const ENERGIZING_PATTERNS = {
     power_pulse: {
         id: "power_pulse",
         name: "Power Pulse",
+        name_sp: "Pulso de Poder",
         description: "Powerful pulse, energy boost",
+        description_sp: "Pulso poderoso, impulso de energía",
         category: "energizing",
         duration: 10000,
         loop: true,
@@ -136,7 +148,9 @@ export const ENERGIZING_PATTERNS = {
     sunrise_awakening: {
         id: "sunrise_awakening",
         name: "Sunrise Awakening",
+        name_sp: "Despertar del Amanecer",
         description: "Sunrise awakening, gradually strengthening",
+        description_sp: "Despertar del amanecer, fortalecimiento gradual",
         category: "energizing",
         duration: 10000,
         loop: true,
@@ -158,7 +172,9 @@ export const ENERGIZING_PATTERNS = {
     focus_booster: {
         id: "focus_booster",
         name: "Focus Booster",
+        name_sp: "Potenciador de Concentración",
         description: "Focus enhancement, stable concentration",
+        description_sp: "Mejora de concentración, enfoque estable",
         category: "energizing",
         duration: 10000,
         loop: true,
@@ -183,7 +199,9 @@ export const DYNAMIC_PATTERNS = {
     rhythmic_dance: {
         id: "rhythmic_dance",
         name: "Rhythmic Dance",
+        name_sp: "Danza Rítmica",
         description: "Rhythmic dance, lively",
+        description_sp: "Danza rítmica, animada",
         category: "dynamic",
         duration: 10000,
         loop: true,
@@ -205,7 +223,9 @@ export const DYNAMIC_PATTERNS = {
     storm_rush: {
         id: "storm_rush",
         name: "Storm Rush",
+        name_sp: "Tormenta Intensa",
         description: "Storm and rain, intense burst",
+        description_sp: "Tormenta y lluvia, ráfaga intensa",
         category: "dynamic",
         duration: 10000,
         loop: true,
@@ -227,7 +247,9 @@ export const DYNAMIC_PATTERNS = {
     tech_pulse: {
         id: "tech_pulse",
         name: "Tech Pulse",
+        name_sp: "Pulso Tecnológico",
         description: "Tech rhythm, modern feel",
+        description_sp: "Ritmo tecnológico, sensación moderna",
         category: "dynamic",
         duration: 10000,
         loop: true,
@@ -302,7 +324,7 @@ export const PatternUtils = {
      * Validate pattern structure
      */
     validatePattern(pattern) {
-        const required = ['id', 'name', 'description', 'category', 'duration', 'loop', 'frames'];
+        const required = ['id', 'name', 'name_sp', 'description', 'description_sp', 'category', 'duration', 'loop', 'frames'];
         const missing = required.filter(field => !(field in pattern));
         
         if (missing.length > 0) {
