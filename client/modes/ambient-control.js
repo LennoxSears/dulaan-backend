@@ -95,16 +95,15 @@ export class AmbientControl {
             try {
                 const pwmValue = this.calculateAmbientPWM();
                 
-                if (pwmValue > 0) {
-                    await this.sdk.motor.write(pwmValue);
-                    this.lastPwmValue = pwmValue;
-                    
-                    // Trigger event for UI updates
-                    this.onAmbientUpdate({
-                        energy: this.lastRMS,
-                        pwmValue: pwmValue
-                    });
-                }
+                // Always write PWM value (even 0) to keep BLE connection active like touch mode
+                await this.sdk.motor.write(pwmValue);
+                this.lastPwmValue = pwmValue;
+                
+                // Trigger event for UI updates
+                this.onAmbientUpdate({
+                    energy: this.lastRMS,
+                    pwmValue: pwmValue
+                });
             } catch (error) {
                 console.error('PWM writing error:', error);
             }
