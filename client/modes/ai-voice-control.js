@@ -49,6 +49,9 @@ class AIVoiceControl {
             totalProcessingTime: 0
         };
         
+        // PWM interval for consistent BLE connection (like ambient and touch modes)
+        this.pwmInterval = null;
+        
         // Setup callbacks
         this.setupCallbacks();
     }
@@ -104,6 +107,9 @@ class AIVoiceControl {
             // Start audio processing
             await this.startAudioProcessing();
             
+            // Start PWM writing interval to keep BLE connection active
+            this.startPwmWriting();
+            
             // Activate conversation mode
             this.handleConversationUpdate(true);
             
@@ -127,11 +133,45 @@ class AIVoiceControl {
         this.state.isListening = false;
         this.state.conversationActive = false;
         
+        // Stop PWM writing interval
+        this.stopPwmWriting();
+        
         // Stop audio processing
         await this.stopAudioProcessing();
         await this.motorController.write(0);
         
         console.log("🔇 Voice control stopped");
+    }
+
+    /**
+     * Start PWM writing interval to keep BLE connection active
+     */
+    startPwmWriting() {
+        // Write PWM every 100ms based on current state (matches ambient and touch modes)
+        this.pwmInterval = setInterval(async () => {
+            try {
+                if (this.motorController) {
+                    await this.motorController.write(this.state.currentPwm);
+                    
+                    // Trigger callback for UI updates
+                    if (this.config.onPwmUpdate) {
+                        this.config.onPwmUpdate(this.state.currentPwm);
+                    }
+                }
+            } catch (error) {
+                console.error('[AI VOICE] PWM writing error:', error);
+            }
+        }, 100); // 100ms interval matches ambient and touch modes
+    }
+
+    /**
+     * Stop PWM writing interval
+     */
+    stopPwmWriting() {
+        if (this.pwmInterval) {
+            clearInterval(this.pwmInterval);
+            this.pwmInterval = null;
+        }
     }
 
     /**
@@ -343,12 +383,9 @@ class AIVoiceControl {
         this.state.lastResponse = response;
         this.state.totalApiCalls++;
         
-        // Update PWM if changed significantly
+        // Update PWM state immediately (motor writing handled by interval)
         if (response.newPwmValue !== undefined) {
-            const pwmDiff = Math.abs(response.newPwmValue - this.state.currentPwm);
-            if (pwmDiff >= this.config.pwmUpdateThreshold) {
-                this.updateMotorPWM(response.newPwmValue);
-            }
+            this.updateMotorPWM(response.newPwmValue);
         }
         
         // Log response
@@ -366,46 +403,21 @@ class AIVoiceControl {
     }
 
     /**
-     * Update motor PWM with optimization
+     * Update motor PWM state (actual motor writing handled by interval)
      */
     async updateMotorPWM(newPwm) {
         console.log(`[MOTOR UPDATE] Requested PWM: ${newPwm}, Current PWM: ${this.state.currentPwm}`);
         
-        // Only update if change is significant (reduces motor wear)
-        const pwmDifference = Math.abs(newPwm - this.state.currentPwm);
-        console.log(`[MOTOR UPDATE] PWM difference: ${pwmDifference}, Threshold: ${this.config.pwmUpdateThreshold}`);
+        // Always update state - interval will handle actual motor writing
+        const oldPwm = this.state.currentPwm;
+        this.state.currentPwm = newPwm;
         
-        if (pwmDifference >= this.config.pwmUpdateThreshold) {
-            const oldPwm = this.state.currentPwm;
-            this.state.currentPwm = newPwm;
-            
-            console.log(`[MOTOR UPDATE] PWM changed from ${oldPwm} to ${newPwm}`);
-            
-            // Send to motor controller if available
-            if (this.motorController) {
-                console.log(`[MOTOR UPDATE] Motor controller connected, sending PWM command...`);
-                try {
-                    await this.motorController.write(newPwm);
-                    console.log(`[MOTOR UPDATE] ✅ PWM ${newPwm} sent to motor successfully`);
-                    
-                    // Trigger callbacks
-                    if (this.config.onPwmUpdate) {
-                        this.config.onPwmUpdate(newPwm);
-                    }
-                    
-                    return true;
-                } catch (error) {
-                    console.error(`[MOTOR UPDATE] ❌ Failed to send PWM to motor:`, error);
-                    return false;
-                }
-            } else {
-                console.warn(`[MOTOR UPDATE] ⚠️ Motor controller not available (connected: ${this.motorController?.isConnected}, exists: ${!!this.motorController})`);
-                return false;
-            }
-        } else {
-            console.log(`[MOTOR UPDATE] ⏭️ PWM change too small (${pwmDifference}), skipping update`);
-            return true; // Not an error, just skipped
-        }
+        console.log(`[MOTOR UPDATE] PWM state updated from ${oldPwm} to ${newPwm} (motor write handled by interval)`);
+        
+        // Note: Actual motor writing is now handled by the 100ms interval
+        // This ensures consistent BLE connection activity like ambient and touch modes
+        
+        return true;
     }
 
 
