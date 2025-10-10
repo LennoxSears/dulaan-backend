@@ -232,10 +232,6 @@ class DulaanSDK {
         return this.currentMode;
     }
 
-    getCurrentMode() {
-        return this.currentMode;
-    }
-
     /**
      * Remote Control API
      */
