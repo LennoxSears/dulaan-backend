@@ -142,7 +142,8 @@ class DulaanSDK {
                 onRemoteCommand: (data, userId) => this.handleRemoteCommand(data, userId),
                 onHostReady: (hostId) => this.onHostReady(hostId),
                 onRemoteConnected: (userId) => this.onRemoteConnected(userId),
-                onRemoteDisconnected: (userId) => this.onRemoteDisconnected(userId)
+                onRemoteDisconnected: (userId) => this.onRemoteDisconnected(userId),
+                onConnectionDrop: () => this.onConnectionDrop()
             });
             
             this.isInitialized = true;
@@ -352,8 +353,13 @@ class DulaanSDK {
     /**
      * Event Handlers
      */
+    remoteCommandUI(userId) {
+        console.log(userId + " send command")
+    }
+
     handleRemoteCommand(data, userId) {
         if (data.type === 'control_command') {
+            this.remoteCommandUI(userId)
             console.log(`[SDK] Received remote command from ${userId}: ${data.mode} = ${data.value}`);
             
             // Handle different command types
@@ -397,6 +403,11 @@ class DulaanSDK {
     onRemoteDisconnected(userId) {
         console.log('Remote user disconnected:', userId);
     }
+
+    onConnectionDrop() {
+        console.log('Remote connection drop');
+    }
+
 
     /**
      * Utility Methods

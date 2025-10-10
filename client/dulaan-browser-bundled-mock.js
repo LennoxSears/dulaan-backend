@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-09-25T06:13:50.098Z
+ * Generated on: 2025-09-26T08:11:31.593Z
  * Build type: Mock
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
@@ -45,20 +45,28 @@ class MockBleClient {
         this.scanCallback = null;
         this.disconnectCallbacks = new Map();
         
-        // Mock device data
+        // Mock device data - using actual target device name
         this.mockDevices = [
             {
                 device: {
                     deviceId: 'MOCK_DEVICE_001',
-                    name: 'Dulaan Motor',
+                    name: 'XKL-Q086-BT',
                     rssi: -45
                 }
             },
             {
                 device: {
                     deviceId: 'MOCK_DEVICE_002', 
-                    name: 'Dulaan Motor',
+                    name: 'XKL-Q086-BT',
                     rssi: -67
+                }
+            },
+            // Add some non-target devices for realistic scanning
+            {
+                device: {
+                    deviceId: 'OTHER_DEVICE_001',
+                    name: 'Random BLE Device',
+                    rssi: -78
                 }
             }
         ];
@@ -88,20 +96,27 @@ class MockBleClient {
         this.isScanning = true;
         this.scanCallback = callback;
 
-        // Simulate finding devices over time
+        // Simulate finding devices over time (more realistic timing)
         setTimeout(() => {
             if (this.isScanning && this.scanCallback) {
-                console.log('[MOCK BLE] Found device 1');
-                this.scanCallback(this.mockDevices[0]);
+                console.log('[MOCK BLE] Found non-target device');
+                this.scanCallback(this.mockDevices[2]); // Non-target device first
             }
-        }, 500);
+        }, 300);
 
         setTimeout(() => {
             if (this.isScanning && this.scanCallback) {
-                console.log('[MOCK BLE] Found device 2');
-                this.scanCallback(this.mockDevices[1]);
+                console.log('[MOCK BLE] Found target device 1');
+                this.scanCallback(this.mockDevices[0]); // First target device
             }
-        }, 1200);
+        }, 800);
+
+        setTimeout(() => {
+            if (this.isScanning && this.scanCallback) {
+                console.log('[MOCK BLE] Found target device 2');
+                this.scanCallback(this.mockDevices[1]); // Second target device
+            }
+        }, 1500);
     }
 
     /**
@@ -282,6 +297,12 @@ class MockVoiceRecorder {
         this.streamInterval = null;
         this.chunkCounter = 0;
         
+        // Error simulation flags for testing edge cases
+        this.simulatePermissionDenied = false;
+        this.simulateStartError = false;
+        this.simulateStopError = false;
+        this.simulateChunkError = false;
+        
         console.log('[MOCK VOICE] MockVoiceRecorder initialized');
     }
 
@@ -291,6 +312,13 @@ class MockVoiceRecorder {
     async requestAudioRecordingPermission() {
         console.log('[MOCK VOICE] Requesting audio permission...');
         await this.delay(300);
+        
+        // Simulate permission denied for testing
+        if (this.simulatePermissionDenied) {
+            const result = { value: false };
+            console.log('[MOCK VOICE] ❌ Audio permission denied (simulated)');
+            return result;
+        }
         
         // Simulate permission granted
         const result = { value: true };
@@ -334,6 +362,13 @@ class MockVoiceRecorder {
         console.log('[MOCK VOICE] Starting audio streaming...');
         await this.delay(200);
         
+        // Simulate start error for testing
+        if (this.simulateStartError) {
+            const error = new Error('Failed to start audio streaming (simulated)');
+            console.error('[MOCK VOICE] ❌ Start streaming error:', error.message);
+            throw error;
+        }
+        
         this.isStreaming = true;
         this.chunkCounter = 0;
         
@@ -356,6 +391,13 @@ class MockVoiceRecorder {
 
         console.log('[MOCK VOICE] Stopping audio streaming...');
         
+        // Simulate stop error for testing
+        if (this.simulateStopError) {
+            const error = new Error('Failed to stop audio streaming (simulated)');
+            console.error('[MOCK VOICE] ❌ Stop streaming error:', error.message);
+            throw error;
+        }
+        
         this.isStreaming = false;
         if (this.streamInterval) {
             clearInterval(this.streamInterval);
@@ -373,6 +415,12 @@ class MockVoiceRecorder {
         if (!this.isStreaming) return;
 
         this.chunkCounter++;
+        
+        // Simulate chunk error for testing
+        if (this.simulateChunkError && this.chunkCounter % 10 === 0) {
+            console.error('[MOCK VOICE] ❌ Simulated chunk processing error');
+            return; // Skip this chunk
+        }
         
         // Generate mock audio data (simulates real audio patterns)
         const mockAudioData = this.generateMockAudioData();
@@ -474,8 +522,44 @@ class MockVoiceRecorder {
             isStreaming: this.isStreaming,
             chunkCounter: this.chunkCounter,
             listenerCount: this.listeners.size,
-            listeners: Array.from(this.listeners.keys())
+            listeners: Array.from(this.listeners.keys()),
+            errorSimulation: {
+                permissionDenied: this.simulatePermissionDenied,
+                startError: this.simulateStartError,
+                stopError: this.simulateStopError,
+                chunkError: this.simulateChunkError
+            }
         };
+    }
+
+    /**
+     * Control error simulation for testing
+     */
+    setErrorSimulation(errorType, enabled = true) {
+        switch (errorType) {
+            case 'permission':
+                this.simulatePermissionDenied = enabled;
+                break;
+            case 'start':
+                this.simulateStartError = enabled;
+                break;
+            case 'stop':
+                this.simulateStopError = enabled;
+                break;
+            case 'chunk':
+                this.simulateChunkError = enabled;
+                break;
+            case 'all':
+                this.simulatePermissionDenied = enabled;
+                this.simulateStartError = enabled;
+                this.simulateStopError = enabled;
+                this.simulateChunkError = enabled;
+                break;
+            default:
+                console.warn('[MOCK VOICE] Unknown error type:', errorType);
+                return;
+        }
+        console.log(`[MOCK VOICE] Error simulation ${errorType}: ${enabled ? 'enabled' : 'disabled'}`);
     }
 
     /**
@@ -2717,7 +2801,6 @@ class RemoteService {
 
             conn.on('error', (error) => {
                 console.log(`Failed to connect to host: ${error.message}`);
-                
                 if (this.onConnectionStatusChange) {
                     this.onConnectionStatusChange(false, error.message);
                 }
@@ -2728,7 +2811,7 @@ class RemoteService {
                 this.isRemote = false;
                 this.hostId = null;
                 this.connections.delete(hostId);
-                
+                this.onConnectionDrop()
                 if (this.onConnectionStatusChange) {
                     this.onConnectionStatusChange(false);
                 }
@@ -2737,7 +2820,6 @@ class RemoteService {
 
         this.peer.on('error', (error) => {
             console.error('Remote peer error:', error);
-            
             if (this.onConnectionStatusChange) {
                 this.onConnectionStatusChange(false, error.message);
             }
@@ -2866,7 +2948,7 @@ class RemoteService {
         this.onRemoteConnected = callbacks.onRemoteConnected || null;
         this.onRemoteDisconnected = callbacks.onRemoteDisconnected || null;
         this.onRemoteCommand = callbacks.onRemoteCommand || null;
-        this.onConnectionStatusChange = callbacks.onConnectionStatusChange || null;
+        this.onConnectionDrop = callbacks.onConnectionDrop|| null;
     }
 
     /**
@@ -4601,7 +4683,8 @@ class DulaanSDK {
                 onRemoteCommand: (data, userId) => this.handleRemoteCommand(data, userId),
                 onHostReady: (hostId) => this.onHostReady(hostId),
                 onRemoteConnected: (userId) => this.onRemoteConnected(userId),
-                onRemoteDisconnected: (userId) => this.onRemoteDisconnected(userId)
+                onRemoteDisconnected: (userId) => this.onRemoteDisconnected(userId),
+                onConnectionDrop: () => this.onConnectionDrop()
             });
             
             this.isInitialized = true;
@@ -4811,8 +4894,13 @@ class DulaanSDK {
     /**
      * Event Handlers
      */
+    remoteCommandUI(userId) {
+        console.log(userId + " send command")
+    }
+
     handleRemoteCommand(data, userId) {
         if (data.type === 'control_command') {
+            this.remoteCommandUI(userId)
             console.log(`[SDK] Received remote command from ${userId}: ${data.mode} = ${data.value}`);
             
             // Handle different command types
@@ -4856,6 +4944,11 @@ class DulaanSDK {
     onRemoteDisconnected(userId) {
         console.log('Remote user disconnected:', userId);
     }
+
+    onConnectionDrop() {
+        console.log('Remote connection drop');
+    }
+
 
     /**
      * Utility Methods

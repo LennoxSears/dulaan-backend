@@ -121,7 +121,6 @@ class RemoteService {
 
             conn.on('error', (error) => {
                 console.log(`Failed to connect to host: ${error.message}`);
-                
                 if (this.onConnectionStatusChange) {
                     this.onConnectionStatusChange(false, error.message);
                 }
@@ -132,7 +131,7 @@ class RemoteService {
                 this.isRemote = false;
                 this.hostId = null;
                 this.connections.delete(hostId);
-                
+                this.onConnectionDrop()
                 if (this.onConnectionStatusChange) {
                     this.onConnectionStatusChange(false);
                 }
@@ -141,7 +140,6 @@ class RemoteService {
 
         this.peer.on('error', (error) => {
             console.error('Remote peer error:', error);
-            
             if (this.onConnectionStatusChange) {
                 this.onConnectionStatusChange(false, error.message);
             }
@@ -270,7 +268,7 @@ class RemoteService {
         this.onRemoteConnected = callbacks.onRemoteConnected || null;
         this.onRemoteDisconnected = callbacks.onRemoteDisconnected || null;
         this.onRemoteCommand = callbacks.onRemoteCommand || null;
-        this.onConnectionStatusChange = callbacks.onConnectionStatusChange || null;
+        this.onConnectionDrop = callbacks.onConnectionDrop|| null;
     }
 
     /**
