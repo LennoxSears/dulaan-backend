@@ -50,6 +50,12 @@ class MotorController {
         // Device identification
         this.TARGET_DEVICE_NAME = "XKL-Q086-BT";
         this.SCAN_TIMEOUT = 10000; // 10 seconds default
+        
+        // Write queue management
+        this.writeQueue = [];
+        this.maxQueueLength = 10; // Handle 1 second of 100ms interval writes
+        this.isProcessingQueue = false;
+        this.lastWrittenPwm = null; // Track last written value to avoid duplicates
     }
 
     /**
@@ -367,6 +373,7 @@ class MotorController {
     /**
      * Write PWM value to motor (0-255)
      * Automatically routes to remote host if connected as remote user
+     * Uses queue to prevent BLE stack overload
      */
     async write(pwmValue) {
         // Validate PWM value first
@@ -377,8 +384,58 @@ class MotorController {
             return this.writeToRemoteHost(pwm);
         }
         
-        // Normal local BLE write
-        return this.writeToLocalBLE(pwm);
+        // Skip if same as last written value (avoid duplicate writes)
+        if (pwm === this.lastWrittenPwm) {
+            // console.log(`[MOTOR WRITE] ⏭️ Skipping - same as last value (${pwm})`);
+            return true;
+        }
+        
+        // Add to queue
+        this.writeQueue.push(pwm);
+        
+        // If queue full, remove oldest and keep latest
+        if (this.writeQueue.length > this.maxQueueLength) {
+            const removed = this.writeQueue.shift();
+            console.log(`[MOTOR WRITE] ⚠️ Queue full (${this.maxQueueLength}), dropped oldest value: ${removed}`);
+        }
+        
+        // Start processing queue if not already running
+        if (!this.isProcessingQueue) {
+            this.processWriteQueue();
+        }
+        
+        return true;
+    }
+
+    /**
+     * Process write queue sequentially
+     */
+    async processWriteQueue() {
+        if (this.isProcessingQueue) {
+            return; // Already processing
+        }
+        
+        this.isProcessingQueue = true;
+        
+        while (this.writeQueue.length > 0) {
+            const pwm = this.writeQueue.shift();
+            
+            // Skip if same as last written (might have duplicates in queue)
+            if (pwm === this.lastWrittenPwm) {
+                continue;
+            }
+            
+            try {
+                const success = await this.writeToLocalBLE(pwm);
+                if (success) {
+                    this.lastWrittenPwm = pwm;
+                }
+            } catch (error) {
+                console.error('[MOTOR WRITE] Queue processing error:', error);
+            }
+        }
+        
+        this.isProcessingQueue = false;
     }
 
     /**
@@ -406,6 +463,7 @@ class MotorController {
 
     /**
      * Write PWM value to local BLE device
+     * Uses writeWithoutResponse for faster performance
      */
     async writeToLocalBLE(pwmValue) {
         
@@ -426,7 +484,8 @@ class MotorController {
                 return true;
             }
             
-            await BleClient.write(
+            // Use writeWithoutResponse for 10x faster writes (5-20ms vs 50-200ms)
+            await BleClient.writeWithoutResponse(
                 this.deviceAddress,
                 this.SERVICE_UUID,
                 this.CHARACTERISTIC_UUID,
@@ -549,6 +608,19 @@ class MotorController {
             currentPwm: this.getCurrentPwm(),
             localPwm: this.currentPwm,
             remotePwm: this.remotePwm
+        };
+    }
+
+    /**
+     * Get write queue status (for debugging)
+     */
+    getQueueStatus() {
+        return {
+            queueLength: this.writeQueue.length,
+            maxQueueLength: this.maxQueueLength,
+            isProcessing: this.isProcessingQueue,
+            lastWrittenPwm: this.lastWrittenPwm,
+            currentPwm: this.currentPwm
         };
     }
 }
