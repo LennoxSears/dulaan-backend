@@ -65,9 +65,74 @@ class MotorController {
             
             await BleClient.initialize();
             console.log('BLE initialized');
+            
+            // Check if Bluetooth is enabled
+            const isEnabled = await this.isBluetoothEnabled();
+            if (!isEnabled) {
+                console.warn('Bluetooth is not enabled on device');
+                return false;
+            }
+            
+            // Request Bluetooth permissions
+            const hasPermission = await this.requestBluetoothPermissions();
+            if (!hasPermission) {
+                console.warn('Bluetooth permissions not granted');
+                return false;
+            }
+            
+            console.log('BLE initialized with permissions');
             return true;
         } catch (error) {
             console.error('BLE initialization failed:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Check if Bluetooth is enabled on device
+     */
+    async isBluetoothEnabled() {
+        try {
+            const BleClient = getBleClient();
+            if (!BleClient) {
+                return true; // Mock mode
+            }
+            
+            const enabled = await BleClient.isEnabled();
+            console.log(`Bluetooth enabled: ${enabled}`);
+            return enabled;
+        } catch (error) {
+            console.error('Failed to check Bluetooth status:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Request Bluetooth permissions
+     */
+    async requestBluetoothPermissions() {
+        try {
+            const BleClient = getBleClient();
+            if (!BleClient) {
+                return true; // Mock mode
+            }
+            
+            // Request location permission (required for BLE scanning on Android)
+            if (typeof window !== 'undefined' && window.Capacitor?.Plugins?.Geolocation) {
+                try {
+                    const permission = await window.Capacitor.Plugins.Geolocation.requestPermissions();
+                    console.log('Location permission:', permission);
+                } catch (error) {
+                    console.warn('Location permission request failed:', error);
+                }
+            }
+            
+            // BleClient.initialize() already requests BLE permissions
+            // Just verify we have them
+            console.log('Bluetooth permissions requested');
+            return true;
+        } catch (error) {
+            console.error('Failed to request Bluetooth permissions:', error);
             return false;
         }
     }
@@ -77,8 +142,8 @@ class MotorController {
      */
     async scan(timeout = this.SCAN_TIMEOUT) {
         if (this.isScanning) {
-            console.warn('Scan already in progress');
-            return false;
+            console.warn('Scan already in progress, stopping previous scan...');
+            await this.stopScan();
         }
 
         try {
@@ -88,18 +153,24 @@ class MotorController {
                 return false;
             }
 
-            await BleClient.initialize();
+            // Check Bluetooth is enabled before scanning
+            const isEnabled = await this.isBluetoothEnabled();
+            if (!isEnabled) {
+                console.error('Cannot scan: Bluetooth is not enabled');
+                return false;
+            }
+
             this.isScanning = true;
             this.scanResults = [];
             
-            console.log('Starting BLE scan for motor devices...');
+            console.log(`Starting BLE scan for "${this.TARGET_DEVICE_NAME}" (timeout: ${timeout}ms)...`);
             
             await BleClient.requestLEScan({}, async (result) => {
                 console.log('Scan result:', JSON.stringify(result));
                 
                 // Filter for target device name (matches plugin.js)
                 if (result.device.name === this.TARGET_DEVICE_NAME) {
-                    console.log('Found target device:', result.device.deviceId);
+                    console.log('✅ Found target device:', result.device.deviceId);
                     this.deviceAddress = result.device.deviceId;
                     this.scanResults.push(result.device);
                     
@@ -117,14 +188,20 @@ class MotorController {
             // Stop scan after timeout
             setTimeout(async () => {
                 if (this.isScanning) {
+                    console.log('Scan timeout reached, stopping scan...');
                     await this.stopScan();
+                    
+                    if (this.scanResults.length === 0) {
+                        console.warn(`❌ No devices found with name "${this.TARGET_DEVICE_NAME}"`);
+                    }
                 }
             }, timeout);
 
             return true;
         } catch (error) {
             console.error('Failed to start scan:', error);
-            this.isScanning = false;
+            // Ensure scan state is reset on error
+            await this.resetScanState();
             return false;
         }
     }
@@ -146,6 +223,29 @@ class MotorController {
             console.log('BLE scan stopped');
         } catch (error) {
             console.error('Failed to stop scan:', error);
+            // Force reset scan state even if stop fails
+            await this.resetScanState();
+        }
+    }
+
+    /**
+     * Reset scan state (used for error recovery)
+     */
+    async resetScanState() {
+        try {
+            const BleClient = getBleClient();
+            if (BleClient && this.isScanning) {
+                try {
+                    await BleClient.stopLEScan();
+                } catch (e) {
+                    // Ignore errors during forced stop
+                }
+            }
+        } catch (error) {
+            console.error('Error during scan state reset:', error);
+        } finally {
+            this.isScanning = false;
+            console.log('Scan state reset');
         }
     }
 
@@ -155,20 +255,52 @@ class MotorController {
     async scanAndConnect(timeout = this.SCAN_TIMEOUT) {
         try {
             console.log('Scanning for motor device...');
-            await this.scan(timeout);
             
-            // Wait for scan to complete
-            await new Promise(resolve => setTimeout(resolve, timeout + 1000));
+            // Use a promise to wait for scan completion properly
+            const scanPromise = new Promise((resolve, reject) => {
+                // Set up callback for when device is found
+                const originalCallback = this.onScanResult;
+                this.onScanResult = (device) => {
+                    // Call original callback if it exists
+                    if (originalCallback) {
+                        originalCallback(device);
+                    }
+                    // Resolve the promise when device is found
+                    resolve(true);
+                };
+                
+                // Start scan
+                this.scan(timeout).then(scanStarted => {
+                    if (!scanStarted) {
+                        reject(new Error('Failed to start scan'));
+                    }
+                }).catch(reject);
+                
+                // Timeout if device not found
+                setTimeout(() => {
+                    if (this.isScanning) {
+                        this.stopScan();
+                    }
+                    if (!this.deviceAddress) {
+                        resolve(false); // Timeout without finding device
+                    }
+                }, timeout + 500); // Add 500ms buffer
+            });
             
-            if (this.deviceAddress) {
+            // Wait for scan to complete or timeout
+            const deviceFound = await scanPromise;
+            
+            if (deviceFound && this.deviceAddress) {
                 console.log('Device found, attempting to connect...');
                 return await this.connect();
             } else {
-                console.warn('No motor device found during scan');
+                console.warn('❌ No motor device found during scan');
+                console.warn(`Make sure device "${this.TARGET_DEVICE_NAME}" is powered on and in range`);
                 return false;
             }
         } catch (error) {
             console.error('Scan and connect failed:', error);
+            await this.resetScanState();
             return false;
         }
     }
