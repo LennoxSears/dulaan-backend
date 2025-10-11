@@ -396,10 +396,7 @@ class AIVoiceControl {
         this.state.lastResponse = response;
         this.state.totalApiCalls++;
         
-        // Update PWM state immediately (motor writing handled by interval)
-        if (response.newPwmValue !== undefined) {
-            this.updateMotorPWM(response.newPwmValue);
-        }
+        // Note: PWM update is handled in handleSpeechReady() to avoid duplicate writes
         
         // Log response
         if (response.response) {
