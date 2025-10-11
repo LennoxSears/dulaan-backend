@@ -173,7 +173,7 @@ class AIVoiceControl {
             } catch (error) {
                 console.error('[AI VOICE] PWM writing error:', error);
             }
-        }, 100); // 100ms interval matches ambient and touch modes
+        }, 200); // 100ms interval matches ambient and touch modes
     }
 
     /**
