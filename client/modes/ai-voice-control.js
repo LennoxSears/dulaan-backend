@@ -147,11 +147,23 @@ class AIVoiceControl {
      * Start PWM writing interval to keep BLE connection active
      */
     startPwmWriting() {
+        let lastPwmValue = null;
+        
         // Write PWM every 100ms based on current state (matches ambient and touch modes)
         this.pwmInterval = setInterval(async () => {
             try {
                 if (this.motorController) {
+                    const writeStart = Date.now();
                     await this.motorController.write(this.state.currentPwm);
+                    const writeTime = Date.now() - writeStart;
+                    
+                    // Only log when PWM value changes or write is slow
+                    if (this.state.currentPwm !== lastPwmValue) {
+                        console.log(`[PWM INTERVAL] Writing PWM: ${lastPwmValue} → ${this.state.currentPwm} (${writeTime}ms)`);
+                        lastPwmValue = this.state.currentPwm;
+                    } else if (writeTime > 20) {
+                        console.log(`[PWM INTERVAL] Slow write detected: ${writeTime}ms for PWM ${this.state.currentPwm}`);
+                    }
                     
                     // Trigger callback for UI updates
                     if (this.config.onPwmUpdate) {
@@ -274,6 +286,7 @@ class AIVoiceControl {
      */
     async handleSpeechReady(speechPacket) {
         try {
+            const t0 = Date.now();
             console.log(`[Speech] Processing speech packet: ${speechPacket.audioData.length} samples`);
             
             this.state.isProcessing = true;
@@ -283,10 +296,14 @@ class AIVoiceControl {
             
             console.log(`[Speech Processing] Processing command`);
             
+            const t1 = Date.now();
             const response = await this.apiService.processSpeechSegment(speechPacket);
+            const t2 = Date.now();
             
             const processingTime = Date.now() - startTime;
             this.state.totalProcessingTime += processingTime;
+            
+            console.log(`[TIMING] API call took: ${t2 - t1}ms`);
             
             // ===== DETAILED API RESPONSE LOGGING =====
             console.log(`[API RESPONSE] Full response:`, response);
@@ -297,19 +314,24 @@ class AIVoiceControl {
             
             if (response && response.newPwmValue !== undefined) {
                 // Update motor with new PWM value
+                const t3 = Date.now();
                 console.log(`[MOTOR] Sending PWM ${response.newPwmValue} to motor controller`);
                 const motorSuccess = await this.updateMotorPWM(response.newPwmValue);
+                const t4 = Date.now();
                 console.log(`[MOTOR] Motor update ${motorSuccess ? 'successful' : 'failed'}`);
+                console.log(`[TIMING] updateMotorPWM took: ${t4 - t3}ms`);
                 
                 // Store the last response
                 this.state.lastResponse = response;
                 
                 console.log(`[PROCESSING COMPLETE] Speech processed successfully`);
+                console.log(`[TIMING] Total handleSpeechReady: ${Date.now() - t0}ms`);
             } else {
                 console.warn(`[API WARNING] No PWM value in response or response is null`);
             }
             
             // ===== RESET STATE FOR NEXT INTERACTION =====
+            const t5 = Date.now();
             this.state.lastInteractionTime = Date.now();
             console.log(`[CONVERSATION] Updated interaction time, ready for next command`);
             
@@ -322,6 +344,8 @@ class AIVoiceControl {
             
             // Ensure conversation stays active for next command
             this.handleConversationUpdate(true);
+            const t6 = Date.now();
+            console.log(`[TIMING] Reset operations took: ${t6 - t5}ms`);
             
         } catch (error) {
             console.error("Speech processing failed:", error);
@@ -408,13 +432,12 @@ class AIVoiceControl {
     async updateMotorPWM(newPwm) {
         console.log(`[MOTOR UPDATE] Requested PWM: ${newPwm}, Current PWM: ${this.state.currentPwm}`);
         
-        // Always update state - interval will handle actual motor writing
         const oldPwm = this.state.currentPwm;
         this.state.currentPwm = newPwm;
         
         console.log(`[MOTOR UPDATE] PWM state updated from ${oldPwm} to ${newPwm} (motor write handled by interval)`);
         
-        // Note: Actual motor writing is now handled by the 100ms interval
+        // Note: Actual motor writing is handled by the 100ms interval
         // This ensures consistent BLE connection activity like ambient and touch modes
         
         return true;
