@@ -145,6 +145,8 @@ class AIVoiceControl {
 
     /**
      * Start PWM writing interval to keep BLE connection active
+     * Note: API responses write immediately via updateMotorPWM()
+     * This interval maintains BLE connection during idle periods
      */
     startPwmWriting() {
         // Write PWM every 100ms based on current state (matches ambient and touch modes)
@@ -403,19 +405,25 @@ class AIVoiceControl {
     }
 
     /**
-     * Update motor PWM state (actual motor writing handled by interval)
+     * Update motor PWM state and write immediately
      */
     async updateMotorPWM(newPwm) {
         console.log(`[MOTOR UPDATE] Requested PWM: ${newPwm}, Current PWM: ${this.state.currentPwm}`);
         
-        // Always update state - interval will handle actual motor writing
         const oldPwm = this.state.currentPwm;
         this.state.currentPwm = newPwm;
         
-        console.log(`[MOTOR UPDATE] PWM state updated from ${oldPwm} to ${newPwm} (motor write handled by interval)`);
-        
-        // Note: Actual motor writing is now handled by the 100ms interval
-        // This ensures consistent BLE connection activity like ambient and touch modes
+        // Write to motor IMMEDIATELY for responsive control
+        // The interval will continue writing this value to keep BLE connection active
+        if (this.motorController) {
+            try {
+                await this.motorController.write(newPwm);
+                console.log(`[MOTOR UPDATE] ✅ PWM immediately written: ${oldPwm} → ${newPwm}`);
+            } catch (error) {
+                console.error(`[MOTOR UPDATE] ❌ Failed to write PWM:`, error);
+                return false;
+            }
+        }
         
         return true;
     }
