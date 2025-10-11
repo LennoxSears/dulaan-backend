@@ -51,6 +51,7 @@ class AIVoiceControl {
         
         // PWM interval for consistent BLE connection (like ambient and touch modes)
         this.pwmInterval = null;
+        this.lastImmediateWrite = 0; // Track last immediate write to avoid conflicts
         
         // Setup callbacks
         this.setupCallbacks();
@@ -152,6 +153,14 @@ class AIVoiceControl {
         // Write PWM every 100ms based on current state (matches ambient and touch modes)
         this.pwmInterval = setInterval(async () => {
             try {
+                // Skip if we just did an immediate write (within last 50ms)
+                // This prevents write conflicts and BLE queue backup
+                const timeSinceImmediateWrite = Date.now() - this.lastImmediateWrite;
+                if (timeSinceImmediateWrite < 50) {
+                    console.log(`[PWM INTERVAL] Skipping write (immediate write ${timeSinceImmediateWrite}ms ago)`);
+                    return;
+                }
+                
                 if (this.motorController) {
                     await this.motorController.write(this.state.currentPwm);
                     
@@ -408,6 +417,7 @@ class AIVoiceControl {
      * Update motor PWM state and write immediately
      */
     async updateMotorPWM(newPwm) {
+        const writeStartTime = Date.now();
         console.log(`[MOTOR UPDATE] Requested PWM: ${newPwm}, Current PWM: ${this.state.currentPwm}`);
         
         const oldPwm = this.state.currentPwm;
@@ -417,8 +427,10 @@ class AIVoiceControl {
         // The interval will continue writing this value to keep BLE connection active
         if (this.motorController) {
             try {
+                this.lastImmediateWrite = Date.now();
                 await this.motorController.write(newPwm);
-                console.log(`[MOTOR UPDATE] ✅ PWM immediately written: ${oldPwm} → ${newPwm}`);
+                const writeTime = Date.now() - writeStartTime;
+                console.log(`[MOTOR UPDATE] ✅ PWM immediately written: ${oldPwm} → ${newPwm} (${writeTime}ms)`);
             } catch (error) {
                 console.error(`[MOTOR UPDATE] ❌ Failed to write PWM:`, error);
                 return false;
