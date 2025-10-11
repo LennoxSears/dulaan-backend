@@ -409,6 +409,7 @@ class MotorController {
 
     /**
      * Process write queue sequentially
+     * Small delays prevent overwhelming plugin's internal queue
      */
     async processWriteQueue() {
         if (this.isProcessingQueue) {
@@ -430,6 +431,10 @@ class MotorController {
                 if (success) {
                     this.lastWrittenPwm = pwm;
                 }
+                
+                // Small delay to prevent overwhelming plugin's internal queue
+                // This gives the plugin time to process the write
+                await new Promise(resolve => setTimeout(resolve, 5));
             } catch (error) {
                 console.error('[MOTOR WRITE] Queue processing error:', error);
             }
@@ -463,7 +468,7 @@ class MotorController {
 
     /**
      * Write PWM value to local BLE device
-     * Uses writeWithoutResponse for faster performance
+     * Uses writeWithoutResponse for faster performance (fire and forget)
      */
     async writeToLocalBLE(pwmValue) {
         
@@ -484,13 +489,16 @@ class MotorController {
                 return true;
             }
             
-            // Use writeWithoutResponse for 10x faster writes (5-20ms vs 50-200ms)
-            await BleClient.writeWithoutResponse(
+            // Fire and forget - don't await writeWithoutResponse
+            // Plugin queues it internally but doesn't block our code
+            BleClient.writeWithoutResponse(
                 this.deviceAddress,
                 this.SERVICE_UUID,
                 this.CHARACTERISTIC_UUID,
                 hexStringToDataView(hexValue)
-            );
+            ).catch(error => {
+                console.error('[MOTOR WRITE] ❌ Write failed:', error);
+            });
             
             this.currentPwm = pwmValue;
             return true;
