@@ -292,7 +292,7 @@ class AIVoiceControl {
             console.log(`[API RESPONSE] Full response:`, response);
             console.log(`[API RESPONSE] Transcription: "${response?.transcription || 'N/A'}"`);
             console.log(`[API RESPONSE] Assistant Response: "${response?.response || 'N/A'}"`);
-            console.log(`[API RESPONSE] New PWM Value: ${response?.newPwmValue || 'N/A'}`);
+            console.log(`[API RESPONSE] New PWM Value: ${response?.newPwmValue ?? 'N/A'}`);
             console.log(`[API RESPONSE] Processing Time: ${processingTime}ms`);
             
             if (response && response.newPwmValue !== undefined) {
