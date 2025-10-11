@@ -147,23 +147,12 @@ class AIVoiceControl {
      * Start PWM writing interval to keep BLE connection active
      */
     startPwmWriting() {
-        let lastPwmValue = null;
-        
-        // Write PWM every 100ms based on current state (matches ambient and touch modes)
+        // Write PWM every 4 seconds to keep BLE connection alive (prevents idle after 5-30 sec)
         this.pwmInterval = setInterval(async () => {
             try {
                 if (this.motorController) {
-                    const writeStart = Date.now();
                     await this.motorController.write(this.state.currentPwm);
-                    const writeTime = Date.now() - writeStart;
-                    
-                    // Only log when PWM value changes or write is slow
-                    if (this.state.currentPwm !== lastPwmValue) {
-                        console.log(`[PWM INTERVAL] Writing PWM: ${lastPwmValue} → ${this.state.currentPwm} (${writeTime}ms)`);
-                        lastPwmValue = this.state.currentPwm;
-                    } else if (writeTime > 20) {
-                        console.log(`[PWM INTERVAL] Slow write detected: ${writeTime}ms for PWM ${this.state.currentPwm}`);
-                    }
+                    console.log(`[PWM KEEP-ALIVE] BLE keep-alive write: PWM ${this.state.currentPwm}`);
                     
                     // Trigger callback for UI updates
                     if (this.config.onPwmUpdate) {
@@ -171,9 +160,9 @@ class AIVoiceControl {
                     }
                 }
             } catch (error) {
-                console.error('[AI VOICE] PWM writing error:', error);
+                console.error('[PWM KEEP-ALIVE] Error:', error);
             }
-        }, 200); // 100ms interval matches ambient and touch modes
+        }, 4000); // 4 seconds - keeps BLE active without CPU contention
     }
 
     /**
@@ -427,18 +416,26 @@ class AIVoiceControl {
     }
 
     /**
-     * Update motor PWM state (actual motor writing handled by interval)
+     * Update motor PWM state and write immediately to BLE
      */
     async updateMotorPWM(newPwm) {
-        console.log(`[MOTOR UPDATE] Requested PWM: ${newPwm}, Current PWM: ${this.state.currentPwm}`);
+        const writeStart = Date.now();
+        console.log(`[MOTOR UPDATE] API response: PWM ${this.state.currentPwm} → ${newPwm}`);
         
         const oldPwm = this.state.currentPwm;
         this.state.currentPwm = newPwm;
         
-        console.log(`[MOTOR UPDATE] PWM state updated from ${oldPwm} to ${newPwm} (motor write handled by interval)`);
-        
-        // Note: Actual motor writing is handled by the 100ms interval
-        // This ensures consistent BLE connection activity like ambient and touch modes
+        // Write immediately to BLE for responsive motor control
+        if (this.motorController) {
+            try {
+                await this.motorController.write(newPwm);
+                const writeTime = Date.now() - writeStart;
+                console.log(`[MOTOR UPDATE] ✅ Immediate write: ${oldPwm} → ${newPwm} (${writeTime}ms)`);
+            } catch (error) {
+                console.error(`[MOTOR UPDATE] ❌ Failed to write PWM:`, error);
+                return false;
+            }
+        }
         
         return true;
     }
