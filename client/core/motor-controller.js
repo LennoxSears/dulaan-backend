@@ -43,13 +43,17 @@ class MotorController {
         this.remoteService = null;
         this.remotePwm = 0; // PWM value when acting as remote
         
-        // BLE service and characteristic UUIDs
-        this.SERVICE_UUID = "0000FFE0-0000-1000-8000-00805F9B34FB";
-        this.CHARACTERISTIC_UUID = "0000FFE1-0000-1000-8000-00805F9B34FB";
+        // BLE service and characteristic UUIDs (V2.0 Protocol)
+        this.SERVICE_UUID = "9A501A2D-594F-4E2B-B123-5F739A2D594F";
+        this.CHARACTERISTIC_UUID = "9A511A2D-594F-4E2B-B123-5F739A2D594F";
         
         // Device identification
         this.TARGET_DEVICE_NAME = "XKL-Q086-BT";
         this.SCAN_TIMEOUT = 10000; // 10 seconds default
+        
+        // Protocol V2.0: Counter for replay protection
+        this.counter = 0n; // 48-bit counter (BigInt)
+        this.COUNTER_STORAGE_KEY = "ble_motor_counter";
         
         // Write queue management
         this.writeQueue = [];
@@ -72,6 +76,9 @@ class MotorController {
             await BleClient.initialize();
             console.log('BLE initialized');
             
+            // Load counter from storage
+            await this.loadCounter();
+            
             // Check if Bluetooth is enabled
             const isEnabled = await this.isBluetoothEnabled();
             if (!isEnabled) {
@@ -92,6 +99,96 @@ class MotorController {
             console.error('BLE initialization failed:', error);
             return false;
         }
+    }
+
+    /**
+     * Load counter from storage
+     */
+    async loadCounter() {
+        try {
+            if (typeof window !== 'undefined' && window.Capacitor?.Plugins?.Storage) {
+                const { value } = await window.Capacitor.Plugins.Storage.get({ 
+                    key: this.COUNTER_STORAGE_KEY 
+                });
+                
+                if (value) {
+                    this.counter = BigInt(value);
+                    console.log(`[COUNTER] Loaded from storage: ${this.counter}`);
+                } else {
+                    this.counter = 0n;
+                    console.log('[COUNTER] Initialized to 0');
+                }
+            } else {
+                this.counter = 0n;
+                console.warn('[COUNTER] Storage not available, using in-memory counter');
+            }
+        } catch (error) {
+            console.error('[COUNTER] Failed to load:', error);
+            this.counter = 0n;
+        }
+    }
+
+    /**
+     * Save counter to storage
+     */
+    async saveCounter() {
+        try {
+            if (typeof window !== 'undefined' && window.Capacitor?.Plugins?.Storage) {
+                await window.Capacitor.Plugins.Storage.set({ 
+                    key: this.COUNTER_STORAGE_KEY,
+                    value: this.counter.toString()
+                });
+                // console.log(`[COUNTER] Saved to storage: ${this.counter}`);
+            }
+        } catch (error) {
+            console.error('[COUNTER] Failed to save:', error);
+        }
+    }
+
+    /**
+     * Increment counter and save periodically
+     */
+    async incrementCounter() {
+        this.counter++;
+        
+        // Save every 256 packets (as per protocol spec)
+        if (this.counter % 256n === 0n) {
+            await this.saveCounter();
+            console.log(`[COUNTER] Saved at ${this.counter}`);
+        }
+        
+        return this.counter;
+    }
+
+    /**
+     * Build 20-byte packet for Protocol V2.0
+     * Format: cmd(1) + counter(6) + duty(1) + rsvd(8) + mic(4)
+     */
+    buildPacket(duty) {
+        const packet = new Uint8Array(20);
+        
+        // Byte 0: cmd = 0x01 (set duty)
+        packet[0] = 0x01;
+        
+        // Bytes 1-6: counter (48-bit little-endian)
+        const counter = this.counter;
+        packet[1] = Number(counter & 0xFFn);
+        packet[2] = Number((counter >> 8n) & 0xFFn);
+        packet[3] = Number((counter >> 16n) & 0xFFn);
+        packet[4] = Number((counter >> 24n) & 0xFFn);
+        packet[5] = Number((counter >> 32n) & 0xFFn);
+        packet[6] = Number((counter >> 40n) & 0xFFn);
+        
+        // Byte 7: duty (0x00-0xFF)
+        packet[7] = duty;
+        
+        // Bytes 8-15: reserved (0x00)
+        // Already initialized to 0
+        
+        // Bytes 16-19: MIC (0x00 for now)
+        // Already initialized to 0
+        
+        return packet;
     }
 
     /**
@@ -463,6 +560,7 @@ class MotorController {
 
     /**
      * Write PWM value to local BLE device
+     * Uses Protocol V2.0: 20-byte packet with counter
      * Uses fire-and-forget pattern to prevent blocking
      */
     async writeToLocalBLE(pwmValue) {
@@ -473,9 +571,6 @@ class MotorController {
         }
 
         try {
-            // Convert to hex string
-            const hexValue = this.decimalToHexString(pwmValue);
-            
             // Write to BLE characteristic
             const BleClient = getBleClient();
             if (!BleClient) {
@@ -484,13 +579,22 @@ class MotorController {
                 return true;
             }
             
+            // Increment counter
+            await this.incrementCounter();
+            
+            // Build 20-byte packet (Protocol V2.0)
+            const packet = this.buildPacket(pwmValue);
+            
+            // Convert to DataView for BLE write
+            const dataView = new DataView(packet.buffer);
+            
             // Fire and forget - don't await write
             // Plugin queues it internally but doesn't block our code
             BleClient.write(
                 this.deviceAddress,
                 this.SERVICE_UUID,
                 this.CHARACTERISTIC_UUID,
-                hexStringToDataView(hexValue)
+                dataView
             ).catch(error => {
                 console.error('[MOTOR WRITE] ❌ Write failed:', error);
             });
@@ -623,8 +727,19 @@ class MotorController {
             maxQueueLength: this.maxQueueLength,
             isProcessing: this.isProcessingQueue,
             lastWrittenPwm: this.lastWrittenPwm,
-            currentPwm: this.currentPwm
+            currentPwm: this.currentPwm,
+            counter: this.counter.toString(),
+            protocol: 'V2.0'
         };
+    }
+
+    /**
+     * Reset counter (for testing/debugging)
+     */
+    async resetCounter() {
+        this.counter = 0n;
+        await this.saveCounter();
+        console.log('[COUNTER] Reset to 0');
     }
 }
 
