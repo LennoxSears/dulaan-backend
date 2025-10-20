@@ -106,8 +106,8 @@ class MotorController {
      */
     async loadCounter() {
         try {
-            if (typeof window !== 'undefined' && window.Capacitor?.Plugins?.Storage) {
-                const { value } = await window.Capacitor.Plugins.Storage.get({ 
+            if (typeof window !== 'undefined' && window.Capacitor?.Plugins?.Preferences) {
+                const { value } = await window.Capacitor.Plugins.Preferences.get({ 
                     key: this.COUNTER_STORAGE_KEY 
                 });
                 
@@ -133,8 +133,8 @@ class MotorController {
      */
     async saveCounter() {
         try {
-            if (typeof window !== 'undefined' && window.Capacitor?.Plugins?.Storage) {
-                await window.Capacitor.Plugins.Storage.set({ 
+            if (typeof window !== 'undefined' && window.Capacitor?.Plugins?.Preferences) {
+                await window.Capacitor.Plugins.Preferences.set({ 
                     key: this.COUNTER_STORAGE_KEY,
                     value: this.counter.toString()
                 });
