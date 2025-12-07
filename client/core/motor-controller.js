@@ -474,8 +474,8 @@ class MotorController {
      */
     async write(pwmValue) {
         // Validate PWM value first
-        const pwm = Math.max(0, Math.min(255, Math.round(pwmValue)));
-        
+        let pwm = Math.max(0, Math.min(255, Math.round(pwmValue)));
+        pwm = Math.round((pwm / 255) * 10000);
         // Check if we're connected as remote to another host
         if (this.remoteService && this.remoteService.isRemote) {
             return this.writeToRemoteHost(pwm);
