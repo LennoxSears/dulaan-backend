@@ -48,7 +48,7 @@ class MotorController {
         this.CHARACTERISTIC_UUID = "9A511A2D-594F-4E2B-B123-5F739A2D594F";
         
         // Device identification
-        this.TARGET_DEVICE_NAME = "XKL-Q086-BT";
+        this.TARGET_DEVICE_NAME = "VibMotor(BLE)";
         this.SCAN_TIMEOUT = 10000; // 10 seconds default
         
         // Protocol V2.0: Counter for replay protection
