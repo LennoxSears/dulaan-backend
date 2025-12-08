@@ -43,17 +43,13 @@ class MotorController {
         this.remoteService = null;
         this.remotePwm = 0; // PWM value when acting as remote
         
-        // BLE service and characteristic UUIDs (V2.0 Protocol)
+        // BLE service and characteristic UUIDs (V3.0 Protocol)
         this.SERVICE_UUID = "9A501A2D-594F-4E2B-B123-5F739A2D594F";
         this.CHARACTERISTIC_UUID = "9A511A2D-594F-4E2B-B123-5F739A2D594F";
         
         // Device identification
         this.TARGET_DEVICE_NAME = "VibMotor(BLE)";
         this.SCAN_TIMEOUT = 10000; // 10 seconds default
-        
-        // Protocol V2.0: Counter for replay protection
-        this.counter = 0n; // 48-bit counter (BigInt)
-        this.COUNTER_STORAGE_KEY = "ble_motor_counter";
         
         // Write queue management
         this.writeQueue = [];
@@ -75,9 +71,6 @@ class MotorController {
             
             await BleClient.initialize();
             console.log('BLE initialized');
-            
-            // Load counter from storage
-            await this.loadCounter();
             
             // Check if Bluetooth is enabled
             const isEnabled = await this.isBluetoothEnabled();
@@ -102,91 +95,18 @@ class MotorController {
     }
 
     /**
-     * Load counter from storage
+     * Build 2-byte packet for Protocol V3.0
+     * Format: duty_cycle (uint16 little-endian, 0-10000 = 0.00%-100.00%)
      */
-    async loadCounter() {
-        try {
-            if (typeof window !== 'undefined' && window.Capacitor?.Plugins?.Preferences) {
-                const { value } = await window.Capacitor.Plugins.Preferences.get({ 
-                    key: this.COUNTER_STORAGE_KEY 
-                });
-                
-                if (value) {
-                    this.counter = BigInt(value);
-                    console.log(`[COUNTER] Loaded from storage: ${this.counter}`);
-                } else {
-                    this.counter = 0n;
-                    console.log('[COUNTER] Initialized to 0');
-                }
-            } else {
-                this.counter = 0n;
-                console.warn('[COUNTER] Storage not available, using in-memory counter');
-            }
-        } catch (error) {
-            console.error('[COUNTER] Failed to load:', error);
-            this.counter = 0n;
-        }
-    }
-
-    /**
-     * Save counter to storage
-     */
-    async saveCounter() {
-        try {
-            if (typeof window !== 'undefined' && window.Capacitor?.Plugins?.Preferences) {
-                await window.Capacitor.Plugins.Preferences.set({ 
-                    key: this.COUNTER_STORAGE_KEY,
-                    value: this.counter.toString()
-                });
-                // console.log(`[COUNTER] Saved to storage: ${this.counter}`);
-            }
-        } catch (error) {
-            console.error('[COUNTER] Failed to save:', error);
-        }
-    }
-
-    /**
-     * Increment counter and save periodically
-     */
-    async incrementCounter() {
-        this.counter++;
+    buildPacket(dutyCycle) {
+        const packet = new Uint8Array(2);
         
-        // Save every 256 packets (as per protocol spec)
-        if (this.counter % 256n === 0n) {
-            await this.saveCounter();
-            console.log(`[COUNTER] Saved at ${this.counter}`);
-        }
+        // Ensure duty cycle is in valid range (0-10000)
+        const duty = Math.max(0, Math.min(10000, Math.round(dutyCycle)));
         
-        return this.counter;
-    }
-
-    /**
-     * Build 20-byte packet for Protocol V2.0
-     * Format: cmd(1) + counter(6) + duty(1) + rsvd(8) + mic(4)
-     */
-    buildPacket(duty) {
-        const packet = new Uint8Array(20);
-        
-        // Byte 0: cmd = 0x01 (set duty)
-        packet[0] = 0x01;
-        
-        // Bytes 1-6: counter (48-bit little-endian)
-        const counter = this.counter;
-        packet[1] = Number(counter & 0xFFn);
-        packet[2] = Number((counter >> 8n) & 0xFFn);
-        packet[3] = Number((counter >> 16n) & 0xFFn);
-        packet[4] = Number((counter >> 24n) & 0xFFn);
-        packet[5] = Number((counter >> 32n) & 0xFFn);
-        packet[6] = Number((counter >> 40n) & 0xFFn);
-        
-        // Byte 7: duty (0x00-0xFF)
-        packet[7] = duty;
-        
-        // Bytes 8-15: reserved (0x00)
-        // Already initialized to 0
-        
-        // Bytes 16-19: MIC (0x00 for now)
-        // Already initialized to 0
+        // Bytes 0-1: duty_cycle (uint16 little-endian)
+        packet[0] = duty & 0xFF;           // Low byte
+        packet[1] = (duty >> 8) & 0xFF;    // High byte
         
         return packet;
     }
@@ -471,24 +391,26 @@ class MotorController {
      * Write PWM value to motor (0-255)
      * Automatically routes to remote host if connected as remote user
      * Uses queue to prevent BLE stack overload
+     * Converts PWM (0-255) to duty cycle (0-10000) for V3.0 protocol
      */
     async write(pwmValue) {
-        // Validate PWM value first
-        let pwm = Math.max(0, Math.min(255, Math.round(pwmValue)));
-        pwm = Math.round((pwm / 255) * 10000);
+        // Validate PWM value (0-255) and convert to duty cycle (0-10000)
+        const pwm = Math.max(0, Math.min(255, Math.round(pwmValue)));
+        const dutyCycle = Math.round((pwm / 255) * 10000);
+        
         // Check if we're connected as remote to another host
         if (this.remoteService && this.remoteService.isRemote) {
-            return this.writeToRemoteHost(pwm);
+            return this.writeToRemoteHost(dutyCycle);
         }
         
         // Skip if same as last written value (avoid duplicate writes)
-        if (pwm === this.lastWrittenPwm) {
-            // console.log(`[MOTOR WRITE] ⏭️ Skipping - same as last value (${pwm})`);
+        if (dutyCycle === this.lastWrittenPwm) {
+            // console.log(`[MOTOR WRITE] ⏭️ Skipping - same as last value (${dutyCycle})`);
             return true;
         }
         
         // Add to queue
-        this.writeQueue.push(pwm);
+        this.writeQueue.push(dutyCycle);
         
         // If queue full, remove oldest and keep latest
         if (this.writeQueue.length > this.maxQueueLength) {
@@ -559,14 +481,14 @@ class MotorController {
     }
 
     /**
-     * Write PWM value to local BLE device
-     * Uses Protocol V2.0: 20-byte packet with counter
-     * Uses fire-and-forget pattern to prevent blocking
+     * Write duty cycle to local BLE device
+     * Uses Protocol V3.0: 2-byte packet (duty cycle 0-10000)
+     * Uses writeWithoutResponse for fire-and-forget pattern
      */
-    async writeToLocalBLE(pwmValue) {
+    async writeToLocalBLE(dutyCycle) {
         
         if (!this.isConnected || !this.deviceAddress) {
-            console.warn('[MOTOR WRITE] ❌ Motor not connected, cannot write PWM value');
+            console.warn('[MOTOR WRITE] ❌ Motor not connected, cannot write duty cycle');
             return false;
         }
 
@@ -574,23 +496,19 @@ class MotorController {
             // Write to BLE characteristic
             const BleClient = getBleClient();
             if (!BleClient) {
-                console.warn('[MOTOR WRITE] ⚠️ BleClient not available - PWM value stored but not transmitted');
-                this.currentPwm = pwmValue;
+                console.warn('[MOTOR WRITE] ⚠️ BleClient not available - duty cycle stored but not transmitted');
+                this.currentPwm = dutyCycle;
                 return true;
             }
             
-            // Increment counter
-            await this.incrementCounter();
-            
-            // Build 20-byte packet (Protocol V2.0)
-            const packet = this.buildPacket(pwmValue);
+            // Build 2-byte packet (Protocol V3.0)
+            const packet = this.buildPacket(dutyCycle);
             
             // Convert to DataView for BLE write
             const dataView = new DataView(packet.buffer);
             
-            // Fire and forget - don't await write
-            // Plugin queues it internally but doesn't block our code
-            BleClient.write(
+            // Use writeWithoutResponse for fire-and-forget (V3.0 protocol requirement)
+            BleClient.writeWithoutResponse(
                 this.deviceAddress,
                 this.SERVICE_UUID,
                 this.CHARACTERISTIC_UUID,
@@ -599,7 +517,7 @@ class MotorController {
                 console.error('[MOTOR WRITE] ❌ Write failed:', error);
             });
             
-            this.currentPwm = pwmValue;
+            this.currentPwm = dutyCycle;
             return true;
         } catch (error) {
             console.error('[MOTOR WRITE] ❌ Failed to write PWM value:', error);
@@ -728,18 +646,8 @@ class MotorController {
             isProcessing: this.isProcessingQueue,
             lastWrittenPwm: this.lastWrittenPwm,
             currentPwm: this.currentPwm,
-            counter: this.counter.toString(),
-            protocol: 'V2.0'
+            protocol: 'V3.0'
         };
-    }
-
-    /**
-     * Reset counter (for testing/debugging)
-     */
-    async resetCounter() {
-        this.counter = 0n;
-        await this.saveCounter();
-        console.log('[COUNTER] Reset to 0');
     }
 }
 
