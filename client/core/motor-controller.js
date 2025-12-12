@@ -604,9 +604,59 @@ class MotorController {
             );
 
             console.log('[DEVICE INFO] ✅ Query sent successfully, waiting for notification...');
+            
+            // Fallback: If notifications don't work, try reading after a delay
+            setTimeout(async () => {
+                if (!this.deviceInfo.isReady) {
+                    console.warn('[DEVICE INFO] ⚠️ No notification received, trying READ fallback...');
+                    await this.readDeviceInfoFallback();
+                }
+            }, 1000); // Wait 1 second for notification
+            
             return true;
         } catch (error) {
             console.error('[DEVICE INFO] ❌ Failed to query device info:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Fallback: Read device info directly if notifications don't work
+     * Some devices may not support notifications properly
+     */
+    async readDeviceInfoFallback() {
+        if (!this.isConnected || !this.deviceAddress) {
+            return false;
+        }
+
+        try {
+            const BleClient = getBleClient();
+            if (!BleClient) {
+                return false;
+            }
+
+            console.log('[DEVICE INFO] 📖 Attempting to READ characteristic...');
+
+            // Read the characteristic directly
+            const result = await BleClient.read(
+                this.deviceAddress,
+                this.SERVICE_UUID,
+                this.DEVICE_INFO_CHAR_UUID
+            );
+
+            console.log('[DEVICE INFO] 📖 READ result:', result);
+
+            // Process the result (same as notification handler)
+            if (result) {
+                this.handleDeviceInfoNotification(result);
+                return true;
+            }
+        } catch (error) {
+            console.error('[DEVICE INFO] ❌ READ fallback failed:', error);
+            console.log('[DEVICE INFO] 💡 Possible reasons:');
+            console.log('  1. Device firmware not responding to query');
+            console.log('  2. Characteristic not readable');
+            console.log('  3. Device needs pairing/bonding first');
             return false;
         }
     }
@@ -722,6 +772,9 @@ class MotorController {
             return true;
         } catch (error) {
             console.error('[DEVICE INFO] ❌ Failed to start notifications:', error);
+            console.log('[DEVICE INFO] 💡 This is OK - will use READ fallback instead');
+            console.log('[DEVICE INFO] 💡 Notification error details:', error.message);
+            // Don't fail - we'll use read fallback
             return false;
         }
     }
