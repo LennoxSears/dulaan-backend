@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-12-12T09:58:38.985Z
+ * Generated on: 2025-12-12T10:07:29.710Z
  * Build type: Production
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
@@ -1214,6 +1214,13 @@ class MotorController {
             packet[1] = 0x00; // Query command
 
             const dataView = new DataView(packet.buffer);
+            
+            console.log('[DEVICE INFO] 📤 Sending query:', {
+                deviceAddress: this.deviceAddress,
+                serviceUUID: this.SERVICE_UUID,
+                charUUID: this.DEVICE_INFO_CHAR_UUID,
+                packet: Array.from(packet)
+            });
 
             // Write query to Device Info characteristic
             await BleClient.write(
@@ -1223,7 +1230,7 @@ class MotorController {
                 dataView
             );
 
-            console.log('[DEVICE INFO] 📤 Query sent, waiting for notification...');
+            console.log('[DEVICE INFO] ✅ Query sent successfully, waiting for notification...');
             return true;
         } catch (error) {
             console.error('[DEVICE INFO] ❌ Failed to query device info:', error);
@@ -1237,13 +1244,28 @@ class MotorController {
      */
     handleDeviceInfoNotification(data) {
         try {
-            // Expect 6 bytes
-            if (data.byteLength !== 6) {
-                console.warn('[DEVICE INFO] ⚠️ Invalid response length:', data.byteLength);
+            console.log('[DEVICE INFO] 📨 Notification received, data:', data);
+            
+            // Handle different data formats (DataView or ArrayBuffer)
+            let bytes;
+            if (data instanceof DataView) {
+                bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+            } else if (data instanceof ArrayBuffer) {
+                bytes = new Uint8Array(data);
+            } else if (data.buffer) {
+                bytes = new Uint8Array(data.buffer);
+            } else {
+                console.error('[DEVICE INFO] ❌ Unknown data format:', typeof data);
                 return;
             }
-
-            const bytes = new Uint8Array(data.buffer);
+            
+            console.log('[DEVICE INFO] 📊 Parsed bytes:', Array.from(bytes));
+            
+            // Expect 6 bytes
+            if (bytes.length !== 6) {
+                console.warn('[DEVICE INFO] ⚠️ Invalid response length:', bytes.length);
+                return;
+            }
 
             // Validate header and command
             if (bytes[0] !== 0xB0 || bytes[1] !== 0x00) {
@@ -1256,6 +1278,13 @@ class MotorController {
             const fwVersionLow = bytes[3];
             const fwVersionHigh = bytes[4];
             const batteryLevel = bytes[5];
+            
+            console.log('[DEVICE INFO] 🔍 Parsed values:', {
+                motorCount,
+                fwVersionLow,
+                fwVersionHigh,
+                batteryLevel
+            });
 
             // Update device info (accessible via window.dulaan.motor.deviceInfo)
             this.deviceInfo = {
@@ -1299,15 +1328,24 @@ class MotorController {
                 return false;
             }
 
+            console.log('[DEVICE INFO] 🔔 Starting notifications...', {
+                deviceAddress: this.deviceAddress,
+                serviceUUID: this.SERVICE_UUID,
+                charUUID: this.DEVICE_INFO_CHAR_UUID
+            });
+            
             // Start notifications on Device Info characteristic
             await BleClient.startNotifications(
                 this.deviceAddress,
                 this.SERVICE_UUID,
                 this.DEVICE_INFO_CHAR_UUID,
-                (data) => this.handleDeviceInfoNotification(data)
+                (data) => {
+                    console.log('[DEVICE INFO] 🔔 Notification callback triggered!');
+                    this.handleDeviceInfoNotification(data);
+                }
             );
 
-            console.log('[DEVICE INFO] 🔔 Notifications enabled');
+            console.log('[DEVICE INFO] ✅ Notifications enabled successfully');
             return true;
         } catch (error) {
             console.error('[DEVICE INFO] ❌ Failed to start notifications:', error);
