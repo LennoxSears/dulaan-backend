@@ -323,14 +323,14 @@ const isActive = motorController.isPeriodicBatteryQueryActive();
 ```
 
 #### 2. Global Window Parameter
-Battery info is now automatically exposed on `window.dulaanBatteryInfo` for easy UI access.
+Battery info is now automatically exposed on `window.dulaan.motor.deviceInfo` for easy UI access.
 
 **Global Parameter Structure:**
 ```javascript
-window.dulaanBatteryInfo = {
-    battery: 85,              // Battery level (0-100%)
+window.dulaan.motor.deviceInfo = {
+    battery: 85,              // Battery level (0-100%) - alias for batteryLevel
     batteryLevel: 85,         // Alias for clarity
-    firmware: "1.2",          // Firmware version
+    firmware: "1.2",          // Firmware version - alias for firmwareVersion
     firmwareVersion: "1.2",   // Alias
     motorCount: 1,            // Number of motors
     lastUpdated: "2024-12-12T08:56:00.000Z"  // ISO timestamp
@@ -341,9 +341,9 @@ window.dulaanBatteryInfo = {
 
 #### Simple UI Update (No Callback Needed)
 ```javascript
-// Just read from window.dulaanBatteryInfo
+// Just read from window.dulaan.motor.deviceInfo
 function updateBatteryUI() {
-    const info = window.dulaanBatteryInfo;
+    const info = window.dulaan.motor.deviceInfo;
     if (info) {
         document.getElementById('battery').textContent = info.battery + '%';
         document.getElementById('firmware').textContent = info.firmware;
@@ -360,10 +360,10 @@ function BatteryDisplay() {
     const [battery, setBattery] = useState(null);
     
     useEffect(() => {
-        // Poll window.dulaanBatteryInfo
+        // Poll window.dulaan.motor.deviceInfo
         const interval = setInterval(() => {
-            if (window.dulaanBatteryInfo) {
-                setBattery(window.dulaanBatteryInfo.battery);
+            if (window.dulaan.motor.deviceInfo) {
+                setBattery(window.dulaan.motor.deviceInfo.battery);
             }
         }, 1000);
         
@@ -392,11 +392,11 @@ export default {
         };
     },
     mounted() {
-        // Poll window.dulaanBatteryInfo
+        // Poll window.dulaan.motor.deviceInfo
         this.interval = setInterval(() => {
-            if (window.dulaanBatteryInfo) {
-                this.battery = window.dulaanBatteryInfo.battery;
-                this.firmware = window.dulaanBatteryInfo.firmware;
+            if (window.dulaan.motor.deviceInfo) {
+                this.battery = window.dulaan.motor.deviceInfo.battery;
+                this.firmware = window.dulaan.motor.deviceInfo.firmware;
             }
         }, 1000);
     },
@@ -426,16 +426,16 @@ window.dulaan.motor.stopPeriodicBatteryQuery();
 // Query manually when needed
 await window.dulaan.motor.queryDeviceInfo();
 
-// Check window.dulaanBatteryInfo after a moment
+// Check window.dulaan.motor.deviceInfo after a moment
 setTimeout(() => {
-    console.log(window.dulaanBatteryInfo);
+    console.log(window.dulaan.motor.deviceInfo);
 }, 500);
 ```
 
 ### Benefits
 
 1. **Zero Configuration**: Works automatically on connection
-2. **Easy UI Integration**: Just read `window.dulaanBatteryInfo`
+2. **Easy UI Integration**: Just read `window.dulaan.motor.deviceInfo`
 3. **No Callbacks Needed**: Simple polling approach
 4. **Always Up-to-Date**: Automatic 30-second updates
 5. **Flexible**: Can customize interval or disable
@@ -451,10 +451,10 @@ motorController.setBatteryUpdateCallback((info) => {
 
 **New Way (Simpler):**
 ```javascript
-// Just read window.dulaanBatteryInfo whenever you need it
+// Just read window.dulaan.motor.deviceInfo whenever you need it
 setInterval(() => {
-    if (window.dulaanBatteryInfo) {
-        updateUI(window.dulaanBatteryInfo);
+    if (window.dulaan.motor.deviceInfo) {
+        updateUI(window.dulaan.motor.deviceInfo);
     }
 }, 1000);
 ```
@@ -495,7 +495,7 @@ console.log('Query interval:',
 
 // Check last update time
 console.log('Last updated:', 
-    window.dulaanBatteryInfo?.lastUpdated);
+    window.dulaan.motor.deviceInfo?.lastUpdated);
 
 // Monitor queries in console
 // Look for: [DEVICE INFO] 🔄 Periodic query started

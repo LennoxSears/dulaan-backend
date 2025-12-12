@@ -1,12 +1,14 @@
 # Battery Info - Quick Start Guide
 
-## TL;DR - Just Read This Global Variable
+## TL;DR - Just Read This Property
 
 ```javascript
 // After connecting, battery info is automatically available here:
-window.dulaanBatteryInfo = {
+window.dulaan.motor.deviceInfo = {
     battery: 85,              // Battery percentage (0-100)
+    batteryLevel: 85,         // Same as battery
     firmware: "1.2",          // Firmware version
+    firmwareVersion: "1.2",   // Same as firmware
     motorCount: 1,            // Number of motors
     lastUpdated: "2024-12-12T08:56:00.000Z"
 };
@@ -20,8 +22,9 @@ await window.dulaan.motor.connect();
 
 // 2. Read battery info (updates automatically every 30 seconds)
 function showBattery() {
-    if (window.dulaanBatteryInfo) {
-        console.log('Battery:', window.dulaanBatteryInfo.battery + '%');
+    const info = window.dulaan.motor.deviceInfo;
+    if (info && info.battery !== null) {
+        console.log('Battery:', info.battery + '%');
     }
 }
 
@@ -37,14 +40,15 @@ function BatteryDisplay() {
     
     useEffect(() => {
         const interval = setInterval(() => {
-            if (window.dulaanBatteryInfo) {
-                setBattery(window.dulaanBatteryInfo.battery);
+            const info = window.dulaan?.motor?.deviceInfo;
+            if (info && info.battery !== null) {
+                setBattery(info.battery);
             }
         }, 1000);
         return () => clearInterval(interval);
     }, []);
     
-    return <div>Battery: {battery}%</div>;
+    return <div>Battery: {battery !== null ? `${battery}%` : '--'}</div>;
 }
 ```
 
@@ -56,11 +60,10 @@ function BatteryDisplay() {
 
 <script>
     setInterval(() => {
-        if (window.dulaanBatteryInfo) {
-            document.getElementById('battery').textContent = 
-                window.dulaanBatteryInfo.battery + '%';
-            document.getElementById('firmware').textContent = 
-                window.dulaanBatteryInfo.firmware;
+        const info = window.dulaan?.motor?.deviceInfo;
+        if (info && info.battery !== null) {
+            document.getElementById('battery').textContent = info.battery + '%';
+            document.getElementById('firmware').textContent = info.firmware;
         }
     }, 1000);
 </script>
@@ -82,13 +85,13 @@ await window.dulaan.motor.queryDeviceInfo();
 ## How It Works
 
 1. **On Connection**: Automatically starts querying every 30 seconds
-2. **Updates**: `window.dulaanBatteryInfo` is updated with each response
-3. **Your UI**: Just read the global variable whenever you need it
+2. **Updates**: `window.dulaan.motor.deviceInfo` is updated with each response
+3. **Your UI**: Just read the property whenever you need it
 4. **On Disconnect**: Automatically stops querying
 
 ## That's It!
 
-No callbacks, no complex setup. Just connect and read `window.dulaanBatteryInfo`.
+No callbacks, no complex setup. Just connect and read `window.dulaan.motor.deviceInfo`.
 
 ---
 

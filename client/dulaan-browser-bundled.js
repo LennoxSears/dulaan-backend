@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-12-12T08:56:03.042Z
+ * Generated on: 2025-12-12T09:52:39.957Z
  * Build type: Production
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
@@ -1253,25 +1253,15 @@ class MotorController {
             const fwVersionHigh = bytes[4];
             const batteryLevel = bytes[5];
 
-            // Update device info
+            // Update device info (accessible via window.dulaan.motor.deviceInfo)
             this.deviceInfo = {
                 motorCount: motorCount,
                 firmwareVersion: `${fwVersionHigh}.${fwVersionLow}`,
                 batteryLevel: batteryLevel,
+                battery: batteryLevel, // Alias for convenience
+                firmware: `${fwVersionHigh}.${fwVersionLow}`, // Alias for convenience
                 lastUpdated: new Date().toISOString()
             };
-
-            // Update global window parameter for easy UI access
-            if (typeof window !== 'undefined') {
-                window.dulaanBatteryInfo = {
-                    battery: batteryLevel,
-                    batteryLevel: batteryLevel, // Alias for clarity
-                    firmware: this.deviceInfo.firmwareVersion,
-                    firmwareVersion: this.deviceInfo.firmwareVersion, // Alias
-                    motorCount: motorCount,
-                    lastUpdated: this.deviceInfo.lastUpdated
-                };
-            }
 
             console.log('[DEVICE INFO] 📥 Received:', {
                 motorCount,
