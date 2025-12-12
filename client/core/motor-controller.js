@@ -64,6 +64,10 @@ class MotorController {
         };
         this.onBatteryUpdate = null; // Callback for battery updates
         
+        // Periodic battery query
+        this.batteryQueryInterval = null;
+        this.batteryQueryIntervalMs = 30000; // Default: 30 seconds
+        
         // Write queue management
         this.writeQueue = [];
         this.maxQueueLength = 10; // Handle 1 second of 100ms interval writes
@@ -379,8 +383,8 @@ class MotorController {
             // Set up device info notifications (V3.0 protocol)
             try {
                 await this.startDeviceInfoNotifications();
-                // Query device info immediately after connection
-                await this.queryDeviceInfo();
+                // Start periodic battery queries (default: 30 seconds)
+                this.startPeriodicBatteryQuery();
             } catch (error) {
                 console.warn('[DEVICE INFO] ⚠️ Failed to set up device info:', error);
                 // Don't fail connection if device info setup fails
@@ -399,6 +403,9 @@ class MotorController {
      */
     async disconnect() {
         try {
+            // Stop periodic battery queries
+            this.stopPeriodicBatteryQuery();
+            
             // Stop device info notifications before disconnecting
             await this.stopDeviceInfoNotifications();
             
@@ -627,6 +634,18 @@ class MotorController {
                 lastUpdated: new Date().toISOString()
             };
 
+            // Update global window parameter for easy UI access
+            if (typeof window !== 'undefined') {
+                window.dulaanBatteryInfo = {
+                    battery: batteryLevel,
+                    batteryLevel: batteryLevel, // Alias for clarity
+                    firmware: this.deviceInfo.firmwareVersion,
+                    firmwareVersion: this.deviceInfo.firmwareVersion, // Alias
+                    motorCount: motorCount,
+                    lastUpdated: this.deviceInfo.lastUpdated
+                };
+            }
+
             console.log('[DEVICE INFO] 📥 Received:', {
                 motorCount,
                 firmwareVersion: this.deviceInfo.firmwareVersion,
@@ -698,6 +717,56 @@ class MotorController {
         } catch (error) {
             console.error('[DEVICE INFO] ❌ Failed to stop notifications:', error);
         }
+    }
+
+    /**
+     * Start periodic battery info queries
+     * @param {number} intervalMs - Query interval in milliseconds (default: 30000 = 30 seconds)
+     */
+    startPeriodicBatteryQuery(intervalMs = null) {
+        // Stop existing interval if any
+        this.stopPeriodicBatteryQuery();
+
+        // Use provided interval or default
+        if (intervalMs !== null) {
+            this.batteryQueryIntervalMs = intervalMs;
+        }
+
+        // Query immediately
+        this.queryDeviceInfo().catch(error => {
+            console.warn('[DEVICE INFO] ⚠️ Initial query failed:', error);
+        });
+
+        // Set up periodic query
+        this.batteryQueryInterval = setInterval(() => {
+            if (this.isConnected) {
+                this.queryDeviceInfo().catch(error => {
+                    console.warn('[DEVICE INFO] ⚠️ Periodic query failed:', error);
+                });
+            } else {
+                console.warn('[DEVICE INFO] ⚠️ Device not connected, skipping query');
+            }
+        }, this.batteryQueryIntervalMs);
+
+        console.log(`[DEVICE INFO] 🔄 Periodic query started (interval: ${this.batteryQueryIntervalMs}ms)`);
+    }
+
+    /**
+     * Stop periodic battery info queries
+     */
+    stopPeriodicBatteryQuery() {
+        if (this.batteryQueryInterval) {
+            clearInterval(this.batteryQueryInterval);
+            this.batteryQueryInterval = null;
+            console.log('[DEVICE INFO] ⏹️ Periodic query stopped');
+        }
+    }
+
+    /**
+     * Check if periodic battery query is active
+     */
+    isPeriodicBatteryQueryActive() {
+        return this.batteryQueryInterval !== null;
     }
 
     /**

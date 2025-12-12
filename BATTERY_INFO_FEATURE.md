@@ -291,3 +291,218 @@ If notification setup fails during connection, the connection will still succeed
 **Protocol Version:** V3.0
 **Status:** ✅ Complete
 **Next Step:** Deploy and test on device
+
+---
+
+## Update: Automatic Periodic Queries & Global Window Parameter
+
+### New Features (2024-12-12)
+
+#### 1. Automatic Periodic Battery Queries
+The motor controller now automatically queries battery info at regular intervals (default: 30 seconds).
+
+**Automatic Behavior:**
+- Starts automatically on connection
+- Queries immediately, then every 30 seconds
+- Stops automatically on disconnection
+- Configurable interval
+
+**Methods:**
+```javascript
+// Start with default interval (30 seconds)
+motorController.startPeriodicBatteryQuery();
+
+// Start with custom interval (e.g., 60 seconds)
+motorController.startPeriodicBatteryQuery(60000);
+
+// Stop periodic queries
+motorController.stopPeriodicBatteryQuery();
+
+// Check if active
+const isActive = motorController.isPeriodicBatteryQueryActive();
+```
+
+#### 2. Global Window Parameter
+Battery info is now automatically exposed on `window.dulaanBatteryInfo` for easy UI access.
+
+**Global Parameter Structure:**
+```javascript
+window.dulaanBatteryInfo = {
+    battery: 85,              // Battery level (0-100%)
+    batteryLevel: 85,         // Alias for clarity
+    firmware: "1.2",          // Firmware version
+    firmwareVersion: "1.2",   // Alias
+    motorCount: 1,            // Number of motors
+    lastUpdated: "2024-12-12T08:56:00.000Z"  // ISO timestamp
+};
+```
+
+### Usage Examples
+
+#### Simple UI Update (No Callback Needed)
+```javascript
+// Just read from window.dulaanBatteryInfo
+function updateBatteryUI() {
+    const info = window.dulaanBatteryInfo;
+    if (info) {
+        document.getElementById('battery').textContent = info.battery + '%';
+        document.getElementById('firmware').textContent = info.firmware;
+    }
+}
+
+// Update UI every second (battery info updates every 30 seconds automatically)
+setInterval(updateBatteryUI, 1000);
+```
+
+#### React Component (Simple)
+```jsx
+function BatteryDisplay() {
+    const [battery, setBattery] = useState(null);
+    
+    useEffect(() => {
+        // Poll window.dulaanBatteryInfo
+        const interval = setInterval(() => {
+            if (window.dulaanBatteryInfo) {
+                setBattery(window.dulaanBatteryInfo.battery);
+            }
+        }, 1000);
+        
+        return () => clearInterval(interval);
+    }, []);
+    
+    return <div>Battery: {battery !== null ? `${battery}%` : 'Unknown'}</div>;
+}
+```
+
+#### Vue Component (Simple)
+```vue
+<template>
+    <div>
+        <div>Battery: {{ battery }}%</div>
+        <div>Firmware: {{ firmware }}</div>
+    </div>
+</template>
+
+<script>
+export default {
+    data() {
+        return {
+            battery: null,
+            firmware: null
+        };
+    },
+    mounted() {
+        // Poll window.dulaanBatteryInfo
+        this.interval = setInterval(() => {
+            if (window.dulaanBatteryInfo) {
+                this.battery = window.dulaanBatteryInfo.battery;
+                this.firmware = window.dulaanBatteryInfo.firmware;
+            }
+        }, 1000);
+    },
+    beforeUnmount() {
+        clearInterval(this.interval);
+    }
+};
+</script>
+```
+
+#### Custom Query Interval
+```javascript
+// Connect with custom 60-second interval
+await window.dulaan.motor.connect();
+
+// Change interval after connection
+window.dulaan.motor.stopPeriodicBatteryQuery();
+window.dulaan.motor.startPeriodicBatteryQuery(60000); // 60 seconds
+```
+
+#### Manual Control
+```javascript
+// Connect without automatic queries
+await window.dulaan.motor.connect();
+window.dulaan.motor.stopPeriodicBatteryQuery();
+
+// Query manually when needed
+await window.dulaan.motor.queryDeviceInfo();
+
+// Check window.dulaanBatteryInfo after a moment
+setTimeout(() => {
+    console.log(window.dulaanBatteryInfo);
+}, 500);
+```
+
+### Benefits
+
+1. **Zero Configuration**: Works automatically on connection
+2. **Easy UI Integration**: Just read `window.dulaanBatteryInfo`
+3. **No Callbacks Needed**: Simple polling approach
+4. **Always Up-to-Date**: Automatic 30-second updates
+5. **Flexible**: Can customize interval or disable
+
+### Migration from Callback Approach
+
+**Old Way (Still Works):**
+```javascript
+motorController.setBatteryUpdateCallback((info) => {
+    updateUI(info);
+});
+```
+
+**New Way (Simpler):**
+```javascript
+// Just read window.dulaanBatteryInfo whenever you need it
+setInterval(() => {
+    if (window.dulaanBatteryInfo) {
+        updateUI(window.dulaanBatteryInfo);
+    }
+}, 1000);
+```
+
+### Configuration
+
+**Default Settings:**
+- Query interval: 30 seconds
+- Auto-start on connection: Yes
+- Auto-stop on disconnect: Yes
+
+**Customize:**
+```javascript
+// Change default interval before connecting
+window.dulaan.motor.batteryQueryIntervalMs = 60000; // 60 seconds
+
+// Or pass to startPeriodicBatteryQuery
+window.dulaan.motor.startPeriodicBatteryQuery(60000);
+```
+
+### Performance Considerations
+
+- **Polling Frequency**: UI polling (1 second) is independent of BLE queries (30 seconds)
+- **BLE Traffic**: Only queries every 30 seconds (configurable)
+- **Memory**: Minimal - single global object
+- **CPU**: Negligible - simple object read
+
+### Debugging
+
+```javascript
+// Check if periodic queries are active
+console.log('Periodic queries active:', 
+    window.dulaan.motor.isPeriodicBatteryQueryActive());
+
+// Check current interval
+console.log('Query interval:', 
+    window.dulaan.motor.batteryQueryIntervalMs + 'ms');
+
+// Check last update time
+console.log('Last updated:', 
+    window.dulaanBatteryInfo?.lastUpdated);
+
+// Monitor queries in console
+// Look for: [DEVICE INFO] 🔄 Periodic query started
+// Look for: [DEVICE INFO] 📥 Received: ...
+```
+
+---
+
+**Updated:** 2024-12-12
+**Bundle Size:** 157.8 KB (+2.4 KB for periodic queries)
