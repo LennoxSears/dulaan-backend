@@ -1,6 +1,6 @@
 /**
  * Dulaan Browser Bundle - Auto-generated from modular sources
- * Generated on: 2025-12-08T02:31:55.313Z
+ * Generated on: 2025-12-12T08:36:18.380Z
  * Build type: Production
  * 
  * This file combines all modular ES6 files into a single browser-compatible bundle.
@@ -672,11 +672,24 @@ class MotorController {
         
         // BLE service and characteristic UUIDs (V3.0 Protocol)
         this.SERVICE_UUID = "9A501A2D-594F-4E2B-B123-5F739A2D594F";
-        this.CHARACTERISTIC_UUID = "9A511A2D-594F-4E2B-B123-5F739A2D594F";
+        this.MOTOR_CONTROL_CHAR_UUID = "9A511A2D-594F-4E2B-B123-5F739A2D594F";
+        this.DEVICE_INFO_CHAR_UUID = "9A521A2D-594F-4E2B-B123-5F739A2D594F";
+        
+        // Keep backward compatibility
+        this.CHARACTERISTIC_UUID = this.MOTOR_CONTROL_CHAR_UUID;
         
         // Device identification
         this.TARGET_DEVICE_NAME = "VibMotor(BLE)";
         this.SCAN_TIMEOUT = 10000; // 10 seconds default
+        
+        // Device info (from V3.0 protocol)
+        this.deviceInfo = {
+            motorCount: null,
+            firmwareVersion: null,
+            batteryLevel: null,
+            lastUpdated: null
+        };
+        this.onBatteryUpdate = null; // Callback for battery updates
         
         // Write queue management
         this.writeQueue = [];
@@ -989,6 +1002,17 @@ class MotorController {
             await BleClient.connect(this.deviceAddress, disconnectCallback);
             this.isConnected = true;
             console.log('Connected to motor device:', this.deviceAddress);
+            
+            // Set up device info notifications (V3.0 protocol)
+            try {
+                await this.startDeviceInfoNotifications();
+                // Query device info immediately after connection
+                await this.queryDeviceInfo();
+            } catch (error) {
+                console.warn('[DEVICE INFO] ⚠️ Failed to set up device info:', error);
+                // Don't fail connection if device info setup fails
+            }
+            
             return true;
         } catch (error) {
             console.error('Failed to connect to motor device:', error);
@@ -1002,6 +1026,9 @@ class MotorController {
      */
     async disconnect() {
         try {
+            // Stop device info notifications before disconnecting
+            await this.stopDeviceInfoNotifications();
+            
             const BleClient = getBleClient();
             if (this.deviceAddress && BleClient) {
                 await BleClient.disconnect(this.deviceAddress);
@@ -1152,7 +1179,153 @@ class MotorController {
         }
     }
 
+    /**
+     * Query device information (battery, firmware version, motor count)
+     * Protocol V3.0: Send 2-byte query request [0xB0, 0x00]
+     * Response will be received via notification
+     */
+    async queryDeviceInfo() {
+        if (!this.isConnected || !this.deviceAddress) {
+            console.warn('[DEVICE INFO] ❌ Motor not connected, cannot query device info');
+            return false;
+        }
 
+        try {
+            const BleClient = getBleClient();
+            if (!BleClient) {
+                console.warn('[DEVICE INFO] ⚠️ BleClient not available');
+                return false;
+            }
+
+            // Build query packet: [0xB0, 0x00]
+            const packet = new Uint8Array(2);
+            packet[0] = 0xB0; // Protocol header
+            packet[1] = 0x00; // Query command
+
+            const dataView = new DataView(packet.buffer);
+
+            // Write query to Device Info characteristic
+            await BleClient.write(
+                this.deviceAddress,
+                this.SERVICE_UUID,
+                this.DEVICE_INFO_CHAR_UUID,
+                dataView
+            );
+
+            console.log('[DEVICE INFO] 📤 Query sent, waiting for notification...');
+            return true;
+        } catch (error) {
+            console.error('[DEVICE INFO] ❌ Failed to query device info:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Handle device info notification response
+     * Protocol V3.0: 6-byte response [0xB0, 0x00, motor_count, fw_low, fw_high, battery]
+     */
+    handleDeviceInfoNotification(data) {
+        try {
+            // Expect 6 bytes
+            if (data.byteLength !== 6) {
+                console.warn('[DEVICE INFO] ⚠️ Invalid response length:', data.byteLength);
+                return;
+            }
+
+            const bytes = new Uint8Array(data.buffer);
+
+            // Validate header and command
+            if (bytes[0] !== 0xB0 || bytes[1] !== 0x00) {
+                console.warn('[DEVICE INFO] ⚠️ Invalid header/command:', bytes[0], bytes[1]);
+                return;
+            }
+
+            // Parse device info
+            const motorCount = bytes[2];
+            const fwVersionLow = bytes[3];
+            const fwVersionHigh = bytes[4];
+            const batteryLevel = bytes[5];
+
+            // Update device info
+            this.deviceInfo = {
+                motorCount: motorCount,
+                firmwareVersion: `${fwVersionHigh}.${fwVersionLow}`,
+                batteryLevel: batteryLevel,
+                lastUpdated: new Date().toISOString()
+            };
+
+            console.log('[DEVICE INFO] 📥 Received:', {
+                motorCount,
+                firmwareVersion: this.deviceInfo.firmwareVersion,
+                batteryLevel: `${batteryLevel}%`
+            });
+
+            // Trigger callback if set
+            if (this.onBatteryUpdate) {
+                this.onBatteryUpdate(this.deviceInfo);
+            }
+        } catch (error) {
+            console.error('[DEVICE INFO] ❌ Failed to parse notification:', error);
+        }
+    }
+
+    /**
+     * Start listening for device info notifications
+     */
+    async startDeviceInfoNotifications() {
+        if (!this.isConnected || !this.deviceAddress) {
+            console.warn('[DEVICE INFO] ❌ Motor not connected');
+            return false;
+        }
+
+        try {
+            const BleClient = getBleClient();
+            if (!BleClient) {
+                console.warn('[DEVICE INFO] ⚠️ BleClient not available');
+                return false;
+            }
+
+            // Start notifications on Device Info characteristic
+            await BleClient.startNotifications(
+                this.deviceAddress,
+                this.SERVICE_UUID,
+                this.DEVICE_INFO_CHAR_UUID,
+                (data) => this.handleDeviceInfoNotification(data)
+            );
+
+            console.log('[DEVICE INFO] 🔔 Notifications enabled');
+            return true;
+        } catch (error) {
+            console.error('[DEVICE INFO] ❌ Failed to start notifications:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Stop listening for device info notifications
+     */
+    async stopDeviceInfoNotifications() {
+        if (!this.deviceAddress) {
+            return;
+        }
+
+        try {
+            const BleClient = getBleClient();
+            if (!BleClient) {
+                return;
+            }
+
+            await BleClient.stopNotifications(
+                this.deviceAddress,
+                this.SERVICE_UUID,
+                this.DEVICE_INFO_CHAR_UUID
+            );
+
+            console.log('[DEVICE INFO] 🔕 Notifications disabled');
+        } catch (error) {
+            console.error('[DEVICE INFO] ❌ Failed to stop notifications:', error);
+        }
+    }
 
     /**
      * Get current PWM value (local or remote depending on mode)
@@ -1275,6 +1448,41 @@ class MotorController {
             currentPwm: this.currentPwm,
             protocol: 'V3.0'
         };
+    }
+
+    /**
+     * Get device information (battery, firmware, motor count)
+     */
+    getDeviceInfo() {
+        return { ...this.deviceInfo };
+    }
+
+    /**
+     * Get battery level (0-100%)
+     */
+    getBatteryLevel() {
+        return this.deviceInfo.batteryLevel;
+    }
+
+    /**
+     * Get firmware version
+     */
+    getFirmwareVersion() {
+        return this.deviceInfo.firmwareVersion;
+    }
+
+    /**
+     * Get motor count
+     */
+    getMotorCount() {
+        return this.deviceInfo.motorCount;
+    }
+
+    /**
+     * Set battery update callback
+     */
+    setBatteryUpdateCallback(callback) {
+        this.onBatteryUpdate = callback;
     }
 }
 
