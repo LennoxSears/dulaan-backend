@@ -56,11 +56,15 @@ class MotorController {
         this.SCAN_TIMEOUT = 10000; // 10 seconds default
         
         // Device info (from V3.0 protocol)
+        // Accessible via window.dulaan.motor.deviceInfo
         this.deviceInfo = {
             motorCount: null,
             firmwareVersion: null,
             batteryLevel: null,
-            lastUpdated: null
+            battery: null,        // Alias for batteryLevel
+            firmware: null,       // Alias for firmwareVersion
+            lastUpdated: null,
+            isReady: false        // True when first data received
         };
         this.onBatteryUpdate = null; // Callback for battery updates
         
@@ -633,7 +637,8 @@ class MotorController {
                 batteryLevel: batteryLevel,
                 battery: batteryLevel, // Alias for convenience
                 firmware: `${fwVersionHigh}.${fwVersionLow}`, // Alias for convenience
-                lastUpdated: new Date().toISOString()
+                lastUpdated: new Date().toISOString(),
+                isReady: true // Data has been received
             };
 
             console.log('[DEVICE INFO] 📥 Received:', {
@@ -915,6 +920,13 @@ class MotorController {
      */
     setBatteryUpdateCallback(callback) {
         this.onBatteryUpdate = callback;
+    }
+
+    /**
+     * Check if device info is ready (has been received at least once)
+     */
+    isDeviceInfoReady() {
+        return this.deviceInfo.isReady === true;
     }
 }
 
